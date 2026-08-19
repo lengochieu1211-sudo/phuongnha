@@ -345,7 +345,6 @@ export class RaceEngine {
       clearInterval(this.countdownTimer);
       this.countdownTimer = null;
     }
-    raceAudio.stopEngine();
-    raceAudio.setDriftSound(false);
+    raceAudio.stopAll();
   }
 }

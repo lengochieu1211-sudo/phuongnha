@@ -20,9 +20,24 @@ export class RaceAudioEngine {
 
   private isMuted: boolean = false;
   private isEngineRunning: boolean = false;
+  private pendingTimers = new Set<ReturnType<typeof setTimeout>>();
 
   constructor() {
     // Lazy init on first user interaction
+  }
+
+  private schedule(fn: () => void, delayMs: number) {
+    const id = setTimeout(() => {
+      this.pendingTimers.delete(id);
+      fn();
+    }, delayMs);
+    this.pendingTimers.add(id);
+    return id;
+  }
+
+  private clearScheduledSounds() {
+    this.pendingTimers.forEach((id) => clearTimeout(id));
+    this.pendingTimers.clear();
   }
 
   private initCtx() {
@@ -262,7 +277,7 @@ export class RaceAudioEngine {
 
     const freqs = [659.25, 880, 1318.5]; // E5, A5, E6
     freqs.forEach((f, i) => {
-      setTimeout(() => {
+      this.schedule(() => {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -326,13 +341,43 @@ export class RaceAudioEngine {
   /**
    * Final Lap Siren / Fanfare
    */
+  public stopAll() {
+    this.stopEngine();
+    this.clearScheduledSounds();
+    try {
+      if (this.driftGain && this.ctx) {
+        this.driftGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.driftGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        this.driftGain.disconnect();
+      }
+      this.driftGain = null;
+      if (this.driftNoiseNode) {
+        try { this.driftNoiseNode.stop(); } catch {}
+        this.driftNoiseNode.disconnect();
+        this.driftNoiseNode = null;
+      }
+      if (this.nitroOsc) {
+        try { this.nitroOsc.stop(); } catch {}
+        this.nitroOsc.disconnect();
+        this.nitroOsc = null;
+      }
+      if (this.nitroGain) {
+        this.nitroGain.disconnect();
+        this.nitroGain = null;
+      }
+      if (this.ctx?.state === 'running') {
+        void this.ctx.suspend().catch(() => undefined);
+      }
+    } catch {}
+  }
+
   public playFinalLapWarning() {
     this.initCtx();
     if (!this.ctx || this.isMuted) return;
 
     const notes = [440, 554.37, 659.25, 880];
     notes.forEach((f, idx) => {
-      setTimeout(() => {
+      this.schedule(() => {
         if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();

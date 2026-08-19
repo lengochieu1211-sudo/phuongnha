@@ -59,7 +59,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       scene.environment = createProceduralRaceEnvironment(track.environmentType);
     }
 
-    const camera = new THREE.PerspectiveCamera(60, width / height, 0.5, 1200);
+    const camera = new THREE.PerspectiveCamera(54, width / height, 0.5, 1400);
     cameraRef.current = camera;
 
     // 2. WebGL Renderer
@@ -94,7 +94,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     }
 
     // 4. Build 3D Track Mesh & Environment Props
-    build3DTrackMesh(scene, engine, profile);
+    build3DTrackMesh(scene, engine, profile, track);
     buildScenery(scene, track, engine, profile);
 
     // 5. Build Player 3D Car
@@ -341,17 +341,17 @@ function updateCameraPosition(
 ) {
   // Keep the car visually prominent on phones. Nitro widens the view, but not so
   // much that the player car becomes tiny.
-  const fovTarget = isNitro ? 70 : 60;
+  const fovTarget = isNitro ? 62 : 54;
   camera.fov += (fovTarget - camera.fov) * 0.1;
   camera.updateProjectionMatrix();
 
   switch (viewMode) {
     case 'close_chase': {
-      const camX = px - tangent.x * 5.4;
-      const camY = py + 2.2;
-      const camZ = pz - tangent.z * 5.4;
-      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.18);
-      camera.lookAt(px + tangent.x * 5.5, py + 1.0, pz + tangent.z * 5.5);
+      const camX = px - tangent.x * 4.05;
+      const camY = py + 1.75;
+      const camZ = pz - tangent.z * 4.05;
+      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.2);
+      camera.lookAt(px + tangent.x * 4.2, py + 0.9, pz + tangent.z * 4.2);
       break;
     }
     case 'hood': {
@@ -381,11 +381,11 @@ function updateCameraPosition(
     }
     case 'chase':
     default: {
-      const camX = px - tangent.x * 7.2;
-      const camY = py + 2.9;
-      const camZ = pz - tangent.z * 7.2;
-      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.14);
-      camera.lookAt(px + tangent.x * 6.5, py + 1.15, pz + tangent.z * 6.5);
+      const camX = px - tangent.x * 5.15;
+      const camY = py + 2.1;
+      const camZ = pz - tangent.z * 5.15;
+      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.16);
+      camera.lookAt(px + tangent.x * 4.8, py + 1.02, pz + tangent.z * 4.8);
       break;
     }
   }
@@ -420,7 +420,7 @@ function setupEnvironmentTheme(scene: THREE.Scene, track: RacingTrackConfig) {
   }
 }
 
-function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: GraphicsProfile) {
+function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: GraphicsProfile, track: RacingTrackConfig) {
   const steps = 180;
   const roadWidth = 24;
   const vertices: number[] = [];
@@ -503,93 +503,172 @@ function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: Graph
   const leftCurb = new THREE.Mesh(leftCurbGeo, curbMatLeft);
   const rightCurb = new THREE.Mesh(rightCurbGeo, curbMatRight);
   scene.add(leftCurb, rightCurb);
+
+  // Road markings greatly improve scale perception and speed, especially on TV/PC.
+  // Instancing keeps the extra geometry inexpensive on mobile.
+  const dashCount = profile.quality === 'high' ? 72 : profile.quality === 'balanced' ? 52 : 34;
+  const dashGeo = new THREE.BoxGeometry(0.28, 0.035, 3.6);
+  const dashMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65, metalness: 0.02 });
+  const dashes = new THREE.InstancedMesh(dashGeo, dashMat, dashCount);
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < dashCount; i++) {
+    const prog = (i + 0.35) / dashCount;
+    const pt = getInterpolatedTrackPoint(engine.waypoints, prog);
+    dummy.position.set(pt.pos.x, pt.pos.y + 0.055, pt.pos.z);
+    dummy.rotation.set(0, Math.atan2(pt.tangent.x, pt.tangent.z), 0);
+    dummy.updateMatrix();
+    dashes.setMatrixAt(i, dummy.matrix);
+  }
+  dashes.instanceMatrix.needsUpdate = true;
+  scene.add(dashes);
+
+  // Give non-floating tracks a believable ground surface beyond the asphalt.
+  if (!['sky_clouds', 'cosmic_space', 'sunset_coast'].includes(track.environmentType)) {
+    const groundColor = track.environmentType === 'sunset_coast' ? 0x5b4636 : track.environmentType === 'mountain' ? 0x263326 : track.environmentType === 'candy' ? 0x6b2148 : 0x10151d;
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(1800, 1800),
+      new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.96, metalness: 0.0 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.18;
+    ground.receiveShadow = profile.shadows;
+    scene.add(ground);
+  }
+}
+
+function createBuildingFacadeTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 512;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#111827'; ctx.fillRect(0, 0, c.width, c.height);
+  for (let y = 12; y < 500; y += 28) {
+    for (let x = 10; x < 250; x += 26) {
+      const lit = Math.random() > 0.28;
+      ctx.fillStyle = lit ? (Math.random() > 0.55 ? '#dbeafe' : '#fef3c7') : '#172033';
+      ctx.globalAlpha = lit ? 0.8 + Math.random() * 0.2 : 0.65;
+      ctx.fillRect(x, y, 13, 16);
+    }
+  }
+  ctx.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 4);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.needsUpdate = true;
+  return t;
 }
 
 function buildScenery(scene: THREE.Scene, track: RacingTrackConfig, engine: RaceEngine, profile: GraphicsProfile) {
-  const steps = Math.max(20, Math.round(36 * profile.sceneryDensity));
-  const buildingGeo = new THREE.BoxGeometry(18, 65, 18);
-  const palmTrunkGeo = new THREE.CylinderGeometry(0.5, 0.8, 8, 8);
+  const steps = Math.max(24, Math.round(52 * profile.sceneryDensity));
+  const palmTrunkGeo = new THREE.CylinderGeometry(0.45, 0.72, 8, profile.quality === 'lite' ? 6 : 10);
   const candyDonutGeo = new THREE.TorusGeometry(6, 2.5, 12, 24);
+  const neonColors = [0x38bdf8, 0xa78bfa, 0xf472b6, 0xfbbf24, 0x34d399];
 
-  const neonColors = [0x06b6d4, 0xa855f7, 0xec4899, 0xeab308, 0x10b981];
+  const facade = track.environmentType === 'city_night' ? createBuildingFacadeTexture() : null;
+  const cityMat = facade ? new THREE.MeshStandardMaterial({
+    color: 0x202938,
+    map: facade,
+    emissive: 0xb9ddff,
+    emissiveMap: facade,
+    emissiveIntensity: profile.quality === 'high' ? 0.38 : 0.22,
+    roughness: 0.52,
+    metalness: 0.15,
+  }) : null;
+  const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+  const poleGeo = new THREE.CylinderGeometry(0.08, 0.11, 5.8, 6);
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.45, metalness: 0.75 });
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff2c2 });
+  const lampGeo = new THREE.SphereGeometry(0.22, 8, 6);
+
+  // Coast gets a reflective water plane beyond the roadside.
+  if (track.environmentType === 'sunset_coast') {
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(1800, 1800),
+      new THREE.MeshPhysicalMaterial({ color: 0x075985, roughness: 0.2, metalness: 0.1, clearcoat: 0.65, clearcoatRoughness: 0.22 })
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -0.32;
+    scene.add(water);
+  }
 
   for (let i = 0; i < steps; i++) {
     const prog = i / steps;
     const pt = getInterpolatedTrackPoint(engine.waypoints, prog);
+    const sides = track.environmentType === 'city_night' && profile.quality === 'high' ? [-1, 1] : [i % 2 === 0 ? 1 : -1];
 
-    const side = i % 2 === 0 ? 1 : -1;
-    const dist = 32 + (i % 3) * 15;
-    const x = pt.pos.x + pt.normal.x * side * dist;
-    const z = pt.pos.z + pt.normal.z * side * dist;
-    const y = pt.pos.y;
+    for (const side of sides) {
+      const dist = 27 + (i % 4) * 9;
+      const x = pt.pos.x + pt.normal.x * side * dist;
+      const z = pt.pos.z + pt.normal.z * side * dist;
+      const y = pt.pos.y;
 
-    if (track.environmentType === 'city_night') {
-      // Futuristic skyscrapers with emissive window strips
-      const color = neonColors[i % neonColors.length];
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x0f172a,
-        emissive: color,
-        emissiveIntensity: 0.4,
-        roughness: 0.3,
-      });
-      const bldg = new THREE.Mesh(buildingGeo, mat);
-      bldg.position.set(x, y + 30, z);
-      bldg.scale.set(1 + (i % 2) * 0.5, 0.8 + (i % 4) * 0.4, 1 + (i % 2) * 0.5);
-      scene.add(bldg);
+      if (track.environmentType === 'city_night' && cityMat) {
+        const height = 28 + ((i * 17) % 58);
+        const width = 10 + ((i * 7) % 13);
+        const depth = 11 + ((i * 11) % 15);
+        const bldg = new THREE.Mesh(buildingGeo, cityMat);
+        bldg.position.set(x, y + height * 0.5, z);
+        bldg.scale.set(width, height, depth);
+        bldg.castShadow = profile.shadows;
+        bldg.receiveShadow = profile.shadows;
+        scene.add(bldg);
 
-      // Light portal rings inside tunnel
-      if (pt.isTunnel) {
-        const ringGeo = new THREE.TorusGeometry(14, 0.4, 8, 24);
-        const ringMat = new THREE.MeshBasicMaterial({ color });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.position.set(pt.pos.x, pt.pos.y + 4, pt.pos.z);
-        ring.lookAt(pt.pos.x + pt.tangent.x, pt.pos.y + pt.tangent.y + 4, pt.pos.z + pt.tangent.z);
-        scene.add(ring);
+        // Rooftop silhouette breaks up the primitive box shape on PC High.
+        if (profile.quality === 'high' && i % 3 === 0) {
+          const roof = new THREE.Mesh(new THREE.BoxGeometry(width * 0.35, 2.2, depth * 0.35), new THREE.MeshStandardMaterial({ color: 0x0b1018, roughness: 0.5, metalness: 0.45 }));
+          roof.position.set(x, y + height + 1.1, z);
+          scene.add(roof);
+        }
+
+        // Street lamps near the road visually connect the city to the racing surface.
+        if (i % 2 === 0) {
+          const lampGroup = new THREE.Group();
+          const pole = new THREE.Mesh(poleGeo, poleMat); pole.position.y = 2.9; lampGroup.add(pole);
+          const bulb = new THREE.Mesh(lampGeo, lampMat); bulb.position.y = 5.75; lampGroup.add(bulb);
+          lampGroup.position.set(pt.pos.x + pt.normal.x * side * 13.5, y, pt.pos.z + pt.normal.z * side * 13.5);
+          scene.add(lampGroup);
+        }
+
+        if (pt.isTunnel && i % 2 === 0) {
+          const color = neonColors[i % neonColors.length];
+          const ringGeo = new THREE.TorusGeometry(13.5, 0.18, 8, 32);
+          const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75 });
+          const ring = new THREE.Mesh(ringGeo, ringMat);
+          ring.position.set(pt.pos.x, pt.pos.y + 4, pt.pos.z);
+          ring.lookAt(pt.pos.x + pt.tangent.x, pt.pos.y + pt.tangent.y + 4, pt.pos.z + pt.tangent.z);
+          scene.add(ring);
+        }
+      } else if (track.environmentType === 'sunset_coast') {
+        const palmGroup = new THREE.Group();
+        const trunk = new THREE.Mesh(palmTrunkGeo, new THREE.MeshStandardMaterial({ color: 0x6b3f1f, roughness: 0.95 }));
+        trunk.position.y = 4; palmGroup.add(trunk);
+        const leafMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.75 });
+        for (let leaf = 0; leaf < (profile.quality === 'high' ? 6 : 4); leaf++) {
+          const frond = new THREE.Mesh(new THREE.ConeGeometry(1.6, 5.4, 5), leafMat);
+          frond.position.y = 8.1; frond.rotation.z = Math.PI / 2.7; frond.rotation.y = leaf * (Math.PI * 2 / 6);
+          palmGroup.add(frond);
+        }
+        palmGroup.position.set(x, y, z); scene.add(palmGroup);
+      } else if (track.environmentType === 'mountain') {
+        const mountain = new THREE.Mesh(
+          new THREE.ConeGeometry(18 + (i % 3) * 7, 42 + (i % 4) * 12, profile.quality === 'lite' ? 7 : 12),
+          new THREE.MeshStandardMaterial({ color: i % 2 ? 0x334155 : 0x3f4d3d, roughness: 0.96 })
+        );
+        mountain.position.set(x, y + 16, z);
+        mountain.scale.z = 1.35;
+        mountain.rotation.y = (i * 0.73) % Math.PI;
+        scene.add(mountain);
+      } else if (track.environmentType === 'candy') {
+        const donut = new THREE.Mesh(candyDonutGeo, new THREE.MeshStandardMaterial({ color: neonColors[i % neonColors.length], roughness: 0.34, clearcoat: 0.35 }));
+        donut.position.set(x, y + 8, z); donut.rotation.x = Math.PI * 0.5; scene.add(donut);
+      } else if (track.environmentType === 'sky_clouds') {
+        const cloud = new THREE.Mesh(new THREE.SphereGeometry(8, 12, 12), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.95 }));
+        cloud.position.set(x, y - 2, z); cloud.scale.set(2.5, 0.8, 1.8); scene.add(cloud);
+      } else if (track.environmentType === 'cosmic_space') {
+        const asteroid = new THREE.Mesh(new THREE.DodecahedronGeometry(6 + (i % 4) * 3), new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.86 }));
+        asteroid.position.set(x, y + 15 + (i % 3) * 10, z); scene.add(asteroid);
       }
-    } else if (track.environmentType === 'sunset_coast') {
-      // Tropical palm trees
-      const palmGroup = new THREE.Group();
-      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
-      const trunk = new THREE.Mesh(palmTrunkGeo, trunkMat);
-      trunk.position.y = 4;
-      palmGroup.add(trunk);
-
-      const leafMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.6 });
-      const leavesGeo = new THREE.ConeGeometry(4.5, 3, 8);
-      const leaves = new THREE.Mesh(leavesGeo, leafMat);
-      leaves.position.y = 8;
-      palmGroup.add(leaves);
-
-      palmGroup.position.set(x, y, z);
-      scene.add(palmGroup);
-    } else if (track.environmentType === 'candy') {
-      // Candy donuts & lollipop sculptures
-      const donutMat = new THREE.MeshStandardMaterial({
-        color: neonColors[i % neonColors.length],
-        roughness: 0.3,
-      });
-      const donut = new THREE.Mesh(candyDonutGeo, donutMat);
-      donut.position.set(x, y + 8, z);
-      donut.rotation.x = Math.PI * 0.5;
-      scene.add(donut);
-    } else if (track.environmentType === 'sky_clouds') {
-      // Volumetric cloud clusters
-      const cloudGeo = new THREE.SphereGeometry(8, 12, 12);
-      const cloudMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.9 });
-      const cloud = new THREE.Mesh(cloudGeo, cloudMat);
-      cloud.position.set(x, y - 2, z);
-      cloud.scale.set(2.5, 0.8, 1.8);
-      scene.add(cloud);
-    } else if (track.environmentType === 'cosmic_space') {
-      // Floating asteroids & planetary rings
-      const asteroidGeo = new THREE.DodecahedronGeometry(6 + (i % 4) * 3);
-      const asteroidMat = new THREE.MeshStandardMaterial({
-        color: 0x475569,
-        roughness: 0.8,
-      });
-      const asteroid = new THREE.Mesh(asteroidGeo, asteroidMat);
-      asteroid.position.set(x, y + 15 + (i % 3) * 10, z);
-      scene.add(asteroid);
     }
   }
 }
+

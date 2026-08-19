@@ -184,13 +184,18 @@ export default function FashionGame({
           }
         };
 
-        // Head layers: hair behind, then hat/head accessory, then glasses/mask.
-        updateDom(hairRef, anchors.headCenter, anchors.headWidth * 1.75, anchors.headWidth * 1.95, anchors.torsoRotation, 0.04);
-        const hatOffset = -anchors.headWidth * 0.42;
-        updateDom(hatRef, anchors.headCenter, anchors.headWidth * 1.55, undefined, anchors.torsoRotation, hatOffset);
-        updateDom(headAccessoryRef, anchors.headCenter, anchors.headWidth * 1.52, undefined, anchors.torsoRotation, -anchors.headWidth * 0.34);
-        updateDom(glassesRef, anchors.headCenter, anchors.headWidth * 0.88, undefined, anchors.torsoRotation, 0.03);
-        updateDom(maskRef, anchors.headCenter, anchors.headWidth * 1.03, anchors.headWidth * 0.68, anchors.torsoRotation, 0.055);
+        // Precision face fitting: each accessory has its own facial anchor.
+        // Do not stack incompatible head/face pieces on top of eyes/nose.
+        const hasHat = Boolean(equippedIds.hat || equippedIds.crown);
+        const hasMask = Boolean(equippedIds.mask);
+        const hasWings = Boolean(equippedIds.wings);
+        updateDom(hairRef, anchors.headCenter, anchors.headWidth * 1.48, anchors.faceHeight * 1.42, anchors.faceRotation, anchors.faceHeight * 0.03);
+        updateDom(hatRef, anchors.foreheadCenter, anchors.headWidth * 1.32, anchors.faceHeight * 0.66, anchors.faceRotation, -anchors.faceHeight * 0.24);
+        if (!hasHat) updateDom(headAccessoryRef, anchors.foreheadCenter, anchors.headWidth * 1.22, anchors.faceHeight * 0.58, anchors.faceRotation, -anchors.faceHeight * 0.19);
+        else if (headAccessoryRef.current) headAccessoryRef.current.style.display = 'none';
+        if (!hasMask) updateDom(glassesRef, anchors.eyeCenter, anchors.eyeWidth * 1.42, anchors.faceHeight * 0.25, anchors.faceRotation, 0);
+        else if (glassesRef.current) glassesRef.current.style.display = 'none';
+        updateDom(maskRef, anchors.faceCenter, anchors.faceWidth * 0.94, anchors.faceHeight * 0.70, anchors.faceRotation, anchors.faceHeight * 0.12);
 
         // Clothing scales from BOTH shoulders and hips instead of one fixed body width.
         // This makes the garment expand/contract with a real child's silhouette.
@@ -213,26 +218,39 @@ export default function FashionGame({
         updateDom(wingsRef, anchors.torsoCenter, anchors.shoulderWidth * 2.85, anchors.torsoHeight * 1.5, anchors.torsoRotation, -0.05);
 
         // 6. Backpack overlay (Center of shoulders)
-        updateDom(backpackRef, anchors.shoulderCenter, anchors.shoulderWidth * 1.15, anchors.torsoHeight * 0.9, anchors.torsoRotation, 0.1);
+        if (!hasWings) updateDom(backpackRef, anchors.shoulderCenter, anchors.shoulderWidth * 1.15, anchors.torsoHeight * 0.9, anchors.torsoRotation, 0.1);
+        else if (backpackRef.current) backpackRef.current.style.display = 'none';
 
         // Draw debug skeleton if active
         if (showSkeletonDebug && debugSkeletonRef.current) {
           const ctx = debugSkeletonRef.current.getContext('2d');
           if (ctx) {
             ctx.clearRect(0, 0, 640, 480);
-            ctx.strokeStyle = '#a855f7';
-            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#22d3ee';
+            ctx.lineWidth = 2.2;
             ctx.fillStyle = '#f43f5e';
-
-            latest.landmarks.forEach((lm) => {
-              if (lm.visibility && lm.visibility > 0.5) {
-                const cx = lm.x * 640;
-                const cy = lm.y * 480;
-                ctx.beginPath();
-                ctx.arc(cx, cy, 6, 0, 2 * Math.PI);
-                ctx.fill();
+            const connections = [
+              [1,2],[2,3],[4,5],[5,6],[3,7],[6,8],[9,10],
+              [11,12],[11,13],[13,15],[15,17],[17,19],[19,21],[15,19],
+              [12,14],[14,16],[16,18],[18,20],[20,22],[16,20],
+              [11,23],[12,24],[23,24],[23,25],[25,27],[27,29],[29,31],[27,31],
+              [24,26],[26,28],[28,30],[30,32],[28,32],
+            ];
+            for (const [a,b] of connections) {
+              const p1=latest.landmarks[a], p2=latest.landmarks[b];
+              if ((p1?.visibility ?? 0) > 0.35 && (p2?.visibility ?? 0) > 0.35) {
+                ctx.beginPath(); ctx.moveTo(p1.x*640,p1.y*480); ctx.lineTo(p2.x*640,p2.y*480); ctx.stroke();
+              }
+            }
+            latest.landmarks.forEach((lm, idx) => {
+              if ((lm.visibility ?? 0) > 0.35) {
+                const cx = lm.x * 640, cy = lm.y * 480;
+                ctx.beginPath(); ctx.arc(cx, cy, idx <= 10 ? 4 : 5, 0, 2 * Math.PI); ctx.fill();
               }
             });
+            // Dedicated face anchors make it obvious where glasses/mask/hat are attached.
+            ctx.fillStyle='#fde047';
+            [anchors.foreheadCenter, anchors.eyeCenter, anchors.faceCenter, anchors.mouthCenter].forEach((pt)=>{ctx.beginPath();ctx.arc(pt.x*640,pt.y*480,5,0,Math.PI*2);ctx.fill();});
           }
         }
       } else {
@@ -283,8 +301,19 @@ export default function FashionGame({
       setEquippedIds((prev) => {
         const next = { ...prev };
         if (next[item.category] === item.id) {
-          delete next[item.category]; // un-equip
+          delete next[item.category];
         } else {
+          // Conflict groups keep the face/head/back clean instead of piling SVGs.
+          if (item.category === 'hat' || item.category === 'crown') {
+            delete next.hat; delete next.crown; delete next.headaccessory;
+          }
+          if (item.category === 'headaccessory') {
+            delete next.hat; delete next.crown;
+          }
+          if (item.category === 'mask') delete next.glasses;
+          if (item.category === 'glasses') delete next.mask;
+          if (item.category === 'wings') delete next.backpack;
+          if (item.category === 'backpack') delete next.wings;
           next[item.category] = item.id;
         }
         return next;

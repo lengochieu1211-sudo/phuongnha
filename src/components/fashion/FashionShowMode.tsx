@@ -127,12 +127,16 @@ export default function FashionShowMode({
           }
         };
 
-        updateDom(hairRef, anchors.headCenter, anchors.headWidth * 1.75, anchors.headWidth * 1.95, anchors.torsoRotation, 0.04);
-        const hatOffset = -anchors.headWidth * 0.42;
-        updateDom(hatRef, anchors.headCenter, anchors.headWidth * 1.55, undefined, anchors.torsoRotation, hatOffset);
-        updateDom(headAccessoryRef, anchors.headCenter, anchors.headWidth * 1.52, undefined, anchors.torsoRotation, -anchors.headWidth * 0.34);
-        updateDom(glassesRef, anchors.headCenter, anchors.headWidth * 0.88, undefined, anchors.torsoRotation, 0.03);
-        updateDom(maskRef, anchors.headCenter, anchors.headWidth * 1.03, anchors.headWidth * 0.68, anchors.torsoRotation, 0.055);
+        const hasHat = Boolean(equippedIds.hat || equippedIds.crown);
+        const hasMask = Boolean(equippedIds.mask);
+        const hasWings = Boolean(equippedIds.wings);
+        updateDom(hairRef, anchors.headCenter, anchors.headWidth * 1.48, anchors.faceHeight * 1.42, anchors.faceRotation, anchors.faceHeight * 0.03);
+        updateDom(hatRef, anchors.foreheadCenter, anchors.headWidth * 1.32, anchors.faceHeight * 0.66, anchors.faceRotation, -anchors.faceHeight * 0.24);
+        if (!hasHat) updateDom(headAccessoryRef, anchors.foreheadCenter, anchors.headWidth * 1.22, anchors.faceHeight * 0.58, anchors.faceRotation, -anchors.faceHeight * 0.19);
+        else if (headAccessoryRef.current) headAccessoryRef.current.style.display = 'none';
+        if (!hasMask) updateDom(glassesRef, anchors.eyeCenter, anchors.eyeWidth * 1.42, anchors.faceHeight * 0.25, anchors.faceRotation, 0);
+        else if (glassesRef.current) glassesRef.current.style.display = 'none';
+        updateDom(maskRef, anchors.faceCenter, anchors.faceWidth * 0.94, anchors.faceHeight * 0.70, anchors.faceRotation, anchors.faceHeight * 0.12);
 
         const reliableHipWidth = anchors.hipCenter.confidence >= 0.45 ? anchors.hipWidth : anchors.shoulderWidth * 0.72;
         const fittedBodyWidth = Math.max(anchors.shoulderWidth * 1.54, reliableHipWidth * 1.32);
@@ -150,7 +154,8 @@ export default function FashionShowMode({
         updateDom(wingsRef, anchors.torsoCenter, anchors.shoulderWidth * 2.85, anchors.torsoHeight * 1.5, anchors.torsoRotation, -0.05);
 
         // 6. Backpack overlay (Center of shoulders)
-        updateDom(backpackRef, anchors.shoulderCenter, anchors.shoulderWidth * 1.15, anchors.torsoHeight * 0.9, anchors.torsoRotation, 0.1);
+        if (!hasWings) updateDom(backpackRef, anchors.shoulderCenter, anchors.shoulderWidth * 1.15, anchors.torsoHeight * 0.9, anchors.torsoRotation, 0.1);
+        else if (backpackRef.current) backpackRef.current.style.display = 'none';
       } else {
         // Lost body tracking or calibration -> hide overlays
         const hide = (ref: React.RefObject<HTMLDivElement | null>) => {

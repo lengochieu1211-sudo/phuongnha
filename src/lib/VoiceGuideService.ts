@@ -105,14 +105,46 @@ class VoiceGuideService {
     }
   }
 
+  private voiceFingerprint(v: SpeechSynthesisVoice): string {
+    return `${v.name} ${(v as any).voiceURI || ''} ${v.lang}`.toLowerCase();
+  }
+
+  private isLikelyFemaleVoice(v: SpeechSynthesisVoice): boolean {
+    const n = this.voiceFingerprint(v);
+    // Android Google Vietnamese natural voices: vic / vid / vif are female variants.
+    // Also cover common Windows/Apple Vietnamese female names.
+    return (
+      /vi-vn-x-vi[cdf]/.test(n) ||
+      n.includes('tiếng việt 1') || n.includes('tiếng việt 2') || n.includes('tiếng việt 4') ||
+      n.includes('hoaimy') || n.includes('hoai my') || n.includes('linh') ||
+      n.includes('female') || n.includes('nữ') || n.includes('nu voice')
+    );
+  }
+
+  private isLikelyMaleVoice(v: SpeechSynthesisVoice): boolean {
+    const n = this.voiceFingerprint(v);
+    return (
+      /vi-vn-x-(vie|gft)/.test(n) ||
+      n.includes('tiếng việt 3') || n.includes('tiếng việt 5') ||
+      n.includes('namminh') || n.includes('nam minh') || n.includes('microsoft an') ||
+      n.includes('male') || n.includes('giọng nam')
+    );
+  }
+
+  private voiceMatchesStyle(v: SpeechSynthesisVoice, style: VoiceStyle): boolean {
+    if (style === 'male_warm') return this.isLikelyMaleVoice(v);
+    if (style === 'female_gentle' || style === 'baby_cute') return this.isLikelyFemaleVoice(v);
+    return true;
+  }
+
   private initVoices() {
     if (!this.synth) return;
     this.voices = this.synth.getVoices();
 
-    // 1. Try to find exact selectedVoiceName from saved settings
+    // Do not blindly restore a stale male voice while the saved style is female.
     if (this.settings.selectedVoiceName) {
       const match = this.voices.find((v) => v.name === this.settings.selectedVoiceName);
-      if (match) {
+      if (match && this.voiceMatchesStyle(match, this.settings.voiceStyle)) {
         this.selectedVoice = match;
         return;
       }
@@ -122,71 +154,30 @@ class VoiceGuideService {
   }
 
   public applyVoiceStyleConfig(style: VoiceStyle) {
-    const viVoices = this.voices.filter(
-      (v) => v.lang.startsWith('vi') || v.lang.includes('VI') || v.lang.includes('VIE')
-    );
+    // Refresh because Chrome/Android populates speechSynthesis voices asynchronously.
+    if (this.synth) this.voices = this.synth.getVoices();
+    const viVoices = this.voices.filter((v) => v.lang.toLowerCase().startsWith('vi'));
+    const femaleViVoice = viVoices.find((v) => this.isLikelyFemaleVoice(v));
+    const maleViVoice = viVoices.find((v) => this.isLikelyMaleVoice(v));
+    const neutralViVoice = viVoices.find((v) => !this.isLikelyMaleVoice(v)) || viVoices[0] || null;
 
-    const isFemaleName = (name: string) => {
-      const n = name.toLowerCase();
-      return (
-        n.includes('hoaimy') ||
-        n.includes('linh') ||
-        n.includes('mai') ||
-        n.includes('chi') ||
-        n.includes('lan') ||
-        n.includes('huong') ||
-        n.includes('thao') ||
-        n.includes('female') ||
-        n.includes('nữ') ||
-        n.includes('zira') ||
-        n.includes('samantha') ||
-        n.includes('natural') ||
-        n.includes('microsoft an') ||
-        n === 'an' ||
-        (n.includes('google') && n.includes('vi-vn') && !n.includes('male'))
-      );
-    };
-
-    const isMaleName = (name: string) => {
-      const n = name.toLowerCase();
-      return (
-        n.includes('nam') ||
-        n.includes('minh') ||
-        n.includes('male') ||
-        n.includes('david') ||
-        n.includes('george')
-      );
-    };
-
-    const femaleViVoice = viVoices.find((v) => isFemaleName(v.name));
-    const maleViVoice = viVoices.find((v) => isMaleName(v.name));
-    const defaultViVoice = viVoices[0] || null;
-
+    this.settings.voiceStyle = style;
     if (style === 'female_gentle') {
-      this.settings.voiceStyle = 'female_gentle';
-      this.settings.rate = 1.0;
-      if (femaleViVoice) {
-        this.selectedVoice = femaleViVoice;
-        this.settings.pitch = 1.2;
-      } else {
-        this.selectedVoice = defaultViVoice || this.voices[0] || null;
-        this.settings.pitch = 1.45; // Gentle pitch shift up for warm tone
-      }
+      this.settings.rate = 0.98;
+      this.settings.pitch = femaleViVoice ? 1.08 : 1.45;
+      this.selectedVoice = femaleViVoice || neutralViVoice || null;
     } else if (style === 'male_warm') {
-      this.settings.voiceStyle = 'male_warm';
-      this.settings.rate = 0.95;
-      this.selectedVoice = maleViVoice || defaultViVoice || this.voices[0] || null;
-      this.settings.pitch = 0.75;
-    } else if (style === 'baby_cute') {
-      this.settings.voiceStyle = 'baby_cute';
-      this.settings.rate = 1.15;
-      this.selectedVoice = femaleViVoice || defaultViVoice || this.voices[0] || null;
-      this.settings.pitch = 1.7;
+      this.settings.rate = 0.94;
+      this.settings.pitch = 0.82;
+      this.selectedVoice = maleViVoice || viVoices[0] || null;
+    } else {
+      this.settings.rate = 1.12;
+      this.settings.pitch = femaleViVoice ? 1.35 : 1.72;
+      this.selectedVoice = femaleViVoice || neutralViVoice || null;
     }
 
-    if (this.selectedVoice) {
-      this.settings.selectedVoiceName = this.selectedVoice.name;
-    }
+    // Clear stale stored names if no matching Vietnamese voice exists.
+    this.settings.selectedVoiceName = this.selectedVoice?.name;
   }
 
   public getVoices(): SpeechSynthesisVoice[] {
@@ -361,6 +352,11 @@ class VoiceGuideService {
     this.notifySpeakingState(true, item.text);
 
     audio.duckMusic(true);
+
+    // Android may publish voices after app startup; refresh before every queued utterance.
+    if (!this.selectedVoice || !this.voiceMatchesStyle(this.selectedVoice, this.settings.voiceStyle)) {
+      this.applyVoiceStyleConfig(this.settings.voiceStyle);
+    }
 
     const utterance = new SpeechSynthesisUtterance(item.text);
     if (this.selectedVoice) {

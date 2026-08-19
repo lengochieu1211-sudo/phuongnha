@@ -274,7 +274,7 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
           <div className="flex items-start gap-2 bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 text-[11px] text-amber-900 leading-snug">
             <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <strong>Mẹo thiết bị:</strong> Trên máy tính Windows/Android, hệ điều hành thường mặc định giọng nam (Microsoft An). Ứng dụng đã xử lý chuyển đổi tần số cao độ (Pitch) thành giọng nữ trong trẻo (1.68x) và em bé (1.98x). Bạn có thể kéo thanh trượt bên dưới để tùy biến theo ý thích!
+              <strong>Giọng đang dùng:</strong> {settings.selectedVoiceName || 'Tự động tiếng Việt trên thiết bị'}. Ứng dụng ưu tiên đúng biến thể nữ/nam tiếng Việt khi hệ điều hành cung cấp. Nếu điện thoại chưa cài giọng nữ tiếng Việt, app sẽ dùng giọng Việt phù hợp nhất và điều chỉnh cao độ; có thể mở phần nâng cao để chọn trực tiếp một giọng hệ thống khác.
             </div>
           </div>
 

@@ -8,6 +8,8 @@ import { GameScreen, PlayerProgress, GameGesture, WorldConfig } from './types';
 import { loadProgress, saveProgress, WORLDS, evaluateAchievements } from './utils/progression';
 import { audio } from './lib/AudioEngine';
 import { recordedVoice } from './lib/RecordedVoiceService';
+import { voiceGuide } from './lib/VoiceGuideService';
+import { raceAudio } from './lib/racing/RaceAudio';
 import { useCameraPose } from './providers/CameraPoseContext';
 
 import MainMenu from './components/MainMenu';
@@ -104,6 +106,18 @@ export default function App() {
     }, 60000); // every 1 minute
 
     return () => clearInterval(interval);
+  }, [currentScreen]);
+
+  // Stop any game-owned audio/voice as soon as the app returns to the hub.
+  // This is intentionally centralized so an individual game's missed cleanup cannot
+  // leave music, engine RPM, drift or TTS speaking after exit.
+  useEffect(() => {
+    if (currentScreen === 'menu') {
+      voiceGuide.stop();
+      recordedVoice.stopAll();
+      raceAudio.stopAll();
+      audio.stopAllImmediate();
+    }
   }, [currentScreen]);
 
   // Sound toggle
@@ -329,7 +343,12 @@ export default function App() {
 
       <VoiceSettingsModal
         isOpen={showVoiceSettings}
-        onClose={() => setShowVoiceSettings(false)}
+        onClose={() => {
+          voiceGuide.stop();
+          recordedVoice.stopAll();
+          audio.stopAllImmediate();
+          setShowVoiceSettings(false);
+        }}
       />
 
       <TVModeModal isOpen={showTVMode} onClose={() => setShowTVMode(false)} />

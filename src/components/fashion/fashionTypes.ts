@@ -10,6 +10,14 @@ export type FashionQualityMode = 'auto' | 'low' | 'medium' | 'high';
 export interface FashionBodyAnchors {
   headCenter: { x: number; y: number; confidence: number };
   headWidth: number;
+  foreheadCenter: { x: number; y: number; confidence: number };
+  eyeCenter: { x: number; y: number; confidence: number };
+  eyeWidth: number;
+  mouthCenter: { x: number; y: number; confidence: number };
+  faceCenter: { x: number; y: number; confidence: number };
+  faceWidth: number;
+  faceHeight: number;
+  faceRotation: number;
   
   shoulderCenter: { x: number; y: number; confidence: number };
   shoulderWidth: number;

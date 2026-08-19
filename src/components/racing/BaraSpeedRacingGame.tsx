@@ -86,7 +86,7 @@ export default function BaraSpeedRacingGame({
   const [selectedTrackId, setSelectedTrackId] = useState<RacingTrackId>('neon_city');
   const [selectedCarId, setSelectedCarId] = useState<CarModelId>(profile.selectedCarId || 'bara_gt');
   const [raceMode, setRaceMode] = useState<RaceMode>('quick_race');
-  const [cameraView, setCameraView] = useState<CameraViewMode>('chase');
+  const [cameraView, setCameraView] = useState<CameraViewMode>('close_chase');
 
   // 3. Settings State
   const [raceSettings, setRaceSettings] = useState<RaceSettings>({
@@ -97,7 +97,7 @@ export default function BaraSpeedRacingGame({
     deadZoneAngle: 5,
     cameraShake: 'normal',
     reducedMotion: false,
-    cameraView: 'chase',
+    cameraView: 'close_chase',
     quality: 'auto',
     soundVolume: 1.0,
     engineVolume: 0.8,

@@ -46,16 +46,17 @@ export default function RealisticWardrobeOverlay({ itemId, category, side = 'lef
   if (category === 'hair') {
     const pony = itemId.includes('ponytail');
     const bob = itemId.includes('bob');
+    // Hair must frame the real face instead of painting an opaque blob over it.
+    // The center is intentionally transparent; only fringe/sides/back are drawn.
     return (
       <svg viewBox="0 0 260 260" className="w-full h-full overflow-visible" aria-hidden>
         {defs}
-        <g filter={`url(#shadow-${uid})`}>
-          <path d={bob
-            ? 'M55 119 Q56 36 130 25 Q205 36 205 119 L190 205 Q163 225 130 225 Q97 225 70 205Z'
-            : 'M45 120 Q47 28 130 20 Q214 30 216 122 L199 229 Q173 247 152 230 L130 205 L108 230 Q78 248 60 225Z'}
-            fill={`url(#${grad})`} stroke="#fff" strokeOpacity=".18" strokeWidth="3" />
-          <path d="M74 92 Q130 45 188 92 Q174 56 130 47 Q90 55 74 92Z" fill="#fff" fillOpacity=".12"/>
-          {pony && <path d="M194 91 Q249 102 226 205 Q207 221 192 197 Q218 139 190 112Z" fill={`url(#${grad})`} />}
+        <g filter={`url(#shadow-${uid})`} fill={`url(#${grad})`} stroke="#fff" strokeOpacity=".16" strokeWidth="2.5">
+          <path d="M54 105 Q55 35 130 22 Q205 35 206 105 Q184 76 164 68 Q130 52 96 68 Q74 76 54 105Z" />
+          <path d={bob ? 'M54 91 Q42 137 62 208 Q77 226 94 206 L91 111 Q75 94 54 91Z' : 'M49 88 Q32 151 57 239 Q75 252 99 226 L91 107 Q72 91 49 88Z'} />
+          <path d={bob ? 'M206 91 Q218 137 198 208 Q183 226 166 206 L169 111 Q185 94 206 91Z' : 'M211 88 Q228 151 203 239 Q185 252 161 226 L169 107 Q188 91 211 88Z'} />
+          <path d="M78 86 Q103 50 130 51 Q158 50 183 86 Q161 70 146 72 Q130 85 114 72 Q96 70 78 86Z" fill="#fff" fillOpacity=".10" stroke="none" />
+          {pony && <path d="M188 79 Q244 84 232 202 Q222 236 197 221 Q218 149 184 104Z" />}
         </g>
       </svg>
     );

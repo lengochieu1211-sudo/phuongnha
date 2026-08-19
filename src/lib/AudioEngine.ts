@@ -14,6 +14,7 @@ class AudioEngine {
   private musicGainVal: number = 0.04;
   private sfxGainVal: number = 1.0;
   private melodyIndex = 0;
+  private pendingTimers = new Set<ReturnType<typeof setTimeout>>();
 
   constructor() {
     // Audio Context is initialized lazily upon first user interaction
@@ -58,6 +59,20 @@ class AudioEngine {
       sound: this.isMutedSound,
       music: this.isMutedMusic,
     };
+  }
+
+  private schedule(fn: () => void, delayMs: number) {
+    const id = setTimeout(() => {
+      this.pendingTimers.delete(id);
+      fn();
+    }, delayMs);
+    this.pendingTimers.add(id);
+    return id;
+  }
+
+  private clearScheduledSounds() {
+    this.pendingTimers.forEach((id) => clearTimeout(id));
+    this.pendingTimers.clear();
   }
 
   // Play a simple procedural tone with full control
@@ -110,14 +125,14 @@ class AudioEngine {
   playCollect() {
     // Sweet high pitch ring (arpeggio-like)
     this.playTone(880, 'sine', 0.12, 0.25, 1200);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(1320, 'sine', 0.15, 0.2, 1760);
     }, 60);
   }
 
   playDiamond() {
     this.playTone(1046, 'sine', 0.08, 0.3, 2093);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(1568, 'sine', 0.1, 0.25, 3136);
     }, 50);
   }
@@ -131,7 +146,7 @@ class AudioEngine {
     // Beautiful major chord arpeggio
     const chord = [261.63, 329.63, 392.00, 523.25]; // C major
     chord.forEach((freq, idx) => {
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(freq, 'sine', 0.25, 0.2, freq * 1.5);
       }, idx * 100);
     });
@@ -139,7 +154,7 @@ class AudioEngine {
 
   playCombo() {
     this.playTone(523.25, 'sine', 0.15, 0.25, 659.25);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(783.99, 'sine', 0.2, 0.3, 1046.5);
     }, 80);
   }
@@ -152,14 +167,14 @@ class AudioEngine {
   playPetCareAction() {
     // Soft bubbling sound
     this.playTone(600, 'sine', 0.1, 0.2, 800);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(700, 'sine', 0.1, 0.15, 900);
     }, 40);
   }
 
   playPowerup() {
     this.playTone(440, 'triangle', 0.3, 0.2, 880);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(660, 'sine', 0.4, 0.25, 1320);
     }, 100);
   }
@@ -180,7 +195,7 @@ class AudioEngine {
       { freq: 1046.5, type: 'sine' as OscillatorType, duration: 0.35, gain: 0.35, sweep: 1318.5 },
     ];
     notes.forEach((note, idx) => {
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(note.freq, note.type, note.duration, note.gain, note.sweep);
       }, idx * 90);
     });
@@ -192,10 +207,10 @@ class AudioEngine {
   playStarCollectSound() {
     if (this.isMutedSound) return;
     this.playTone(1046.5, 'sine', 0.1, 0.3, 1318.5);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(1318.5, 'sine', 0.12, 0.35, 1567.98);
     }, 50);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(1567.98, 'sine', 0.18, 0.3, 2093.0);
     }, 100);
   }
@@ -208,15 +223,15 @@ class AudioEngine {
     // 3 - 2 - 1 countdown beeps
     const countBeeps = [440, 440, 440];
     countBeeps.forEach((freq, idx) => {
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(freq, 'triangle', 0.12, 0.25, freq * 1.05);
       }, idx * 250);
     });
     // GO flourish!
-    setTimeout(() => {
+    this.schedule(() => {
       const goNotes = [523.25, 659.25, 783.99, 1046.5];
       goNotes.forEach((f, i) => {
-        setTimeout(() => {
+        this.schedule(() => {
           this.playTone(f, 'sawtooth', 0.2, 0.35, f * 1.3);
         }, i * 40);
       });
@@ -236,7 +251,7 @@ class AudioEngine {
       { freq: 1318.5, delay: 500, duration: 0.6, type: 'sine' as OscillatorType, sweep: 1567.98 },
     ];
     fanfare.forEach((n) => {
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(n.freq, n.type, n.duration, 0.35, n.sweep);
       }, n.delay);
     });
@@ -249,12 +264,12 @@ class AudioEngine {
     if (this.isMutedSound) return;
     if (type === 'success') {
       this.playTone(880, 'sine', 0.08, 0.25, 1174.66);
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(1318.5, 'sine', 0.12, 0.3, 1760);
       }, 60);
     } else if (type === 'warning') {
       this.playTone(350, 'sawtooth', 0.12, 0.2, 280);
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(280, 'sawtooth', 0.15, 0.25, 220);
       }, 70);
     } else {
@@ -266,7 +281,7 @@ class AudioEngine {
   playVictory() {
     const victoryChord = [523.25, 659.25, 783.99, 1046.5];
     victoryChord.forEach((freq, idx) => {
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(freq, 'sine', 0.3, 0.3, freq * 1.2);
       }, idx * 120);
     });
@@ -281,7 +296,7 @@ class AudioEngine {
   playFruitJuice() {
     // Juicy splash
     this.playTone(600, 'sine', 0.12, 0.3, 900);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(400, 'triangle', 0.15, 0.2, 700);
     }, 40);
   }
@@ -295,7 +310,7 @@ class AudioEngine {
     // Chime glissando
     const freqs = [523.25, 659.25, 783.99, 1046.5, 1318.5];
     freqs.forEach((f, i) => {
-      setTimeout(() => {
+      this.schedule(() => {
         this.playTone(f, 'sine', 0.2, 0.25, f * 1.2);
       }, i * 40);
     });
@@ -320,7 +335,7 @@ class AudioEngine {
   playBubbleCapture() {
     // Magic capture chime
     this.playTone(700, 'triangle', 0.18, 0.25, 1100);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(1050, 'sine', 0.22, 0.3, 1400);
     }, 60);
   }
@@ -328,7 +343,7 @@ class AudioEngine {
   playChickenCluck() {
     // Gentle cute cluck
     this.playTone(380, 'sine', 0.08, 0.2, 450);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(320, 'sine', 0.08, 0.2, 400);
     }, 70);
   }
@@ -347,10 +362,10 @@ class AudioEngine {
   playMonsterCheer() {
     // Happy wake up chime
     this.playTone(440, 'triangle', 0.12, 0.2, 660);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(660, 'triangle', 0.15, 0.25, 880);
     }, 80);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(880, 'sine', 0.2, 0.3, 1320);
     }, 160);
   }
@@ -371,7 +386,7 @@ class AudioEngine {
     // Rhythmic rolling clatter
     const times = [0, 50, 110, 180, 260, 360, 480];
     times.forEach((t, i) => {
-      setTimeout(() => {
+      this.schedule(() => {
         const f = 400 + Math.random() * 250;
         this.playTone(f, 'triangle', 0.04, 0.15 + (i / times.length) * 0.15);
       }, t);
@@ -386,7 +401,7 @@ class AudioEngine {
   playPieceSpawn() {
     // Sparkling emergence chime
     this.playTone(523.25, 'triangle', 0.1, 0.2, 784);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(1046.5, 'sine', 0.15, 0.25, 1318.5);
     }, 80);
   }
@@ -394,7 +409,7 @@ class AudioEngine {
   playPieceCapture() {
     // Fun pop and bounce
     this.playTone(280, 'triangle', 0.12, 0.3, 140);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(650, 'sine', 0.15, 0.25, 900);
     }, 100);
   }
@@ -402,15 +417,15 @@ class AudioEngine {
   playHomeCheer() {
     // Victory fanfare for arriving at home
     this.playTone(523.25, 'triangle', 0.12, 0.25);
-    setTimeout(() => this.playTone(659.25, 'triangle', 0.12, 0.25), 100);
-    setTimeout(() => this.playTone(783.99, 'triangle', 0.15, 0.3), 200);
-    setTimeout(() => this.playTone(1046.5, 'sine', 0.3, 0.35), 320);
+    this.schedule(() => this.playTone(659.25, 'triangle', 0.12, 0.25), 100);
+    this.schedule(() => this.playTone(783.99, 'triangle', 0.15, 0.3), 200);
+    this.schedule(() => this.playTone(1046.5, 'sine', 0.3, 0.35), 320);
   }
 
   playMagicTileTrigger() {
     // Rainbow / star sparkle
     this.playTone(880, 'sine', 0.1, 0.25, 1200);
-    setTimeout(() => {
+    this.schedule(() => {
       this.playTone(1320, 'sine', 0.15, 0.3, 1760);
     }, 80);
   }
@@ -470,6 +485,18 @@ class AudioEngine {
     if (this.musicInterval) {
       clearInterval(this.musicInterval);
       this.musicInterval = null;
+    }
+  }
+
+  // Immediate lifecycle stop used when leaving a game/screen.
+  // Suspending the shared context also silences any short procedural SFX whose
+  // setTimeout callbacks were already queued; the next user interaction resumes it.
+  stopAllImmediate() {
+    this.stopMusic();
+    this.clearScheduledSounds();
+    this.isDucked = false;
+    if (this.ctx && this.ctx.state === 'running') {
+      void this.ctx.suspend().catch(() => undefined);
     }
   }
 }

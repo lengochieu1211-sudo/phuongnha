@@ -21,9 +21,13 @@ export default function FashionCalibration({
   const { landmarks, isStreaming, bodyDetected } = useCameraPose();
   
   const [checklist, setChecklist] = useState({
-    head: false,
+    face: false,
     leftShoulder: false,
     rightShoulder: false,
+    leftElbow: false,
+    rightElbow: false,
+    leftWrist: false,
+    rightWrist: false,
     leftHip: false,
     rightHip: false,
     leftKnee: false,
@@ -59,11 +63,15 @@ export default function FashionCalibration({
 
   useEffect(() => {
     if (!landmarks || landmarks.length === 0) {
-      if (checklist.head || checklist.leftShoulder || checklist.rightShoulder || checklist.leftHip || checklist.rightHip || checklist.leftKnee || checklist.rightKnee || checklist.leftAnkle || checklist.rightAnkle) {
+      if (checklist.face || checklist.leftShoulder || checklist.rightShoulder || checklist.leftHip || checklist.rightHip || checklist.leftKnee || checklist.rightKnee || checklist.leftAnkle || checklist.rightAnkle) {
         setChecklist({
-          head: false,
+          face: false,
           leftShoulder: false,
           rightShoulder: false,
+          leftElbow: false,
+          rightElbow: false,
+          leftWrist: false,
+          rightWrist: false,
           leftHip: false,
           rightHip: false,
           leftKnee: false,
@@ -95,9 +103,13 @@ export default function FashionCalibration({
       return lm && lm.visibility !== undefined ? lm.visibility >= 0.5 : false;
     };
 
-    const headVis = getVis(0); // Nose
+    const faceVis = [0,1,2,3,4,5,6,7,8,9,10].filter(getVis).length >= 7;
     const lsVis = getVis(11);
     const rsVis = getVis(12);
+    const leVis = getVis(13);
+    const reVis = getVis(14);
+    const lwVis = getVis(15);
+    const rwVis = getVis(16);
     const lhVis = getVis(23);
     const rhVis = getVis(24);
     const lkVis = getVis(25);
@@ -106,9 +118,13 @@ export default function FashionCalibration({
     const raVis = getVis(28);
 
     const checklistChanged = 
-      checklist.head !== headVis ||
+      checklist.face !== faceVis ||
       checklist.leftShoulder !== lsVis ||
       checklist.rightShoulder !== rsVis ||
+      checklist.leftElbow !== leVis ||
+      checklist.rightElbow !== reVis ||
+      checklist.leftWrist !== lwVis ||
+      checklist.rightWrist !== rwVis ||
       checklist.leftHip !== lhVis ||
       checklist.rightHip !== rhVis ||
       checklist.leftKnee !== lkVis ||
@@ -118,9 +134,13 @@ export default function FashionCalibration({
 
     if (checklistChanged) {
       setChecklist({
-        head: headVis,
+        face: faceVis,
         leftShoulder: lsVis,
         rightShoulder: rsVis,
+        leftElbow: leVis,
+        rightElbow: reVis,
+        leftWrist: lwVis,
+        rightWrist: rwVis,
         leftHip: lhVis,
         rightHip: rhVis,
         leftKnee: lkVis,
@@ -131,7 +151,7 @@ export default function FashionCalibration({
     }
 
     // Full body condition
-    const isFullBodyValid = headVis && lsVis && rsVis && lhVis && rhVis && lkVis && rkVis && laVis && raVis;
+    const isFullBodyValid = faceVis && lsVis && rsVis && leVis && reVis && lwVis && rwVis && lhVis && rhVis && lkVis && rkVis && laVis && raVis;
     if (fullBodyReady !== isFullBodyValid) {
       setFullBodyReady(isFullBodyValid);
     }
@@ -176,21 +196,25 @@ export default function FashionCalibration({
     <div id="fashion-calibration-container" className="flex flex-col items-center justify-center p-6 bg-white/95 backdrop-blur-md rounded-3xl border-4 border-purple-200 shadow-2xl max-w-xl w-full mx-auto relative select-none">
       <div className="absolute -top-6 bg-purple-600 text-white px-5 py-1.5 rounded-full text-xs font-black shadow-lg flex items-center gap-1">
         <Camera className="w-4 h-4 animate-pulse" />
-        CHẾ ĐỘ QUÉT TOÀN THÂN
+        QUÉT XƯƠNG CHI TIẾT 33 ĐIỂM
       </div>
 
       <div className="text-center mt-4">
         <h3 className="text-xl md:text-2xl font-black text-purple-800">Căn Chỉnh Gương Phép Thuật</h3>
         <p className="text-xs text-slate-500 font-bold mt-1 max-w-md mx-auto leading-relaxed">
-          Đứng lùi xa camera khoảng 1.5m - 2m sao cho thấy được cả đầu, vai và đôi chân bé nhé!
+          Đứng lùi camera khoảng 1.5m - 2m. Gương sẽ kiểm tra khuôn mặt, vai, khuỷu tay, cổ tay, hông, gối và bàn chân trước khi thử đồ.
         </p>
       </div>
 
       {/* Checklist items list */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full my-6 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
-        <CheckItem label="Đầu / Khuôn mặt" checked={checklist.head} />
+        <CheckItem label="Mặt (mắt/mũi/tai/miệng)" checked={checklist.face} />
         <CheckItem label="Vai trái" checked={checklist.leftShoulder} />
         <CheckItem label="Vai phải" checked={checklist.rightShoulder} />
+        <CheckItem label="Khuỷu tay trái" checked={checklist.leftElbow} />
+        <CheckItem label="Khuỷu tay phải" checked={checklist.rightElbow} />
+        <CheckItem label="Cổ tay trái" checked={checklist.leftWrist} />
+        <CheckItem label="Cổ tay phải" checked={checklist.rightWrist} />
         <CheckItem label="Hông trái" checked={checklist.leftHip} />
         <CheckItem label="Hông phải" checked={checklist.rightHip} />
         <CheckItem label="Đầu gối trái" checked={checklist.leftKnee} />
