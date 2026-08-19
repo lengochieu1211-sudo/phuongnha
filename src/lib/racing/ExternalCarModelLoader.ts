@@ -22,6 +22,7 @@ interface ExternalVehicleConfig {
   kind: VehicleKind;
   policy: 'tv_up' | 'desktop_only';
   rideHeight: number;
+  wheelMode?: 'named' | 'infer' | 'none';
 }
 
 interface WheelRigNode {
@@ -39,34 +40,41 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   canis_mesa_3d: {
     file: 'assets/cars/canis-mesa-cronoz.fbx',
     targetLength: 4.65,
-    defaultYaw: Math.PI,
+    defaultYaw: 0,
     kind: 'car',
     policy: 'tv_up',
     rideHeight: 0.18,
+    wheelMode: 'named',
   },
   v12_sv_3d: {
     file: 'assets/cars/v12-sv-supercar.fbx',
     targetLength: 4.75,
-    defaultYaw: Math.PI,
+    defaultYaw: 0,
     kind: 'car',
     policy: 'desktop_only',
     rideHeight: 0.14,
+    wheelMode: 'named',
   },
   roadster_883_3d: {
     file: 'assets/cars/roadster-883-3d.fbx',
     targetLength: 2.22,
-    defaultYaw: Math.PI,
+    // Trust FBX +Z forward; X-long sources are normalized below.
+    defaultYaw: 0,
     kind: 'motorcycle',
     policy: 'tv_up',
     rideHeight: 0.10,
+    // Node names are generic Group/Mesh. Do not guess wheels or the handlebar/fork can rotate by mistake.
+    wheelMode: 'none',
   },
   vespa_studio_3d: {
     file: 'assets/cars/vespa-studio-3d.fbx',
     targetLength: 1.86,
-    defaultYaw: Math.PI,
+    // Trust FBX +Z forward; X-long sources are normalized below.
+    defaultYaw: 0,
     kind: 'motorcycle',
     policy: 'tv_up',
     rideHeight: 0.09,
+    wheelMode: 'none',
   },
 };
 
@@ -245,7 +253,13 @@ function inferWheelNodes(root: THREE.Object3D, kind: VehicleKind): WheelRigNode[
   }));
 }
 
-function collectWheelRig(root: THREE.Object3D, kind: VehicleKind): WheelRigNode[] {
+function collectWheelRig(
+  root: THREE.Object3D,
+  kind: VehicleKind,
+  mode: 'named' | 'infer' | 'none' = 'infer',
+): WheelRigNode[] {
+  if (mode === 'none') return [];
+
   const named = namedWheelNodes(root);
   if (named.length >= (kind === 'motorcycle' ? 2 : 4)) {
     return named.slice(0, kind === 'motorcycle' ? 2 : 4).map((obj) => ({
@@ -255,8 +269,10 @@ function collectWheelRig(root: THREE.Object3D, kind: VehicleKind): WheelRigNode[
     }));
   }
 
-  // Several SketchUp-exported FBXs name everything Group1/Mesh1.
-  // Fall back to cautious geometric wheel inference.
+  if (mode === 'named') return [];
+
+  // Only opt-in models may use geometric inference. Generic SketchUp Group/Mesh
+  // hierarchies can otherwise mistake handlebars/forks/body groups for wheels.
   return inferWheelNodes(root, kind);
 }
 
@@ -322,7 +338,9 @@ export async function attachExternalCarModel(
 
   // Long axis should run along Z in the racing world.
   if (size.x > size.z * 1.15) {
-    holder.rotation.y += Math.PI / 2;
+    // If a SketchUp/FBX export arrives lengthwise on X, map +X -> +Z.
+    // The old +90deg mapping sent +X -> -Z and made every such model face backward.
+    holder.rotation.y -= Math.PI / 2;
     box = new THREE.Box3().setFromObject(holder);
     size = box.getSize(new THREE.Vector3());
   }
@@ -353,7 +371,7 @@ export async function attachExternalCarModel(
   });
 
   holder.updateWorldMatrix(true, true);
-  const wheelRig = collectWheelRig(fbx, cfg.kind);
+  const wheelRig = collectWheelRig(fbx, cfg.kind, cfg.wheelMode ?? 'infer');
   const originalUpdate = instance.updateAnimation;
   const baseHolderZ = holder.rotation.z;
 

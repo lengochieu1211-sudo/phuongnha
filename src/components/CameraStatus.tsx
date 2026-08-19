@@ -112,7 +112,7 @@ export default function CameraStatus({
       )}
 
       {/* Camera Live Feed Card */}
-      <div className="relative aspect-video w-full rounded-2xl overflow-hidden border-4 border-purple-200 bg-slate-900 shadow-inner flex items-center justify-center">
+      <div className="relative aspect-[4/3] w-full rounded-2xl overflow-hidden border-4 border-purple-200 bg-slate-900 shadow-inner flex items-center justify-center">
         {isStreaming ? (
           <>
             {/* Display Canvas with custom rendered skeleton/overlays */}
@@ -121,7 +121,7 @@ export default function CameraStatus({
               id="webcam-canvas-output"
               width={640}
               height={480}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain bg-black"
             />
 
             {/* Dotted target silhouette when no body detected */}

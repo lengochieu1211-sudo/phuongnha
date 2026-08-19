@@ -118,13 +118,23 @@ export function CameraPoseProvider({ children }: { children: ReactNode }) {
         streamRef.current = null;
       }
 
+      const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
+      const videoConstraints: MediaTrackConstraints = {
+        // Keep a 4:3 sensor crop because it retains more vertical field-of-view than 16:9.
+        // On a portrait phone request the same 4:3 frame rotated to portrait.
+        width: { ideal: portrait ? 720 : 960 },
+        height: { ideal: portrait ? 960 : 720 },
+        aspectRatio: { ideal: portrait ? 0.75 : 4 / 3 },
+        facingMode: { ideal: 'user' },
+        frameRate: { ideal: 30, max: 30 },
+      };
+
+      // Chromium supports resizeMode on many Android devices. "none" asks the browser
+      // not to digitally crop/zoom the sensor just to satisfy the requested resolution.
+      (videoConstraints as any).resizeMode = { ideal: 'none' };
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          facingMode: 'user',
-          frameRate: { ideal: 30, max: 60 },
-        },
+        video: videoConstraints,
         audio: false,
       });
 
@@ -145,6 +155,31 @@ export function CameraPoseProvider({ children }: { children: ReactNode }) {
             video.onloadedmetadata = () => resolve();
           }
         });
+
+        // Some Android front cameras open with digital zoom/crop. Force the widest
+        // available field-of-view when the browser exposes the zoom capability.
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps: any = track?.getCapabilities?.() || {};
+          if (caps.zoom && Number.isFinite(caps.zoom.min)) {
+            await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min } as any] });
+          }
+        } catch (e) {
+          console.warn('Camera wide-FOV constraint not supported:', e);
+        }
+
+        // The old fixed 640x480 canvas stretched portrait camera frames and the UI later
+        // cropped them with object-cover. Preserve the real camera aspect ratio instead.
+        const vw = Math.max(1, video.videoWidth || 640);
+        const vh = Math.max(1, video.videoHeight || 480);
+        const maxCanvasSide = 720;
+        if (vw >= vh) {
+          canvas.width = maxCanvasSide;
+          canvas.height = Math.max(1, Math.round(maxCanvasSide * vh / vw));
+        } else {
+          canvas.height = maxCanvasSide;
+          canvas.width = Math.max(1, Math.round(maxCanvasSide * vw / vh));
+        }
 
         try {
           await video.play();

@@ -538,7 +538,9 @@ export class PoseDetectorManager {
 
     // Body Checks & Feedback
     const upperBodyVisible = (leftShoulder?.visibility || 0) > 0.4 && (rightShoulder?.visibility || 0) > 0.4;
-    const lowerBodyVisible = (leftAnkle?.visibility || 0) > 0.35 || (rightAnkle?.visibility || 0) > 0.35;
+    const leftAnkleInFrame = (leftAnkle?.visibility || 0) > 0.30 && (leftAnkle?.y ?? 1) < 0.97;
+    const rightAnkleInFrame = (rightAnkle?.visibility || 0) > 0.30 && (rightAnkle?.y ?? 1) < 0.97;
+    const lowerBodyVisible = leftAnkleInFrame && rightAnkleInFrame;
     const fullBodyDetected = upperBodyVisible && lowerBodyVisible;
 
     let trackingFeedback: PoseResult['trackingFeedback'] = 'ok';

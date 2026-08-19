@@ -101,9 +101,9 @@ export default function CalibrationScreen({
   }, [isStreaming, canvasElement]);
 
   // Profile classification
-  const isFullBodyRequired = ['mimic', 'adventure', 'workout', 'randomworkout', 'workout_session', 'ninja', 'goalkeeper'].includes(targetScreen || '');
+  const isFullBodyRequired = ['mimic', 'adventure', 'workout', 'randomworkout', 'workout_session', 'ninja', 'goalkeeper', 'magicacademy'].includes(targetScreen || '');
   const isRacingRequired = ['racing'].includes(targetScreen || '');
-  const isUpperBodyRequired = ['dance', 'parentplay', 'magicacademy'].includes(targetScreen || '');
+  const isUpperBodyRequired = ['dance', 'parentplay'].includes(targetScreen || '');
   const isWristOnlyRequired = ['fruitslash', 'chickenblaster', 'sweetzombie', 'starcatcher'].includes(targetScreen || '');
 
   // Body position checklist state
@@ -185,8 +185,8 @@ export default function CalibrationScreen({
       const rHipOk = Boolean(rHip && (rHip.visibility ?? 1) > 0.35);
       const bothHipsOk = lHipOk && rHipOk;
 
-      const lAnkleOk = Boolean(lAnkle && (lAnkle.visibility ?? 1) > 0.25);
-      const rAnkleOk = Boolean(rAnkle && (rAnkle.visibility ?? 1) > 0.25);
+      const lAnkleOk = Boolean(lAnkle && (lAnkle.visibility ?? 1) > 0.25 && lAnkle.y < 0.965);
+      const rAnkleOk = Boolean(rAnkle && (rAnkle.visibility ?? 1) > 0.25 && rAnkle.y < 0.965);
       const bothFeetOk = lAnkleOk && rAnkleOk;
 
       const lWristOk = Boolean(lWrist && (lWrist.visibility ?? 1) > 0.35);
@@ -301,10 +301,10 @@ export default function CalibrationScreen({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
         {/* Left 7 cols: Video Stage with Silhouette Overlay */}
         <div className="md:col-span-7 flex flex-col items-center gap-3">
-          <div className="relative aspect-video w-full rounded-3xl overflow-hidden border-4 border-emerald-400 bg-slate-900 shadow-2xl flex items-center justify-center">
+          <div className="relative aspect-[4/3] w-full rounded-3xl overflow-hidden border-4 border-emerald-400 bg-slate-900 shadow-2xl flex items-center justify-center">
             {isStreaming ? (
               <>
-                <canvas ref={localCanvasRef} width={640} height={480} className="w-full h-full object-cover" />
+                <canvas ref={localCanvasRef} width={640} height={480} className="w-full h-full object-contain bg-black" />
 
                 {/* Silhouette framing guide overlay */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
