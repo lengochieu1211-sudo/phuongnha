@@ -63,14 +63,14 @@ function checkVoiceFiles() {
   fs.mkdirSync(path.dirname(statusPath), { recursive: true });
   fs.writeFileSync(statusPath, JSON.stringify({
     recordedPackAvailable: invalidFiles === 0 && missingFiles === 0,
-    voiceStyle: 'female_offline_vi',
-    generator: 'bundled offline Vietnamese female-formant TTS',
+    voiceStyle: 'female_offline_vi_fallback',
+    generator: 'bundled offline Vietnamese female-formant synthetic fallback',
     totalFiles,
     validFiles,
     invalidFiles,
     missingFiles,
     checkedAt: new Date().toISOString(),
-    note: 'Female mode is offline-only and never falls back to the device system male voice.',
+    note: 'Synthetic offline fallback pack, not a human recording. The app prefers a verified Vietnamese female system voice when available and never silently switches female mode to a detected male voice.',
   }, null, 2));
 
   if (invalidFiles > 0 || missingFiles > 0) {
@@ -79,7 +79,7 @@ function checkVoiceFiles() {
     console.log('Chế độ Giọng Nữ sẽ không tự chuyển sang giọng hệ thống để tránh đổi sang giọng nam trên Android/Chrome.');
     console.log('Hãy bổ sung/khôi phục file MP3 hợp lệ trong /public/audio/voice/vi-female/ trước khi phát hành.');
   } else {
-    console.log('\n🎉 TOÀN BỘ FILE ÂM THANH THẬT ĐÃ HỢP LỆ VÀ SẴN SÀNG!');
+    console.log('\n🎉 TOÀN BỘ FILE MP3 OFFLINE ĐÃ HỢP LỆ VÀ SẴN SÀNG LÀM GIỌNG DỰ PHÒNG!');
   }
   console.log('===================================================');
 }

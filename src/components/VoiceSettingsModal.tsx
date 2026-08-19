@@ -18,6 +18,7 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
   const [isPlayingPreview, setIsPlayingPreview] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
   const [systemVoices, setSystemVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const femaleVoiceStatus = voiceGuide.getFemaleVoiceStatus();
 
   useEffect(() => {
     const unsub = voiceGuide.subscribeSettings((newSettings) => {
@@ -83,10 +84,10 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
       id: 'female_gentle',
       name: 'Chị Phương Nhã',
       title: 'Giọng Nữ Dịu Dàng',
-      description: 'Giọng nữ tiếng Việt đã đóng sẵn trong game: 343 câu MP3 offline, phát giống nhau trên điện thoại, PC và TV.',
-      pitchDesc: 'MP3 OFFLINE • Không phụ thuộc giọng hệ thống',
+      description: 'Ưu tiên giọng nữ tiếng Việt tự nhiên nếu thiết bị có. Nếu thiết bị không có giọng nữ tự nhiên, game dùng bộ MP3 nữ tổng hợp offline dự phòng. Bộ này không phải giọng người thu thật và app không tự chuyển sang giọng nam.',
+      pitchDesc: 'NỮ TỰ NHIÊN ƯU TIÊN • MP3 TỔNG HỢP DỰ PHÒNG',
       emoji: '👩‍🏫',
-      badge: 'Thu Sẵn • Mặc Định',
+      badge: 'Nữ • Mặc Định',
       icon: Heart,
       color: 'border-pink-300 bg-pink-50/70 text-pink-700',
     },
@@ -279,7 +280,11 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
             <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
               {settings.voiceStyle === 'female_gentle' ? (
-                <><strong>Giọng Nữ Thu Sẵn:</strong> game ưu tiên 343 câu MP3 tiếng Việt đóng sẵn, nên điện thoại/PC/TV không còn phụ thuộc giọng nam mặc định của Chrome cho các câu đã ánh xạ.</>
+                <><strong>Nguồn giọng nữ:</strong> {femaleVoiceStatus.activeSource === 'natural-system-female'
+                  ? `Đang dùng giọng nữ tự nhiên của thiết bị${femaleVoiceStatus.naturalFemaleName ? ` – ${femaleVoiceStatus.naturalFemaleName}` : ''}.`
+                  : femaleVoiceStatus.activeSource === 'offline-fallback'
+                  ? 'Thiết bị chưa có giọng nữ Việt tự nhiên; đang dùng MP3 nữ tổng hợp offline dự phòng (không phải bản thu người thật).'
+                  : 'Chưa tìm thấy nguồn giọng nữ phù hợp.'}</>
               ) : (
                 <><strong>Giọng hệ thống:</strong> {settings.selectedVoiceName || 'Tự động tiếng Việt trên thiết bị'}. Hai kiểu Nam/Em bé vẫn dùng Web Speech của thiết bị.</>
               )}

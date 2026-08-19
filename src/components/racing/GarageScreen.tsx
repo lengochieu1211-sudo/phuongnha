@@ -26,8 +26,9 @@ import {
   saveRaceProfile,
 } from '../../lib/racing/CarData';
 import { buildCar3D, Car3DInstance } from '../../lib/racing/Car3DBuilder';
+import { attachExternalCarModel, isExternalCar, shouldUseExternalCar, ExternalCarHandle } from '../../lib/racing/ExternalCarModelLoader';
 import { raceAudio } from '../../lib/racing/RaceAudio';
-import { resolveRacingGraphicsProfile } from '../../utils/graphicsQuality';
+import { resolveRacingGraphicsProfile, detectDeviceClass } from '../../utils/graphicsQuality';
 import {
   Sparkles,
   Zap,
@@ -114,6 +115,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const carInstanceRef = useRef<Car3DInstance | null>(null);
   const graphicsProfile = useRef(resolveRacingGraphicsProfile(qualitySetting)).current;
+  const actualDeviceClass = useRef(detectDeviceClass()).current;
   const isDraggingRef = useRef(false);
   const prevMouseXRef = useRef(0);
   const turntableAngleRef = useRef(0.6);
@@ -133,8 +135,13 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 1.85, 5.7);
-    camera.lookAt(0, 0.4, 0);
+    if (currentCar.category === 'motorcycle') {
+      camera.position.set(0, 1.28, 3.25);
+      camera.lookAt(0, 0.72, 0);
+    } else {
+      camera.position.set(0, 1.85, 5.7);
+      camera.lookAt(0, 0.4, 0);
+    }
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
     renderer.setSize(width, height);
@@ -193,6 +200,26 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     scene.add(carInst.root);
     carInstanceRef.current = carInst;
 
+    let externalGarageHandle: ExternalCarHandle | null = null;
+    let externalGarageCancelled = false;
+    if (
+      isExternalCar(currentCar.id) &&
+      shouldUseExternalCar(currentCar.id, actualDeviceClass)
+    ) {
+      attachExternalCarModel(carInst, currentCar.id, currentCustomization, graphicsProfile.carDetail)
+        .then((handle) => {
+          if (!handle) return;
+          if (externalGarageCancelled) {
+            handle.dispose();
+            return;
+          }
+          externalGarageHandle = handle;
+        })
+        .catch((err) => {
+          console.warn('Garage FBX preview failed; keeping procedural fallback.', err);
+        });
+    }
+
     let animId: number;
     const animate = () => {
       if (!isDraggingRef.current) {
@@ -219,6 +246,8 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     ro.observe(container);
 
     return () => {
+      externalGarageCancelled = true;
+      externalGarageHandle?.dispose();
       cancelAnimationFrame(animId);
       ro.disconnect();
       renderer.dispose();

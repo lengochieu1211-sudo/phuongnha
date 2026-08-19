@@ -21,10 +21,25 @@ export interface FashionBodyAnchors {
   
   shoulderCenter: { x: number; y: number; confidence: number };
   shoulderWidth: number;
+  leftShoulder: { x: number; y: number; confidence: number };
+  rightShoulder: { x: number; y: number; confidence: number };
+  leftElbow: { x: number; y: number; confidence: number };
+  rightElbow: { x: number; y: number; confidence: number };
   
   torsoCenter: { x: number; y: number; confidence: number };
   torsoHeight: number;
   torsoRotation: number; // in degrees
+  torsoYaw: number; // pseudo-3D left/right turn in degrees
+  torsoFacing: 'front' | 'left' | 'right';
+
+  leftUpperArmRotation: number;
+  rightUpperArmRotation: number;
+  leftForearmRotation: number;
+  rightForearmRotation: number;
+  leftUpperArmLength: number;
+  rightUpperArmLength: number;
+  leftForearmLength: number;
+  rightForearmLength: number;
   
   hipCenter: { x: number; y: number; confidence: number };
   hipWidth: number;

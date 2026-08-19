@@ -50,11 +50,11 @@ class RecordedVoiceService {
         voiceGuide.registerRecordedVoicePlayer(this);
       } else {
         this.enabled = false;
-        console.info('[Voice] Recorded female pack is unavailable; using configured Web Speech TTS.');
+        console.info('[Voice] Offline synthetic female fallback is unavailable; using configured Web Speech TTS when appropriate.');
       }
     } catch {
       this.enabled = false;
-      console.info('[Voice] Recorded pack status unavailable; using configured Web Speech TTS.');
+      console.info('[Voice] Offline fallback status unavailable; using configured Web Speech TTS when appropriate.');
     }
   }
 
@@ -92,7 +92,7 @@ class RecordedVoiceService {
   }
 
   /**
-   * Play a recorded voice line with priority-based preemption and fallback
+   * Play a bundled offline voice line with priority-based preemption
    */
   public play(key: string, priority: VoicePriority = 'event', callbacks?: { onStart?: () => void; onEnd?: () => void }) {
     if (!this.enabled) return;
@@ -179,7 +179,7 @@ class RecordedVoiceService {
         })
         .catch((_err) => {
           // Promise rejected (e.g., user gesture restriction or file not found)
-          // Fall back to Web Speech synthesis
+          // Do not switch female mode to an unknown system voice on playback failure
           if (audioObj.onerror) {
             audioObj.onerror(new Event('error'));
           }

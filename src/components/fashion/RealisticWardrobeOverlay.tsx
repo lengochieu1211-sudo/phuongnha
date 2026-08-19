@@ -174,11 +174,13 @@ export default function RealisticWardrobeOverlay({ itemId, category, side = 'lef
       <svg viewBox="0 0 260 330" preserveAspectRatio="xMidYMid meet" className="w-full h-full overflow-visible" aria-hidden>
         {defs}
         <g filter={`url(#shadow-${uid})`}>
-          <path d={dress ? 'M72 50 L38 91 L66 126 L81 112 L55 299 Q130 326 205 299 L178 112 L195 126 L222 91 L188 50 L157 37 Q130 58 103 37Z' : 'M73 48 L33 92 L62 126 L82 108 L77 285 Q130 303 183 285 L178 108 L198 126 L227 92 L187 48 L157 35 Q130 55 103 35Z'} fill={`url(#${grad})`} stroke="#fff" strokeOpacity=".55" strokeWidth="3" />
+          <path d={dress ? 'M92 48 Q103 36 112 35 Q130 57 148 35 Q158 36 169 48 L185 112 L205 299 Q130 326 55 299 L75 112 Z' : 'M91 48 Q102 36 104 35 Q130 55 157 35 Q160 36 170 48 L184 108 L183 285 Q130 303 77 285 L76 108 Z'} fill={`url(#${grad})`} stroke="#fff" strokeOpacity=".55" strokeWidth="3" />
           <path d="M104 38 Q130 61 157 38 Q150 78 130 79 Q109 77 104 38Z" fill="#0f172a" fillOpacity={robot?.5:.12} />
           {karate && <><path d="M130 75 L130 271" stroke="#334155" strokeWidth="5"/><path d="M75 184 Q130 207 184 184" stroke="#111827" strokeWidth="17"/></>}
           {robot && <><path d="M91 108 L169 108 L177 190 L130 220 L83 190Z" fill="#111827" fillOpacity=".56" stroke="#93c5fd" strokeWidth="4"/><circle cx="130" cy="153" r="26" fill="#22d3ee" fillOpacity=".72" stroke="#e0f2fe" strokeWidth="5"/></>}
           {!robot && !karate && <path d="M92 89 Q130 70 169 89" fill="none" stroke="#fff" strokeOpacity=".34" strokeWidth="8" strokeLinecap="round" />}
+          <path d="M94 92 Q91 178 96 267 M166 92 Q169 178 164 267" fill="none" stroke="#0f172a" strokeOpacity=".12" strokeWidth="3"/>
+          <path d="M112 58 Q130 74 148 58" fill="none" stroke="#fff" strokeOpacity=".45" strokeWidth="4" strokeLinecap="round"/>
           {dress && <path d="M71 214 Q130 237 190 214" fill="none" stroke="#fff" strokeOpacity=".55" strokeWidth="7" />}
         </g>
       </svg>

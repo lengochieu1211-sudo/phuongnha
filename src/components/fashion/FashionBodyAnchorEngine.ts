@@ -37,13 +37,14 @@ export class FashionBodyAnchorEngine {
 
     const getLm = (index: number) => {
       const lm = landmarks[index];
-      if (!lm) return { x: 0.5, y: 0.5, confidence: 0 };
+      if (!lm) return { x: 0.5, y: 0.5, z: 0, confidence: 0 };
       
       // DO NOT mirror X again, as poseDetector has already mirrored landmarks
       const x = lm.x;
       return {
         x,
         y: lm.y,
+        z: typeof lm.z === 'number' ? lm.z : 0,
         confidence: lm.visibility !== undefined ? lm.visibility : 0.8
       };
     };
@@ -62,6 +63,8 @@ export class FashionBodyAnchorEngine {
     const mouthRight = getLm(10);
     const leftShoulder = getLm(11);
     const rightShoulder = getLm(12);
+    const leftElbow = getLm(13);
+    const rightElbow = getLm(14);
     const leftWrist = getLm(15);
     const rightWrist = getLm(16);
     const leftHip = getLm(23);
@@ -170,6 +173,34 @@ export class FashionBodyAnchorEngine {
       if (torsoRotation < -45) torsoRotation = -45;
     }
 
+    // Estimate body yaw from shoulder depth and face/torso offset.
+    // MediaPipe Z is relative depth; combining it with the 2D shoulder span
+    // is much more stable than using only width shrinkage.
+    const shoulderDepth = (leftShoulder.z || 0) - (rightShoulder.z || 0);
+    const safeShoulderWidth = Math.max(0.06, shoulderWidth);
+    let torsoYaw = Math.atan2(shoulderDepth, safeShoulderWidth) * (180 / Math.PI);
+    const faceSideBias = ((nose.x - shoulderCenter.x) / safeShoulderWidth) * 26;
+    torsoYaw += faceSideBias;
+    torsoYaw = Math.max(-58, Math.min(58, torsoYaw));
+    const torsoFacing: 'front' | 'left' | 'right' =
+      torsoYaw > 12 ? 'right' : torsoYaw < -12 ? 'left' : 'front';
+
+    const segment = (
+      a: {x:number;y:number;confidence:number},
+      b: {x:number;y:number;confidence:number},
+    ) => {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      return {
+        length: Math.sqrt(dx * dx + dy * dy),
+        rotation: Math.atan2(dy, dx) * (180 / Math.PI),
+      };
+    };
+    const leftUpperArm = segment(leftShoulder, leftElbow);
+    const rightUpperArm = segment(rightShoulder, rightElbow);
+    const leftForearm = segment(leftElbow, leftWrist);
+    const rightForearm = segment(rightElbow, rightWrist);
+
     // Create current raw anchors
     const rawAnchors: FashionBodyAnchors = {
       headCenter,
@@ -184,9 +215,23 @@ export class FashionBodyAnchorEngine {
       faceRotation,
       shoulderCenter,
       shoulderWidth,
+      leftShoulder,
+      rightShoulder,
+      leftElbow,
+      rightElbow,
       torsoCenter,
       torsoHeight,
       torsoRotation,
+      torsoYaw,
+      torsoFacing,
+      leftUpperArmRotation: leftUpperArm.rotation,
+      rightUpperArmRotation: rightUpperArm.rotation,
+      leftForearmRotation: leftForearm.rotation,
+      rightForearmRotation: rightForearm.rotation,
+      leftUpperArmLength: leftUpperArm.length,
+      rightUpperArmLength: rightUpperArm.length,
+      leftForearmLength: leftForearm.length,
+      rightForearmLength: rightForearm.length,
       hipCenter,
       hipWidth,
       leftKnee,
@@ -232,11 +277,25 @@ export class FashionBodyAnchorEngine {
       
       shoulderCenter: smoothPoint(prev.shoulderCenter, rawAnchors.shoulderCenter, factor),
       shoulderWidth: smoothVal(prev.shoulderWidth, rawAnchors.shoulderWidth, factor),
-      
+      leftShoulder: smoothPoint(prev.leftShoulder, rawAnchors.leftShoulder, factor),
+      rightShoulder: smoothPoint(prev.rightShoulder, rawAnchors.rightShoulder, factor),
+      leftElbow: smoothPoint(prev.leftElbow, rawAnchors.leftElbow, factor),
+      rightElbow: smoothPoint(prev.rightElbow, rawAnchors.rightElbow, factor),
+
       torsoCenter: smoothPoint(prev.torsoCenter, rawAnchors.torsoCenter, factor),
       torsoHeight: smoothVal(prev.torsoHeight, rawAnchors.torsoHeight, factor),
       torsoRotation: smoothVal(prev.torsoRotation, rawAnchors.torsoRotation, factor),
-      
+      torsoYaw: smoothVal(prev.torsoYaw, rawAnchors.torsoYaw, factor),
+      torsoFacing: rawAnchors.torsoFacing,
+      leftUpperArmRotation: smoothVal(prev.leftUpperArmRotation, rawAnchors.leftUpperArmRotation, factor),
+      rightUpperArmRotation: smoothVal(prev.rightUpperArmRotation, rawAnchors.rightUpperArmRotation, factor),
+      leftForearmRotation: smoothVal(prev.leftForearmRotation, rawAnchors.leftForearmRotation, factor),
+      rightForearmRotation: smoothVal(prev.rightForearmRotation, rawAnchors.rightForearmRotation, factor),
+      leftUpperArmLength: smoothVal(prev.leftUpperArmLength, rawAnchors.leftUpperArmLength, factor),
+      rightUpperArmLength: smoothVal(prev.rightUpperArmLength, rawAnchors.rightUpperArmLength, factor),
+      leftForearmLength: smoothVal(prev.leftForearmLength, rawAnchors.leftForearmLength, factor),
+      rightForearmLength: smoothVal(prev.rightForearmLength, rawAnchors.rightForearmLength, factor),
+
       hipCenter: smoothPoint(prev.hipCenter, rawAnchors.hipCenter, factor),
       hipWidth: smoothVal(prev.hipWidth, rawAnchors.hipWidth, factor),
       

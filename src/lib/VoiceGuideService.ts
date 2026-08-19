@@ -157,7 +157,7 @@ class VoiceGuideService {
     // Refresh because Chrome/Android populates speechSynthesis voices asynchronously.
     if (this.synth) this.voices = this.synth.getVoices();
     const viVoices = this.voices.filter((v) => v.lang.toLowerCase().startsWith('vi'));
-    const femaleViVoice = viVoices.find((v) => this.isLikelyFemaleVoice(v));
+    const femaleViVoice = this.getNaturalFemaleVoice();
     const maleViVoice = viVoices.find((v) => this.isLikelyMaleVoice(v));
     const neutralViVoice = viVoices.find((v) => !this.isLikelyMaleVoice(v)) || viVoices[0] || null;
 
@@ -182,6 +182,43 @@ class VoiceGuideService {
 
   public getVoices(): SpeechSynthesisVoice[] {
     return this.voices;
+  }
+
+  public getFemaleVoiceStatus() {
+    if (this.synth) this.voices = this.synth.getVoices();
+    const female = this.getNaturalFemaleVoice();
+    return {
+      naturalFemaleAvailable: Boolean(female),
+      naturalFemaleName: female?.name || '',
+      offlinePackAvailable: Boolean(this.recordedVoicePlayer),
+      activeSource:
+        this.settings.voiceStyle !== 'female_gentle' ? 'system' :
+        female ? 'natural-system-female' :
+        this.recordedVoicePlayer ? 'offline-fallback' : 'unavailable',
+    } as const;
+  }
+
+  private getNaturalFemaleVoice(): SpeechSynthesisVoice | null {
+    if (this.synth) this.voices = this.synth.getVoices();
+    const candidates = this.voices.filter((v) => v.lang.toLowerCase().startsWith('vi') && this.isLikelyFemaleVoice(v));
+    if (!candidates.length) return null;
+
+    // Prefer higher-quality/natural Vietnamese voices when the browser exposes several.
+    // Keep this deterministic so Android does not randomly switch speakers between sessions.
+    const score = (v: SpeechSynthesisVoice) => {
+      const n = this.voiceFingerprint(v);
+      let s = 0;
+      if (n.includes('natural')) s += 80;
+      if (n.includes('network')) s += 35;
+      if (n.includes('google tiếng việt 1') || n.includes('vi-vn-x-vic')) s += 30;
+      if (n.includes('google tiếng việt 2') || n.includes('vi-vn-x-vid')) s += 26;
+      if (n.includes('google tiếng việt 4') || n.includes('vi-vn-x-vif')) s += 24;
+      if (n.includes('hoaimy') || n.includes('hoai my')) s += 32;
+      if (n.includes('linh')) s += 18;
+      if (v.localService) s += 8; // useful when the device has downloaded the voice for offline use
+      return s;
+    };
+    return [...candidates].sort((a, b) => score(b) - score(a))[0] || null;
   }
 
   public setVoiceStyle(style: VoiceStyle) {
@@ -234,11 +271,20 @@ class VoiceGuideService {
   public previewVoiceStyle(style: VoiceStyle) {
     this.applyVoiceStyleConfig(style);
     this.stop();
-    // The female preview must use the bundled recording, not a device TTS voice.
-    // This prevents Android/Chrome from previewing a male Vietnamese system voice.
-    if (style === 'female_gentle' && this.recordedVoicePlayer) {
-      this.playKey('common.welcome', 'high');
-      return;
+    // Prefer a real/natural Vietnamese female system voice when the device
+    // exposes one. The bundled offline pack is retained as a fallback for
+    // devices that only expose a male/neutral Vietnamese voice.
+    if (style === 'female_gentle') {
+      const naturalFemale = this.getNaturalFemaleVoice();
+      if (naturalFemale) {
+        this.selectedVoice = naturalFemale;
+        this.speakSynthesized('Xin chào Phương Nhã! Mình cùng bắt đầu cuộc phiêu lưu nhé!', 'high');
+        return;
+      }
+      if (this.recordedVoicePlayer) {
+        this.playKey('common.welcome', 'high');
+        return;
+      }
     }
     let sampleText = 'Xin chào bé yêu! Chị Phương Nhã rất vui được cùng em phiêu lưu và vận động nhé!';
     if (style === 'male_warm') {
@@ -265,23 +311,30 @@ class VoiceGuideService {
   ) {
     if (!this.settings.enabled || !text) return;
 
-    // The bundled offline recordings are the female voice pack. Respect the
-    // selected Male/Baby styles by using Web Speech for those styles instead
-    // of silently playing the female recording.
-    if (this.recordedVoicePlayer && this.settings.voiceStyle === 'female_gentle') {
-      const manifestKey = this.findManifestKeyByText(text);
-      if (manifestKey) {
-        const mappedPriority: any =
-          priority === 'high' ? 'instruction' :
-          priority === 'low' ? 'praise' : 'event';
-        this.recordedVoicePlayer.play(manifestKey, mappedPriority, callbacks);
+    if (this.settings.voiceStyle === 'female_gentle') {
+      // First choice: a verified Vietnamese female system voice. These voices
+      // are usually much more natural than the small bundled fallback clips.
+      const naturalFemale = this.getNaturalFemaleVoice();
+      if (naturalFemale) {
+        this.selectedVoice = naturalFemale;
+        this.speakSynthesized(text, priority, callbacks);
         return;
       }
-      // Female mode is intentionally OFFLINE-ONLY. Never fall back to the
-      // device Web Speech voice because many Android/Chrome devices expose a
-      // Vietnamese male voice as the default. An unmapped dynamic sentence is
-      // skipped instead of unexpectedly changing speaker/gender mid-game.
-      console.warn('[VoiceGuide] Female offline line is not mapped:', text);
+
+      // Second choice: bundled offline pack. It guarantees that a device which
+      // only has a Vietnamese male voice never changes speaker unexpectedly.
+      if (this.recordedVoicePlayer) {
+        const manifestKey = this.findManifestKeyByText(text);
+        if (manifestKey) {
+          const mappedPriority: any =
+            priority === 'high' ? 'instruction' :
+            priority === 'low' ? 'praise' : 'event';
+          this.recordedVoicePlayer.play(manifestKey, mappedPriority, callbacks);
+          return;
+        }
+      }
+
+      console.warn('[VoiceGuide] No verified female Vietnamese source for:', text);
       callbacks?.onEnd?.();
       return;
     }
@@ -300,11 +353,20 @@ class VoiceGuideService {
     const entry = VOICE_MANIFEST[category]?.[subKey];
 
     if (entry) {
-      if (this.recordedVoicePlayer && this.settings.voiceStyle === 'female_gentle') {
-        const mappedPriority: any =
-          priority === 'high' ? 'instruction' :
-          priority === 'low' ? 'praise' : 'event';
-        this.recordedVoicePlayer.play(key, mappedPriority, callbacks);
+      if (this.settings.voiceStyle === 'female_gentle') {
+        const naturalFemale = this.getNaturalFemaleVoice();
+        if (naturalFemale) {
+          this.selectedVoice = naturalFemale;
+          this.speakSynthesized(entry.text, priority, callbacks);
+        } else if (this.recordedVoicePlayer) {
+          const mappedPriority: any =
+            priority === 'high' ? 'instruction' :
+            priority === 'low' ? 'praise' : 'event';
+          this.recordedVoicePlayer.play(key, mappedPriority, callbacks);
+        } else {
+          console.warn(`[VoiceGuide] Female voice unavailable for key: ${key}`);
+          callbacks?.onEnd?.();
+        }
       } else {
         this.speakSynthesized(entry.text, priority, callbacks);
       }

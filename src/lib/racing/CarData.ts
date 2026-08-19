@@ -16,6 +16,90 @@ import {
 
 export const CAR_CATALOG: CarConfig[] = [
   {
+    id: 'roadster_883_3d',
+    name: '883 ROADSTER 3D',
+    subTitle: 'Motorcycle • Model FBX thật',
+    category: 'motorcycle',
+    description:
+      'Mẫu xe máy 3D chi tiết do người dùng cung cấp. Kích thước và camera được chuẩn hóa riêng cho xe hai bánh; điện thoại yếu dùng fallback nhẹ.',
+    baseStats: {
+      topSpeed: 86,
+      acceleration: 91,
+      handling: 88,
+      drift: 70,
+      nitro: 86,
+      braking: 84,
+    },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#20242b',
+    specialAura: '🏍️ Roadster 883',
+  },
+  {
+    id: 'vespa_studio_3d',
+    name: 'VESPA STUDIO 3D',
+    subTitle: 'Retro Scooter • Model FBX thật',
+    category: 'motorcycle',
+    description:
+      'Scooter cổ điển 3D với nhiều chi tiết vật liệu. Bản TV/PC dùng FBX thật; điện thoại dùng fallback để giữ khung hình ổn định.',
+    baseStats: {
+      topSpeed: 68,
+      acceleration: 79,
+      handling: 92,
+      drift: 66,
+      nitro: 73,
+      braking: 91,
+    },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#d9e8e6',
+    specialAura: '🛵 Retro scooter',
+  },
+  {
+    id: 'canis_mesa_3d',
+    name: 'CANIS MESA 3D',
+    subTitle: 'Off-road 4x4 • Model FBX thật',
+    category: 'suv_perf',
+    description:
+      'Mẫu 4x4 3D chi tiết do người dùng cung cấp. Bản PC/TV ưu tiên model FBX thật; điện thoại yếu tự chuyển sang mô hình nhẹ để giữ FPS.',
+    baseStats: {
+      topSpeed: 76,
+      acceleration: 79,
+      handling: 82,
+      drift: 76,
+      nitro: 80,
+      braking: 85,
+    },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#6b7a4a',
+    specialAura: '🏜️ 4x4 địa hình thực tế',
+  },
+  {
+    id: 'v12_sv_3d',
+    name: 'V12 SV 3D',
+    subTitle: 'Supercar • Model FBX thật',
+    category: 'supercar',
+    description:
+      'Siêu xe V12 3D chi tiết do người dùng cung cấp. Chạy model thật trên PC/TV đủ mạnh và dùng fallback nhẹ khi thiết bị yếu.',
+    baseStats: {
+      topSpeed: 97,
+      acceleration: 95,
+      handling: 91,
+      drift: 89,
+      nitro: 96,
+      braking: 94,
+    },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#f2c300',
+    specialAura: '⚡ V12 SV tốc độ cao',
+  },
+  {
     id: 'bara_gt',
     name: 'BARA GT',
     subTitle: 'Chiến Mã Capybara Huyền Thoại',
@@ -396,7 +480,7 @@ const RACING_SAVE_KEY = 'bara_speed_racing_profile_v1';
 
 export function getInitialRaceProfile(): PlayerRaceProfile {
   return {
-    unlockedCars: ['bara_gt', 'ap_r1'],
+    unlockedCars: ['bara_gt', 'ap_r1', 'canis_mesa_3d', 'v12_sv_3d', 'roadster_883_3d', 'vespa_studio_3d'],
     selectedCarId: 'bara_gt',
     carCustomizations: {
       bara_gt: {
@@ -429,9 +513,18 @@ export function loadRaceProfile(): PlayerRaceProfile {
     if (raw) {
       const parsed = JSON.parse(raw);
       const initial = getInitialRaceProfile();
+      const mergedUnlockedCars = Array.from(new Set([
+        ...(initial.unlockedCars || []),
+        ...(parsed.unlockedCars || []),
+        'canis_mesa_3d',
+        'v12_sv_3d',
+        'roadster_883_3d',
+        'vespa_studio_3d',
+      ])) as CarModelId[];
       return {
         ...initial,
         ...parsed,
+        unlockedCars: mergedUnlockedCars,
         carCustomizations: { ...initial.carCustomizations, ...(parsed.carCustomizations || {}) },
         carUpgrades: { ...initial.carUpgrades, ...(parsed.carUpgrades || {}) },
         bestLapTimes: { ...initial.bestLapTimes, ...(parsed.bestLapTimes || {}) },

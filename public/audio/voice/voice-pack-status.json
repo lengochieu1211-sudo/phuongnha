@@ -1,10 +1,10 @@
 {
   "recordedPackAvailable": true,
-  "voiceStyle": "female_offline_vi",
-  "generator": "offline Vietnamese female-formant TTS",
+  "voiceStyle": "female_offline_vi_fallback",
+  "generator": "offline Vietnamese female-formant synthetic fallback",
   "totalFiles": 366,
   "validFiles": 366,
   "invalidFiles": 0,
   "missingFiles": 0,
-  "note": "Bundled valid MP3 voice pack. Female mode is offline-only and never falls back to the device system male voice."
+  "note": "Synthetic offline fallback pack, not a human recording. The app prefers a verified Vietnamese female system voice when available and never silently switches female mode to a detected male voice."
 }

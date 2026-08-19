@@ -18,7 +18,9 @@ import FashionCalibration from './FashionCalibration';
 import FashionShowMode from './FashionShowMode';
 import { FashionQualityMode } from './fashionTypes';
 import RealisticWardrobeOverlay from './RealisticWardrobeOverlay';
+import FittedSleeveOverlay from './FittedSleeveOverlay';
 import CameraReadinessBadge from '../CameraReadinessBadge';
+import AvatarMirrorMode from './AvatarMirrorMode';
 import { detectGraphicsProfile } from '../../utils/graphicsQuality';
 
 interface FashionGameProps {
@@ -56,6 +58,7 @@ export default function FashionGame({
   // Navigation / Game States
   const [gameState, setGameState] = useState<'calibration' | 'dressing' | 'show'>('calibration');
   const [activeCategory, setActiveCategory] = useState<CategoryType>('hat');
+  const [showAvatarMirror, setShowAvatarMirror] = useState<boolean>(false);
   const [qualityMode] = useState<FashionQualityMode>('auto');
   const graphicsProfile = useRef(detectGraphicsProfile()).current;
   const [showSkeletonDebug, setShowSkeletonDebug] = useState(false);
@@ -82,6 +85,10 @@ export default function FashionGame({
   const hatRef = useRef<HTMLDivElement | null>(null);
   const glassesRef = useRef<HTMLDivElement | null>(null);
   const shirtRef = useRef<HTMLDivElement | null>(null);
+  const sleeveLeftUpperRef = useRef<HTMLDivElement | null>(null);
+  const sleeveRightUpperRef = useRef<HTMLDivElement | null>(null);
+  const sleeveLeftForeRef = useRef<HTMLDivElement | null>(null);
+  const sleeveRightForeRef = useRef<HTMLDivElement | null>(null);
   const shoesLeftRef = useRef<HTMLDivElement | null>(null);
   const shoesRightRef = useRef<HTMLDivElement | null>(null);
   const wingsRef = useRef<HTMLDivElement | null>(null);
@@ -121,6 +128,13 @@ export default function FashionGame({
   // Imperative 60 FPS Render Loop
   useEffect(() => {
     let active = true;
+    let lastRigUpdate = 0;
+    const rigTargetFps = graphicsProfile.deviceClass === 'phone'
+      ? 30
+      : graphicsProfile.deviceClass === 'tv' || graphicsProfile.deviceClass === 'tablet'
+        ? 40
+        : graphicsProfile.quality === 'high' ? 60 : 48;
+    const rigIntervalMs = 1000 / rigTargetFps;
 
     const renderLoop = () => {
       if (!active) return;
@@ -139,6 +153,13 @@ export default function FashionGame({
         }
       }
 
+      const now = performance.now();
+      if (now - lastRigUpdate < rigIntervalMs) {
+        requestAnimationFrame(renderLoop);
+        return;
+      }
+      lastRigUpdate = now;
+
       const latest = getLatestPose();
       const anchors = anchorEngineRef.current.update(latest.landmarks, true); // true for mirrored camera
 
@@ -153,7 +174,7 @@ export default function FashionGame({
         }
 
         // Helper to update DOM transform
-        const updateDom = (ref: React.RefObject<HTMLDivElement | null>, pos: { x: number; y: number; confidence: number }, widthNormalized: number, heightNormalized?: number, rotation = 0, yOffset = 0) => {
+        const updateDom = (ref: React.RefObject<HTMLDivElement | null>, pos: { x: number; y: number; confidence: number }, widthNormalized: number, heightNormalized?: number, rotation = 0, yOffset = 0, yaw = 0) => {
           const el = ref.current;
           if (!el) return;
 
@@ -171,10 +192,15 @@ export default function FashionGame({
             }
             
             // Build transform string
-            let transform = 'translate(-50%, -50%)';
-            if (rotation !== 0) {
-              transform += ` rotate(${rotation}deg)`;
+            let transform = 'translate(-50%, -50%) perspective(760px)';
+            if (yaw !== 0) {
+              transform += ` rotateY(${Math.max(-60, Math.min(60, yaw))}deg)`;
             }
+            if (rotation !== 0) {
+              transform += ` rotateZ(${rotation}deg)`;
+            }
+            el.style.transformOrigin = '50% 50%';
+            el.style.transformStyle = 'preserve-3d';
             el.style.transform = transform;
             el.style.opacity = '1';
           } else {
@@ -184,26 +210,101 @@ export default function FashionGame({
           }
         };
 
+        const updateSegment = (
+          ref: React.RefObject<HTMLDivElement | null>,
+          a: {x:number;y:number;confidence:number},
+          b: {x:number;y:number;confidence:number},
+          thickness: number,
+          yaw = 0,
+        ) => {
+          const el = ref.current;
+          if (!el) return;
+          const confidence = Math.min(a.confidence, b.confidence);
+          if (confidence < 0.45) {
+            el.style.display = 'none';
+            el.style.opacity = '0';
+            return;
+          }
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          el.style.display = 'flex';
+          el.style.opacity = '1';
+          el.style.left = `${((a.x + b.x) * 0.5) * 100}%`;
+          el.style.top = `${((a.y + b.y) * 0.5) * 100}%`;
+          el.style.width = `${Math.max(4, Math.min(55, len * 112))}%`;
+          el.style.height = `${Math.max(2.8, Math.min(18, thickness * 100))}%`;
+          const depthScale = Math.max(0.86, 1 - Math.min(55, Math.abs(yaw)) / 420);
+          el.style.transformOrigin = '50% 50%';
+          el.style.transformStyle = 'preserve-3d';
+          el.style.transform = `translate(-50%, -50%) perspective(760px) rotateY(${yaw * 0.28}deg) rotateZ(${angle}deg) scaleY(${depthScale})`;
+        };
+
         // Precision face fitting: each accessory has its own facial anchor.
         // Do not stack incompatible head/face pieces on top of eyes/nose.
         const hasHat = Boolean(equippedIds.hat || equippedIds.crown);
         const hasMask = Boolean(equippedIds.mask);
         const hasWings = Boolean(equippedIds.wings);
-        updateDom(hairRef, anchors.headCenter, anchors.headWidth * 1.48, anchors.faceHeight * 1.42, anchors.faceRotation, anchors.faceHeight * 0.03);
-        updateDom(hatRef, anchors.foreheadCenter, anchors.headWidth * 1.32, anchors.faceHeight * 0.66, anchors.faceRotation, -anchors.faceHeight * 0.24);
-        if (!hasHat) updateDom(headAccessoryRef, anchors.foreheadCenter, anchors.headWidth * 1.22, anchors.faceHeight * 0.58, anchors.faceRotation, -anchors.faceHeight * 0.19);
+        updateDom(hairRef, anchors.headCenter, anchors.headWidth * 1.48, anchors.faceHeight * 1.42, anchors.faceRotation, anchors.faceHeight * 0.03, anchors.torsoYaw * 0.55);
+        updateDom(hatRef, anchors.foreheadCenter, anchors.headWidth * 1.32, anchors.faceHeight * 0.66, anchors.faceRotation, -anchors.faceHeight * 0.24, anchors.torsoYaw * 0.55);
+        if (!hasHat) updateDom(headAccessoryRef, anchors.foreheadCenter, anchors.headWidth * 1.22, anchors.faceHeight * 0.58, anchors.faceRotation, -anchors.faceHeight * 0.19, anchors.torsoYaw * 0.55);
         else if (headAccessoryRef.current) headAccessoryRef.current.style.display = 'none';
-        if (!hasMask) updateDom(glassesRef, anchors.eyeCenter, anchors.eyeWidth * 1.42, anchors.faceHeight * 0.25, anchors.faceRotation, 0);
+        if (!hasMask) updateDom(glassesRef, anchors.eyeCenter, anchors.eyeWidth * 1.42, anchors.faceHeight * 0.25, anchors.faceRotation, 0, anchors.torsoYaw * 0.55);
         else if (glassesRef.current) glassesRef.current.style.display = 'none';
-        updateDom(maskRef, anchors.faceCenter, anchors.faceWidth * 0.94, anchors.faceHeight * 0.70, anchors.faceRotation, anchors.faceHeight * 0.12);
+        updateDom(maskRef, anchors.faceCenter, anchors.faceWidth * 0.94, anchors.faceHeight * 0.70, anchors.faceRotation, anchors.faceHeight * 0.12, anchors.torsoYaw * 0.55);
 
         // Clothing scales from BOTH shoulders and hips instead of one fixed body width.
         // This makes the garment expand/contract with a real child's silhouette.
         const reliableHipWidth = anchors.hipCenter.confidence >= 0.45 ? anchors.hipWidth : anchors.shoulderWidth * 0.72;
         const fittedBodyWidth = Math.max(anchors.shoulderWidth * 1.54, reliableHipWidth * 1.32);
         const torsoH = Math.max(anchors.torsoHeight * 1.48, fittedBodyWidth * 1.05);
-        updateDom(shirtRef, anchors.torsoCenter, fittedBodyWidth, torsoH, anchors.torsoRotation, 0.015);
-        updateDom(necklaceRef, anchors.shoulderCenter, anchors.shoulderWidth * 0.82, anchors.torsoHeight * 0.62, anchors.torsoRotation, 0.11);
+        const yawCompression = Math.max(0.72, 1 - Math.abs(anchors.torsoYaw) / 185);
+        const displayedBodyWidth = fittedBodyWidth * yawCompression;
+        updateDom(shirtRef, anchors.torsoCenter, displayedBodyWidth, torsoH, anchors.torsoRotation, 0.015, anchors.torsoYaw);
+        if (shirtRef.current) {
+          shirtRef.current.style.transformOrigin = anchors.torsoYaw > 8 ? '62% 50%' : anchors.torsoYaw < -8 ? '38% 50%' : '50% 50%';
+          shirtRef.current.style.zIndex = '5';
+        }
+        updateDom(necklaceRef, anchors.shoulderCenter, anchors.shoulderWidth * 0.82, anchors.torsoHeight * 0.62, anchors.torsoRotation, 0.11, anchors.torsoYaw);
+
+        // Body-contour crop: shoulder and hip widths define a live trapezoid so
+        // the garment hugs the torso instead of remaining a fixed rectangle.
+        if (shirtRef.current) {
+          const shoulderRatio = Math.max(0.42, Math.min(0.98, anchors.shoulderWidth / Math.max(0.001, displayedBodyWidth)));
+          const hipRatio = Math.max(0.36, Math.min(0.94, reliableHipWidth / Math.max(0.001, displayedBodyWidth)));
+          const topInset = (1 - shoulderRatio) * 50;
+          const bottomInset = (1 - hipRatio) * 50;
+          shirtRef.current.style.clipPath = `polygon(${topInset}% 1%, ${100-topInset}% 1%, ${100-bottomInset}% 99%, ${bottomInset}% 99%)`;
+        }
+
+        // Pose-rigged sleeves: each arm is split shoulder->elbow and elbow->wrist.
+        // This is the key difference from the old flat shirt overlay.
+        const sleeveThickness = Math.max(0.032, Math.min(0.095, anchors.shoulderWidth * 0.18));
+        if (equippedIds.shirt) {
+          updateSegment(sleeveLeftUpperRef, anchors.leftShoulder, anchors.leftElbow, sleeveThickness, anchors.torsoYaw);
+          updateSegment(sleeveRightUpperRef, anchors.rightShoulder, anchors.rightElbow, sleeveThickness, anchors.torsoYaw);
+          updateSegment(sleeveLeftForeRef, anchors.leftElbow, anchors.leftWrist, sleeveThickness * 0.88, anchors.torsoYaw);
+          updateSegment(sleeveRightForeRef, anchors.rightElbow, anchors.rightWrist, sleeveThickness * 0.88, anchors.torsoYaw);
+
+          // Body-depth ordering: when the child turns, the arm closer to the camera
+          // renders in front of the torso while the far arm slips behind it.
+          const leftNear = anchors.torsoYaw < -7;
+          const rightNear = anchors.torsoYaw > 7;
+          const applyDepth = (refs: React.RefObject<HTMLDivElement | null>[], near: boolean) => {
+            refs.forEach((r) => {
+              if (!r.current) return;
+              r.current.style.zIndex = near ? '8' : '3';
+              r.current.style.filter = near ? 'brightness(1.04)' : 'brightness(.91)';
+            });
+          };
+          applyDepth([sleeveLeftUpperRef, sleeveLeftForeRef], leftNear || (!leftNear && !rightNear));
+          applyDepth([sleeveRightUpperRef, sleeveRightForeRef], rightNear || (!leftNear && !rightNear));
+        } else {
+          [sleeveLeftUpperRef, sleeveRightUpperRef, sleeveLeftForeRef, sleeveRightForeRef].forEach((r) => {
+            if (r.current) r.current.style.display = 'none';
+          });
+        }
 
         // Gloves independently follow each wrist.
         const gloveWidth = Math.max(anchors.headWidth * 0.42, anchors.hipWidth * 0.24, 0.045);
@@ -215,10 +316,10 @@ export default function FashionGame({
         updateDom(shoesRightRef, anchors.rightAnkle, Math.max(anchors.hipWidth * 0.42, 0.075), undefined, 0, 0.02);
 
         // 5. Wings overlay (Behind Torso Center, slightly scaled up)
-        updateDom(wingsRef, anchors.torsoCenter, anchors.shoulderWidth * 2.85, anchors.torsoHeight * 1.5, anchors.torsoRotation, -0.05);
+        updateDom(wingsRef, anchors.torsoCenter, anchors.shoulderWidth * 2.85, anchors.torsoHeight * 1.5, anchors.torsoRotation, -0.05, anchors.torsoYaw);
 
         // 6. Backpack overlay (Center of shoulders)
-        if (!hasWings) updateDom(backpackRef, anchors.shoulderCenter, anchors.shoulderWidth * 1.15, anchors.torsoHeight * 0.9, anchors.torsoRotation, 0.1);
+        if (!hasWings) updateDom(backpackRef, anchors.shoulderCenter, anchors.shoulderWidth * 1.15, anchors.torsoHeight * 0.9, anchors.torsoRotation, 0.1, anchors.torsoYaw);
         else if (backpackRef.current) backpackRef.current.style.display = 'none';
 
         // Draw debug skeleton if active
@@ -484,6 +585,12 @@ export default function FashionGame({
           <span className="text-amber-400 flex items-center gap-0.5">★ {progress.stars}</span>
           <span className="text-cyan-400">💎 {progress.diamonds}</span>
         </div>
+        <button
+          onClick={() => setShowAvatarMirror(true)}
+          className="px-3 py-1.5 rounded-full border border-cyan-300/30 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-100 font-black text-[10px] sm:text-xs shadow-lg"
+        >
+          🤖 Avatar 3D
+        </button>
       </div>
 
       {/* Main AR Display Area - LANDSCAPE GRID */}
@@ -539,6 +646,20 @@ export default function FashionGame({
             {/* Necklace follows the neckline/upper torso. */}
             <div ref={necklaceRef} className="absolute pointer-events-none select-none items-center justify-center text-center transition-all duration-75" style={{ display: 'none' }}>
               <RealisticWardrobeOverlay itemId={equippedIds.necklace} category="necklace" />
+            </div>
+
+            {/* Pose-rigged sleeves move with shoulder / elbow / wrist joints */}
+            <div ref={sleeveLeftUpperRef} className="absolute pointer-events-none select-none items-center justify-center transition-all duration-75" style={{ display: 'none', zIndex: 4 }}>
+              <FittedSleeveOverlay itemId={equippedIds.shirt} segment="upper" />
+            </div>
+            <div ref={sleeveRightUpperRef} className="absolute pointer-events-none select-none items-center justify-center transition-all duration-75" style={{ display: 'none', zIndex: 4 }}>
+              <FittedSleeveOverlay itemId={equippedIds.shirt} segment="upper" />
+            </div>
+            <div ref={sleeveLeftForeRef} className="absolute pointer-events-none select-none items-center justify-center transition-all duration-75" style={{ display: 'none', zIndex: 4 }}>
+              <FittedSleeveOverlay itemId={equippedIds.shirt} segment="forearm" />
+            </div>
+            <div ref={sleeveRightForeRef} className="absolute pointer-events-none select-none items-center justify-center transition-all duration-75" style={{ display: 'none', zIndex: 4 }}>
+              <FittedSleeveOverlay itemId={equippedIds.shirt} segment="forearm" />
             </div>
 
             {/* Shirt overlay */}
@@ -818,6 +939,12 @@ export default function FashionGame({
           )}
 
         </div>
+      <AvatarMirrorMode
+        isOpen={showAvatarMirror}
+        onClose={() => setShowAvatarMirror(false)}
+        equippedIds={equippedIds}
+      />
+
       </div>
     </div>
   );

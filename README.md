@@ -1,3 +1,10 @@
+## V5.5 – AR body-rig + Companion Pro + sửa nguồn giọng nữ
+
+- **Gương Phép Thuật:** áo tự fit vai/hông/thân, xoay phối cảnh theo hướng người; ống tay tách vai→khuỷu→cổ tay và tự đi theo tay. Có Z-order tay gần/tay xa và tự giảm tần suất rig trên điện thoại/TV để đỡ lag.
+- **Bạn Đồng Hành:** dựng lại Cinnamoroll, Kuromi và Capybara theo đặc điểm hình dáng tham khảo; sửa material/gradient thiếu và bỏ balô mặc định của Capybara. Toàn bộ vẫn là SVG procedural nhẹ, không nhúng ảnh web.
+- **Giọng nữ:** ưu tiên giọng nữ Việt tự nhiên của thiết bị; 366 MP3 hiện có chỉ được dùng làm **fallback tổng hợp offline**, không còn mô tả sai là bản thu người thật và không tự đổi sang giọng nam.
+- Xem chi tiết: `AUDIT-V5.5.md`.
+
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>

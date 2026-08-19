@@ -14,8 +14,9 @@ import {
 } from '../../types';
 import { RaceEngine } from '../../lib/racing/RaceEngine';
 import { buildCar3D, Car3DInstance } from '../../lib/racing/Car3DBuilder';
+import { attachExternalCarModel, isExternalCar, shouldUseExternalCar, ExternalCarHandle } from '../../lib/racing/ExternalCarModelLoader';
 import { getInterpolatedTrackPoint } from '../../lib/racing/TrackData';
-import { createAsphaltTexture, resolveRacingGraphicsProfile, GraphicsProfile } from '../../utils/graphicsQuality';
+import { createAsphaltTexture, resolveRacingGraphicsProfile, GraphicsProfile, detectDeviceClass } from '../../utils/graphicsQuality';
 
 interface Race3DCanvasProps {
   engine: RaceEngine;
@@ -51,6 +52,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     const height = container.clientHeight || window.innerHeight;
 
     const profile = resolveRacingGraphicsProfile(qualitySetting);
+    const actualDeviceClass = detectDeviceClass();
 
     // 1. Three.js Scene & Camera
     const scene = new THREE.Scene();
@@ -105,13 +107,35 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     scene.add(playerCar.root);
     playerCarRef.current = playerCar;
 
+    // V5.7: lazy-load user-provided FBX cars only when selected.
+    // Phones / Low mode keep the procedural fallback so initial loading and FPS stay safe.
+    let externalPlayerHandle: ExternalCarHandle | null = null;
+    let externalLoadCancelled = false;
+    if (
+      isExternalCar(car.id) &&
+      shouldUseExternalCar(car.id, actualDeviceClass)
+    ) {
+      attachExternalCarModel(playerCar, car.id, customization, profile.carDetail)
+        .then((handle) => {
+          if (!handle) return;
+          if (externalLoadCancelled) {
+            handle.dispose();
+            return;
+          }
+          externalPlayerHandle = handle;
+        })
+        .catch((err) => {
+          console.warn('External FBX car failed; keeping procedural fallback.', err);
+        });
+    }
+
     // Cheap contact shadow keeps the car visually planted even when realtime shadows
     // are disabled on phones/TV. This costs one transparent quad instead of a shadow map.
     const contactShadow = new THREE.Mesh(
       new THREE.CircleGeometry(1.0, profile.quality === 'high' ? 36 : 20),
       new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false })
     );
-    contactShadow.scale.set(1.15, 2.25, 1);
+    contactShadow.scale.set(car.category === 'motorcycle' ? 0.42 : 1.15, car.category === 'motorcycle' ? 1.12 : 2.25, 1);
     contactShadow.rotation.x = -Math.PI / 2;
     contactShadow.renderOrder = 2;
     scene.add(contactShadow);
@@ -301,6 +325,8 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     resizeObserver.observe(container);
 
     return () => {
+      externalLoadCancelled = true;
+      externalPlayerHandle?.dispose();
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
       resizeObserver.disconnect();
       scene.traverse((obj: any) => {

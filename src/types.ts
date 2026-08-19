@@ -295,7 +295,11 @@ export type CarModelId =
   | 'amg_gt3_monster'
   | 'solus_hyper_proto'
   | 'miata_roadster'
-  | 'nissan_370z_tuner';
+  | 'nissan_370z_tuner'
+  | 'canis_mesa_3d'
+  | 'v12_sv_3d'
+  | 'roadster_883_3d'
+  | 'vespa_studio_3d';
 
 export type CarCategory =
   | 'city'
@@ -307,7 +311,8 @@ export type CarCategory =
   | 'euro_sport'
   | 'suv_perf'
   | 'electric'
-  | 'mascot_special';
+  | 'mascot_special'
+  | 'motorcycle';
 
 export interface CarStats {
   topSpeed: number; // 0-100 base score

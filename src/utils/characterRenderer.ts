@@ -23,7 +23,7 @@ export const CHARACTERS_CONFIG = [
     id: 'bara' as CharacterId,
     name: 'Bara',
     species: 'Capybara',
-    description: 'Thân tròn xinh, mắt to long lanh, má hồng và chiếc balô nhỏ xinh xắn!',
+    description: 'Capybara nâu ấm với thân bầu chắc, tai tròn nhỏ, mắt hiền và mõm vuông đặc trưng.',
     avatarColor: '#C88D58',
     unlockStars: 0,
     isUnlockedByDefault: true,
@@ -68,8 +68,8 @@ export const CHARACTERS_CONFIG = [
   {
     id: 'cinnamoroll' as CharacterId,
     name: 'Cinnamoroll',
-    species: 'Thỏ Mây',
-    description: 'Chú thỏ mây trắng muốt với đôi tai dài mềm mại, mắt xanh biển trong trẻo và nụ cười rạng rỡ!',
+    species: 'Chú cún mây',
+    description: 'Cinnamoroll trắng mềm như mây, đôi tai cực dài, mắt xanh, má hồng và chiếc đuôi cuộn đặc trưng.',
     avatarColor: '#FFFFFF',
     unlockStars: 30,
     specialAbility: '☁️ Lướt mây nhẹ nhàng & Thu hút sao tự động',
@@ -77,8 +77,8 @@ export const CHARACTERS_CONFIG = [
   {
     id: 'kuromi' as CharacterId,
     name: 'Kuromi',
-    species: 'Thỏ Hề Đen',
-    description: 'Cá tính vượt trội với chiếc mũ hề màu đen, biểu tượng đầu lâu hồng siêu ngầu và đôi tai jester!',
+    species: 'Nhân vật Sanrio',
+    description: 'Kuromi cá tính với mũ jester đen, đầu lâu hồng, khuôn mặt trắng và chiếc đuôi quỷ nhỏ tinh nghịch.',
     avatarColor: '#2D2B30',
     unlockStars: 60,
     specialAbility: '🖤 Bùa phép cá tính & Nhân đôi chuỗi Combo',
@@ -362,6 +362,14 @@ export function renderCharacterSvg({
     innerEarColor = '#27272A';
   }
 
+  const outlineColor = characterId === 'cinnamoroll'
+    ? '#75A9C7'
+    : characterId === 'bara' || characterId === 'capy_tie'
+      ? '#5B4028'
+      : characterId === 'kuromi'
+        ? '#27212D'
+        : '#1E293B';
+
   // Contact Blob Shadow parameters (shrinks/lightens when jumping)
   const shadowRadiusX = Math.max(10, 48 - Math.abs(bodyY) * 0.6);
   const shadowRadiusY = Math.max(4, 12 - Math.abs(bodyY) * 0.2);
@@ -387,7 +395,7 @@ export function renderCharacterSvg({
 
   // Backpack SVG with physics bounce
   let backpackSvg = '';
-  if (equipped.backpack || characterId === 'bara') {
+  if (equipped.backpack) {
     const bgCol = equipped.backpack === 'backpack_pink' ? '#FF8AAE' : '#3B82F6';
     backpackSvg = `
       <g transform="translate(0, ${backpackBounce})">
@@ -614,21 +622,21 @@ export function renderCharacterSvg({
     `;
   } else if (characterId === 'cinnamoroll') {
     earsSvg = `
-      <g transform="translate(60, 56) rotate(${-12 + earBounce})">
-        <path d="M0,0 C-34,-20 -64,8 -54,34 C-46,50 -18,34 0,8 Z" fill="url(#mayGrad)" stroke="#1E293B" stroke-width="2.5" filter="url(#softShadow)"/>
-        <ellipse cx="-28" cy="18" rx="14" ry="7" fill="#FFE4E1" opacity="0.8"/>
+      <g transform="translate(62, 57) rotate(${-7 + earBounce * 0.55})">
+        <path d="M0,2 C-18,-13 -47,-15 -56,2 C-63,14 -56,27 -41,28 C-24,28 -10,18 0,8 Z" fill="#FFFDFC" stroke="#75A9C7" stroke-width="2.2" filter="url(#softShadow)"/>
+        <path d="M-48,5 Q-31,-5 -14,7" fill="none" stroke="#FFFFFF" stroke-opacity=".72" stroke-width="5" stroke-linecap="round"/>
       </g>
-      <g transform="translate(140, 56) rotate(${12 - earBounce})">
-        <path d="M0,0 C34,-20 64,8 54,34 C46,50 18,34 0,-8 Z" fill="url(#mayGrad)" stroke="#1E293B" stroke-width="2.5" filter="url(#softShadow)"/>
-        <ellipse cx="28" cy="18" rx="14" ry="7" fill="#FFE4E1" opacity="0.8"/>
+      <g transform="translate(138, 57) rotate(${7 - earBounce * 0.55})">
+        <path d="M0,2 C18,-13 47,-15 56,2 C63,14 56,27 41,28 C24,28 10,18 0,8 Z" fill="#FFFDFC" stroke="#75A9C7" stroke-width="2.2" filter="url(#softShadow)"/>
+        <path d="M48,5 Q31,-5 14,7" fill="none" stroke="#FFFFFF" stroke-opacity=".72" stroke-width="5" stroke-linecap="round"/>
       </g>
     `;
   } else if (characterId === 'kuromi') {
     earsSvg = `
       <g transform="translate(100, 46)" filter="url(#softShadow)">
-        <path d="M-38,15 C-42,-22 -20,-42 -44,-52 C-52,-55 -58,-44 -44,-28 C-35,-12 -22,10 -18,20 Z" fill="#2D2B30" stroke="#1E293B" stroke-width="2.5"/>
-        <path d="M38,15 C42,-22 20,-42 44,-52 C52,-55 58,-44 44,-28 C35,-12 22,10 18,20 Z" fill="#2D2B30" stroke="#1E293B" stroke-width="2.5"/>
-        <path d="M-40,12 C-28,-20 0,-28 28,-20 C40,12 34,26 0,26 C-34,26 -40,12 -40,12 Z" fill="#2D2B30" stroke="#1E293B" stroke-width="2.5"/>
+        <path d="M-38,15 C-42,-22 -20,-42 -44,-52 C-52,-55 -58,-44 -44,-28 C-35,-12 -22,10 -18,20 Z" fill="#2D2B30" stroke="${outlineColor}" stroke-width="2.5"/>
+        <path d="M38,15 C42,-22 20,-42 44,-52 C52,-55 58,-44 44,-28 C35,-12 22,10 18,20 Z" fill="#2D2B30" stroke="${outlineColor}" stroke-width="2.5"/>
+        <path d="M-40,12 C-28,-20 0,-28 28,-20 C40,12 34,26 0,26 C-34,26 -40,12 -40,12 Z" fill="#2D2B30" stroke="${outlineColor}" stroke-width="2.5"/>
         <circle cx="-44" cy="-52" r="6.5" fill="#FF69B4" stroke="#1E293B" stroke-width="1.5"/>
         <circle cx="44" cy="-52" r="6.5" fill="#FF69B4" stroke="#1E293B" stroke-width="1.5"/>
         <g transform="translate(0, -6) scale(0.9)">
@@ -641,8 +649,8 @@ export function renderCharacterSvg({
     `;
   } else if (characterId === 'po') {
     earsSvg = `
-      <circle cx="64" cy="40" r="13" fill="#18181B" stroke="#1E293B" stroke-width="2.5"/>
-      <circle cx="136" cy="40" r="13" fill="#18181B" stroke="#1E293B" stroke-width="2.5"/>
+      <circle cx="64" cy="40" r="13" fill="#18181B" stroke="${outlineColor}" stroke-width="2.5"/>
+      <circle cx="136" cy="40" r="13" fill="#18181B" stroke="${outlineColor}" stroke-width="2.5"/>
     `;
   }
 
@@ -668,14 +676,37 @@ export function renderCharacterSvg({
         <path d="M0,0 Q30,26 24,44" fill="none" stroke="#118AB2" stroke-width="5.5" stroke-linecap="round"/>
       </g>
     `;
+  } else if (characterId === 'cinnamoroll') {
+    tailSvg = `
+      <g transform="translate(139, 116) rotate(${tailWiggle * 0.35})" filter="url(#softShadow)">
+        <path d="M0,0 C22,-5 26,25 7,27 C-6,28 -8,12 3,10 C12,9 14,18 8,20"
+          fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+        <path d="M1,-1 C18,-3 21,19 8,21" fill="none" stroke="#DCEEFF" stroke-width="2.2" stroke-linecap="round" opacity=".85"/>
+      </g>
+    `;
+  } else if (characterId === 'kuromi') {
+    tailSvg = `
+      <g transform="translate(139, 116) rotate(${tailWiggle * 0.45})" filter="url(#softShadow)">
+        <path d="M0,0 Q22,8 18,28" fill="none" stroke="#2D2B30" stroke-width="7" stroke-linecap="round"/>
+        <path d="M18,28 l-8,-3 l7,11 l9,-9 Z" fill="#2D2B30" stroke="#1E293B" stroke-width="1.5"/>
+      </g>
+    `;
   }
 
   return `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="${width}" height="${height}">
       <defs>
         <!-- Soft Drop Shadow -->
-        <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="3.5" flood-color="#0F172A" flood-opacity="0.22"/>
+        <filter id="softShadow" x="-24%" y="-24%" width="148%" height="156%" color-interpolation-filters="sRGB">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="3.2" result="blur"/>
+          <feOffset in="blur" dx="0" dy="4" result="offsetBlur"/>
+          <feComponentTransfer in="offsetBlur" result="shadowAlpha">
+            <feFuncA type="linear" slope="0.22"/>
+          </feComponentTransfer>
+          <feMerge>
+            <feMergeNode in="shadowAlpha"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
         </filter>
 
         <!-- Blush Glow -->
@@ -708,6 +739,17 @@ export function renderCharacterSvg({
         <linearGradient id="baraEarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stop-color="#C88D58"/>
           <stop offset="100%" stop-color="#A56E3B"/>
+        </linearGradient>
+
+        <!-- Kuromi hood/body material -->
+        <linearGradient id="kuromiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#403845"/>
+          <stop offset="48%" stop-color="#2D2B30"/>
+          <stop offset="100%" stop-color="#17131B"/>
+        </linearGradient>
+        <linearGradient id="poEarGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#27272A"/>
+          <stop offset="100%" stop-color="#09090B"/>
         </linearGradient>
 
         <!-- Mây Dog Soft Gradient -->
@@ -784,18 +826,27 @@ export function renderCharacterSvg({
         <!-- Feet / Paws -->
         <g id="paws" filter="url(#softShadow)">
           <g transform="rotate(${legLeftAngle}, 78, 138)" transform-origin="78 138">
-            <rect x="68" y="132" width="20" height="18" rx="9" fill="url(#${mainGradId})" stroke="#1E293B" stroke-width="2.5"/>
+            <rect x="68" y="132" width="20" height="18" rx="9" fill="url(#${mainGradId})" stroke="${outlineColor}" stroke-width="2.5"/>
           </g>
           <g transform="rotate(${legRightAngle}, 122, 138)" transform-origin="122 138">
-            <rect x="112" y="132" width="20" height="18" rx="9" fill="url(#${mainGradId})" stroke="#1E293B" stroke-width="2.5"/>
+            <rect x="112" y="132" width="20" height="18" rx="9" fill="url(#${mainGradId})" stroke="${outlineColor}" stroke-width="2.5"/>
           </g>
         </g>
 
-        <!-- Main Body Chassis -->
-        <rect x="50" y="84" width="100" height="60" rx="30" fill="url(#${mainGradId})" stroke="#1E293B" stroke-width="3" filter="url(#softShadow)"/>
-        
-        <!-- Tummy Highlight -->
-        <ellipse cx="100" cy="115" rx="32" ry="23" fill="url(#${bellyGradId})"/>
+        <!-- Main Body Chassis: character-specific proportions -->
+        ${characterId === 'cinnamoroll' ? `
+          <ellipse cx="100" cy="116" rx="48" ry="37" fill="#FFFDFC" stroke="#75A9C7" stroke-width="2.2" filter="url(#softShadow)"/>
+          <ellipse cx="88" cy="102" rx="22" ry="10" fill="#FFFFFF" opacity=".58"/>
+        ` : characterId === 'kuromi' ? `
+          <path d="M53 101 Q60 83 82 80 L118 80 Q140 83 147 101 L145 133 Q128 151 100 151 Q72 151 55 133Z" fill="url(#kuromiGrad)" stroke="#27212D" stroke-width="2.7" filter="url(#softShadow)"/>
+          <g transform="translate(100 112) scale(.52)"><circle cx="0" cy="0" r="9" fill="#FF69B4"/><rect x="-6" y="4" width="12" height="6" rx="2" fill="#FF69B4"/><circle cx="-3.5" cy="-1" r="2" fill="#2D2B30"/><circle cx="3.5" cy="-1" r="2" fill="#2D2B30"/></g>
+        ` : characterId === 'bara' || characterId === 'capy_tie' ? `
+          <rect x="44" y="82" width="112" height="68" rx="30" fill="url(#baraGrad)" stroke="#5B4028" stroke-width="2.8" filter="url(#softShadow)"/>
+          <path d="M58 95 Q96 78 141 94" fill="none" stroke="#F1C38E" stroke-opacity=".32" stroke-width="7" stroke-linecap="round"/>
+        ` : `
+          <rect x="50" y="84" width="100" height="60" rx="30" fill="url(#${mainGradId})" stroke="${outlineColor}" stroke-width="3" filter="url(#softShadow)"/>
+          <ellipse cx="100" cy="115" rx="32" ry="23" fill="url(#${bellyGradId})"/>
+        `}
 
         ${characterId === 'capy_tie' ? `
           <!-- Capybara Shirt & Tie -->
@@ -821,12 +872,12 @@ export function renderCharacterSvg({
 
         <!-- Left Arm -->
         <g transform="translate(56, 102) rotate(${armLeftAngle})" transform-origin="0 0" filter="url(#softShadow)">
-          <rect x="-22" y="-7" width="24" height="14" rx="7" fill="url(#${mainGradId})" stroke="#1E293B" stroke-width="2.5"/>
+          <rect x="-22" y="-7" width="24" height="14" rx="7" fill="url(#${mainGradId})" stroke="${outlineColor}" stroke-width="2.5"/>
         </g>
 
         <!-- Right Arm -->
         <g transform="translate(144, 102) rotate(${armRightAngle})" transform-origin="0 0" filter="url(#softShadow)">
-          <rect x="-2" y="-7" width="24" height="14" rx="7" fill="url(#${mainGradId})" stroke="#1E293B" stroke-width="2.5"/>
+          <rect x="-2" y="-7" width="24" height="14" rx="7" fill="url(#${mainGradId})" stroke="${outlineColor}" stroke-width="2.5"/>
         </g>
 
         <!-- Ears -->
@@ -834,38 +885,67 @@ export function renderCharacterSvg({
 
         <!-- Head Bone Group -->
         <g transform="translate(0, ${headY}) rotate(${headRotate}, 100, 72)" transform-origin="100 72">
-          <!-- Head Base -->
-          <ellipse cx="100" cy="72" rx="44" ry="36" fill="url(#${mainGradId})" stroke="#1E293B" stroke-width="3" filter="url(#softShadow)"/>
-
-          <!-- Capybara Muzzle / Snout -->
-          ${characterId === 'bara' || characterId === 'capy_tie' ? `
-            <ellipse cx="100" cy="78" rx="20" ry="14" fill="url(#${bellyGradId})"/>
-            <!-- Snout nostrils -->
-            <ellipse cx="100" cy="73" rx="5.5" ry="4" fill="#1E293B"/>
-            <circle cx="98" cy="73" r="1" fill="#FFFFFF"/>
-            <circle cx="102" cy="73" r="1" fill="#FFFFFF"/>
+          <!-- Character-specific head/face. Licensed-character references are
+               recreated procedurally; no downloaded web artwork is embedded. -->
+          ${characterId === 'cinnamoroll' ? `
+            <!-- Cinnamoroll: broad white puppy face, blue eyes, pink cheeks, no generic dog nose -->
+            <ellipse cx="100" cy="72" rx="47" ry="35" fill="#FFFDFC" stroke="#B9DDF5" stroke-width="2.4" filter="url(#softShadow)"/>
+            <ellipse cx="81" cy="69" rx="5.6" ry="8.2" fill="#63B3ED"/>
+            <ellipse cx="119" cy="69" rx="5.6" ry="8.2" fill="#63B3ED"/>
+            <circle cx="79.5" cy="66.5" r="1.7" fill="#FFFFFF"/>
+            <circle cx="117.5" cy="66.5" r="1.7" fill="#FFFFFF"/>
+            <ellipse cx="72" cy="79" rx="9" ry="4.8" fill="#F9A8D4" opacity=".55"/>
+            <ellipse cx="128" cy="79" rx="9" ry="4.8" fill="#F9A8D4" opacity=".55"/>
+            ${userTalking
+              ? `<ellipse cx="100" cy="82" rx="5" ry="${4 + Math.abs(Math.sin(tick * 0.45)) * 4}" fill="#8B3A4A"/>
+                 <ellipse cx="100" cy="84" rx="3.2" ry="1.8" fill="#FF9FB2"/>`
+              : `<path d="M94 79 Q100 87 106 79" fill="none" stroke="#7C4A55" stroke-width="2.3" stroke-linecap="round"/>
+                 <path d="M100 80 v4" stroke="#7C4A55" stroke-width="1.6" stroke-linecap="round"/>`}
+          ` : characterId === 'kuromi' ? `
+            <!-- Kuromi: white face framed by the black jester hood -->
+            <ellipse cx="100" cy="74" rx="42" ry="34" fill="#FFF9F8" stroke="#2D2B30" stroke-width="2.8" filter="url(#softShadow)"/>
+            <path d="M70 64 Q80 57 91 65" fill="none" stroke="#2D2B30" stroke-width="3.2" stroke-linecap="round"/>
+            <path d="M109 65 Q120 57 130 64" fill="none" stroke="#2D2B30" stroke-width="3.2" stroke-linecap="round"/>
+            <ellipse cx="82" cy="70" rx="4.5" ry="6.8" fill="#2D2B30"/>
+            <ellipse cx="118" cy="70" rx="4.5" ry="6.8" fill="#2D2B30"/>
+            <path d="M78 64 l-5 -4 M122 64 l5 -4" stroke="#2D2B30" stroke-width="2" stroke-linecap="round"/>
+            <ellipse cx="100" cy="78" rx="3.4" ry="2.5" fill="#F472B6"/>
+            <ellipse cx="72" cy="80" rx="7.5" ry="3.8" fill="#F9A8D4" opacity=".45"/>
+            <ellipse cx="128" cy="80" rx="7.5" ry="3.8" fill="#F9A8D4" opacity=".45"/>
+            ${userTalking
+              ? `<ellipse cx="100" cy="87" rx="5" ry="${3.5 + Math.abs(Math.sin(tick * 0.45)) * 3}" fill="#2D2B30"/>
+                 <ellipse cx="100" cy="89" rx="3" ry="1.6" fill="#F472B6"/>`
+              : `<path d="M93 85 Q100 91 108 84" fill="none" stroke="#2D2B30" stroke-width="2.3" stroke-linecap="round"/>`}
+          ` : characterId === 'bara' || characterId === 'capy_tie' ? `
+            <!-- Capybara: smaller eyes + long rectangular muzzle, closer to a real capybara silhouette -->
+            <path d="M59 63 Q61 38 82 32 Q101 25 121 32 Q142 39 143 65 L139 88 Q129 105 101 108 Q73 105 61 89 Z"
+              fill="url(#baraGrad)" stroke="#513923" stroke-width="2.6" filter="url(#softShadow)"/>
+            <ellipse cx="82" cy="67" rx="4.2" ry="5.1" fill="#2B2118"/>
+            <ellipse cx="119" cy="67" rx="4.2" ry="5.1" fill="#2B2118"/>
+            <circle cx="80.8" cy="65.8" r="1.1" fill="#FFFFFF" opacity=".8"/>
+            <circle cx="117.8" cy="65.8" r="1.1" fill="#FFFFFF" opacity=".8"/>
+            <path d="M82 75 Q100 68 119 75 L116 95 Q100 103 84 95 Z" fill="#A67C58" opacity=".82"/>
+            <ellipse cx="94" cy="82" rx="3.2" ry="2.6" fill="#2B2118"/>
+            <ellipse cx="106" cy="82" rx="3.2" ry="2.6" fill="#2B2118"/>
+            <path d="M100 85 v5" stroke="#2B2118" stroke-width="1.8"/>
+            <path d="M100 90 Q95 94 91 92 M100 90 Q105 94 109 92" fill="none" stroke="#2B2118" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M83 84 l-18 -4 M84 88 l-20 2 M117 84 l18 -4 M116 88 l20 2" stroke="#6B513C" stroke-width="1.2" stroke-linecap="round" opacity=".8"/>
           ` : `
+            <!-- Generic mascot face -->
+            <ellipse cx="100" cy="72" rx="44" ry="36" fill="url(#${mainGradId})" stroke="#1E293B" stroke-width="3" filter="url(#softShadow)"/>
             <ellipse cx="100" cy="78" rx="18" ry="12" fill="url(#${bellyGradId})"/>
             <ellipse cx="100" cy="74" rx="5" ry="3.5" fill="#1E293B"/>
+            ${characterId === 'miu' ? `
+              <line x1="68" y1="76" x2="52" y2="72" stroke="#1E293B" stroke-width="2"/>
+              <line x1="68" y1="80" x2="54" y2="82" stroke="#1E293B" stroke-width="2"/>
+              <line x1="132" y1="76" x2="148" y2="72" stroke="#1E293B" stroke-width="2"/>
+              <line x1="132" y1="80" x2="146" y2="82" stroke="#1E293B" stroke-width="2"/>
+            ` : ''}
+            <circle cx="68" cy="78" r="8.5" fill="url(#blushGrad)"/>
+            <circle cx="132" cy="78" r="8.5" fill="url(#blushGrad)"/>
+            ${eyesSvg}
+            ${mouthSvg}
           `}
-
-          <!-- Cat Whiskers -->
-          ${characterId === 'miu' ? `
-            <line x1="68" y1="76" x2="52" y2="72" stroke="#1E293B" stroke-width="2"/>
-            <line x1="68" y1="80" x2="54" y2="82" stroke="#1E293B" stroke-width="2"/>
-            <line x1="132" y1="76" x2="148" y2="72" stroke="#1E293B" stroke-width="2"/>
-            <line x1="132" y1="80" x2="146" y2="82" stroke="#1E293B" stroke-width="2"/>
-          ` : ''}
-
-          <!-- Rosy Cheeks -->
-          <circle cx="68" cy="78" r="8.5" fill="url(#blushGrad)"/>
-          <circle cx="132" cy="78" r="8.5" fill="url(#blushGrad)"/>
-
-          <!-- Eyes -->
-          ${eyesSvg}
-
-          <!-- Mouth -->
-          ${mouthSvg}
 
           <!-- Glasses -->
           ${glassesSvg}
