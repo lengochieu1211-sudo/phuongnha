@@ -200,7 +200,7 @@ export default function FashionShowMode({
   useEffect(() => {
     if (gameState !== 'playing') return;
 
-    voiceGuide.speak(`Hãy tạo dáng: ${activePose.name}! ${activePose.description}`, 'high');
+    voiceGuide.speak('Hãy tạo dáng theo hình mẫu trên màn hình nhé!', 'high');
   }, [currentPoseIndex, gameState]);
 
   // Real-time matching logic

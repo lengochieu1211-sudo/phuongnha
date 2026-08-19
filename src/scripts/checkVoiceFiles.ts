@@ -63,18 +63,21 @@ function checkVoiceFiles() {
   fs.mkdirSync(path.dirname(statusPath), { recursive: true });
   fs.writeFileSync(statusPath, JSON.stringify({
     recordedPackAvailable: invalidFiles === 0 && missingFiles === 0,
+    voiceStyle: 'female_offline_vi',
+    generator: 'bundled offline Vietnamese female-formant TTS',
     totalFiles,
     validFiles,
     invalidFiles,
     missingFiles,
     checkedAt: new Date().toISOString(),
+    note: 'Female mode is offline-only and never falls back to the device system male voice.',
   }, null, 2));
 
   if (invalidFiles > 0 || missingFiles > 0) {
     console.log('\n⚠️ CHƯA TẠO ĐƯỢC AUDIO THẬT!');
     console.log('Lý do: Môi trường phát triển AI Studio tự động tạo các file im lặng làm placeholder.');
-    console.log('Hệ thống dự phòng Web Speech Synthesis (TTS) Giọng Nữ Tiếng Việt đã được chuẩn bị 100% để phát âm thanh.');
-    console.log('Hệ thống cũng hoàn tất cấu trúc sẵn sàng để nhà phát triển tải lên các file audio chất lượng cao (.mp3) đè vào thư mục /public/audio/voice/vi-female/');
+    console.log('Chế độ Giọng Nữ sẽ không tự chuyển sang giọng hệ thống để tránh đổi sang giọng nam trên Android/Chrome.');
+    console.log('Hãy bổ sung/khôi phục file MP3 hợp lệ trong /public/audio/voice/vi-female/ trước khi phát hành.');
   } else {
     console.log('\n🎉 TOÀN BỘ FILE ÂM THANH THẬT ĐÃ HỢP LỆ VÀ SẴN SÀNG!');
   }

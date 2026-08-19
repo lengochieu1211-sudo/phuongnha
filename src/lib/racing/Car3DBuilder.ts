@@ -82,8 +82,8 @@ function createAerodynamicBodyGeometry(profile: CarBodyProfile, rings = 30, radi
   return geo;
 }
 
-function addHighDetailBodyShell(group: THREE.Group, profile: CarBodyProfile, bodyMaterial: THREE.Material, glassMaterial: THREE.Material, carbonMaterial: THREE.Material) {
-  const shell = new THREE.Mesh(createAerodynamicBodyGeometry(profile), bodyMaterial);
+function addHighDetailBodyShell(group: THREE.Group, profile: CarBodyProfile, bodyMaterial: THREE.Material, glassMaterial: THREE.Material, carbonMaterial: THREE.Material, ultra = false) {
+  const shell = new THREE.Mesh(createAerodynamicBodyGeometry(profile, ultra ? 46 : 34, ultra ? 32 : 24), bodyMaterial);
   shell.castShadow = true; shell.receiveShadow = true;
   group.add(shell);
 
@@ -129,7 +129,7 @@ export interface Car3DInstance {
   applyCustomization: (custom: CarCustomization) => void;
 }
 
-export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization, detail: 'lite' | 'high' = 'lite'): Car3DInstance {
+export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization, detail: 'lite' | 'high' | 'ultra' = 'lite'): Car3DInstance {
   const root = new THREE.Group();
   const bodyProfile = getCarBodyProfile(modelId);
 
@@ -174,7 +174,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     roughness: 0.25,
     metalness: 0.85,
   });
-  if (detail === 'high') {
+  if (detail !== 'lite') {
     new THREE.TextureLoader().load(
       `${((import.meta as any).env?.BASE_URL || "/")}assets/pc-hd/carbon-hd.webp`,
       (carbonTex) => {
@@ -256,8 +256,8 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
   rearWindowMesh.position.set(0, 0.86, -1.15);
   carBodyGroup.add(rearWindowMesh);
 
-  if (detail === 'high') {
-    // High-end desktop silhouette: keep a thin chassis underneath but replace boxy upper panels.
+  if (detail !== 'lite') {
+    // High-end silhouette: keep a thin chassis underneath but replace boxy upper panels.
     // The smooth procedural shell is the visible body on desktop. Keeping the old
     // rectangular chassis visible caused box edges to poke through the curved shell.
     bodyMesh.visible = false;
@@ -265,7 +265,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     cabinMesh.visible = false;
     windshieldMesh.visible = false;
     rearWindowMesh.visible = false;
-    addHighDetailBodyShell(carBodyGroup, bodyProfile, bodyMaterial, glassMaterial, carbonMaterial);
+    addHighDetailBodyShell(carBodyGroup, bodyProfile, bodyMaterial, glassMaterial, carbonMaterial, detail === 'ultra');
   }
 
   // Front Bumper & Splitter
@@ -299,7 +299,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
   rightSideGlass.position.x = sideGlassX;
   carBodyGroup.add(leftSideGlass, rightSideGlass);
 
-  const mirrorHousingGeo = new THREE.SphereGeometry(0.14, detail === 'high' ? 28 : 16, detail === 'high' ? 18 : 10);
+  const mirrorHousingGeo = new THREE.SphereGeometry(0.14, detail !== 'lite' ? 28 : 16, detail !== 'lite' ? 18 : 10);
   mirrorHousingGeo.scale(1.3, 0.55, 0.72);
   const leftMirror = new THREE.Mesh(mirrorHousingGeo, bodyMaterial);
   const mirrorX = bodyProfile.width * 0.54;
@@ -335,7 +335,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
 
   // Four subtle fender shoulders make the wheel arches read more like a real sports car.
   const fenderRadius = Math.max(0.42, Math.min(0.52, bodyProfile.width * 0.245));
-  const fenderGeo = new THREE.SphereGeometry(fenderRadius, detail === 'high' ? 30 : 18, detail === 'high' ? 20 : 12);
+  const fenderGeo = new THREE.SphereGeometry(fenderRadius, detail !== 'lite' ? 30 : 18, detail !== 'lite' ? 20 : 12);
   fenderGeo.scale(1.0, 0.48, 1.15);
   const fenderX = bodyProfile.track * 0.43;
   const fenderZ = bodyProfile.wheelbase * 0.50;
@@ -518,7 +518,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
   }
 
   // Desktop/high-performance detail pack. Kept procedural so it works offline and falls back safely.
-  if (detail === 'high') {
+  if (detail !== 'lite') {
     // Interior: seats, dashboard and steering wheel become visible through the glass in garage/chase views.
     const interiorMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.58, metalness: 0.08 });
     const leatherMat = new THREE.MeshPhysicalMaterial({ color: 0x171717, roughness: 0.42, clearcoat: 0.22 });
@@ -558,6 +558,64 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     });
   }
 
+  // PC Ultra detail pack: extra paneling and aero cues that are intentionally omitted
+  // from phone/TV profiles. All pieces are lightweight primitives so there is no GLB download.
+  if (detail === 'ultra') {
+    const panelLineMat = new THREE.MeshBasicMaterial({ color: 0x05070a, transparent: true, opacity: 0.76 });
+    const meshBlackMat = new THREE.MeshStandardMaterial({ color: 0x07090c, roughness: 0.48, metalness: 0.32 });
+
+    // Hood creases and roof rails give highlights something to catch in chase/garage views.
+    [-0.46, 0.46].forEach((sx) => {
+      const crease = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.018, bodyProfile.length * 0.34), panelLineMat);
+      crease.position.set(sx * (bodyProfile.width / 1.92), Math.max(0.60, bodyProfile.noseHeight + 0.055), bodyProfile.length * 0.24);
+      crease.rotation.x = -0.015;
+      carBodyGroup.add(crease);
+    });
+
+    // Side intake blades behind the doors.
+    [-1, 1].forEach((side) => {
+      const intakeFrame = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.34, 0.72), meshBlackMat);
+      intakeFrame.position.set(side * bodyProfile.width * 0.495, 0.46, bodyProfile.cabinOffsetZ - bodyProfile.cabinLength * 0.40);
+      carBodyGroup.add(intakeFrame);
+      for (let j = -2; j <= 2; j++) {
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.025, 0.56), chromeMaterial);
+        blade.position.set(side * bodyProfile.width * 0.512, 0.46 + j * 0.055, bodyProfile.cabinOffsetZ - bodyProfile.cabinLength * 0.40);
+        carBodyGroup.add(blade);
+      }
+    });
+
+    // Rear diffuser fins + separate tail lamp elements read much more like a production supercar.
+    for (let i = -2; i <= 2; i++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.48), carbonMaterial);
+      fin.position.set(i * bodyProfile.width * 0.15, 0.18, -bodyProfile.length * 0.485);
+      fin.rotation.x = -0.12;
+      carBodyGroup.add(fin);
+    }
+    const tailSegmentMat = new THREE.MeshStandardMaterial({ color: 0x7f1d1d, emissive: 0xff1838, emissiveIntensity: 2.6, roughness: 0.18 });
+    [-0.58, -0.25, 0.25, 0.58].forEach((sx) => {
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(bodyProfile.width * 0.19, 0.055, 0.035), tailSegmentMat);
+      seg.position.set(sx * bodyProfile.width * 0.72, 0.59, -bodyProfile.length * 0.505);
+      carBodyGroup.add(seg);
+    });
+
+    // Front lower intakes with horizontal vanes.
+    [-1, 1].forEach((side) => {
+      const intake = new THREE.Mesh(new THREE.BoxGeometry(bodyProfile.width * 0.27, 0.19, 0.035), meshBlackMat);
+      intake.position.set(side * bodyProfile.width * 0.31, 0.32, bodyProfile.length * 0.505);
+      carBodyGroup.add(intake);
+      for (let j = -1; j <= 1; j++) {
+        const vane = new THREE.Mesh(new THREE.BoxGeometry(bodyProfile.width * 0.23, 0.018, 0.018), chromeMaterial);
+        vane.position.set(side * bodyProfile.width * 0.31, 0.32 + j * 0.055, bodyProfile.length * 0.512);
+        carBodyGroup.add(vane);
+      }
+    });
+
+    // Subtle underbody tray visible during hills/jumps.
+    const undertray = new THREE.Mesh(new THREE.BoxGeometry(bodyProfile.width * 0.88, 0.035, bodyProfile.wheelbase * 1.05), carbonMaterial);
+    undertray.position.set(0, 0.115, 0);
+    carBodyGroup.add(undertray);
+  }
+
   root.add(carBodyGroup);
 
   // 5. Spoiler Group
@@ -567,9 +625,9 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
   root.add(spoilerGroup);
 
   // 6. Wheels with Brake Disk & Calipers
-  const wheelRadius = detail === 'high' ? (modelId === 'miata_roadster' ? 0.34 : 0.38) : 0.36;
-  const wheelWidth = detail === 'high' ? 0.30 : 0.26;
-  const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, detail === 'high' ? 48 : 24);
+  const wheelRadius = detail !== 'lite' ? (modelId === 'miata_roadster' ? 0.34 : 0.38) : 0.36;
+  const wheelWidth = detail !== 'lite' ? 0.30 : 0.26;
+  const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, detail !== 'lite' ? 48 : 24);
   wheelGeo.rotateZ(Math.PI * 0.5);
 
   const tireMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.85 });
@@ -584,7 +642,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     const tire = new THREE.Mesh(wheelGeo, tireMat);
     tire.castShadow = true;
     wGroup.add(tire);
-    if (detail === 'high') {
+    if (detail !== 'lite') {
       const sidewallMat = new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.96 });
       const sidewallGeo = new THREE.TorusGeometry(wheelRadius * 0.81, wheelRadius * 0.16, 10, 36);
       sidewallGeo.rotateY(Math.PI / 2);
@@ -594,7 +652,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     }
 
     // Rim inner hub
-    const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.72, wheelRadius * 0.72, wheelWidth * 1.05, detail === 'high' ? 32 : 16);
+    const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.72, wheelRadius * 0.72, wheelWidth * 1.05, detail !== 'lite' ? 32 : 16);
     rimGeo.rotateZ(Math.PI * 0.5);
     const rim = new THREE.Mesh(rimGeo, rimMat);
     wGroup.add(rim);
@@ -607,7 +665,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     const spoke3 = new THREE.Mesh(spokeGeo, rimMat);
     spoke3.rotateX(Math.PI * 0.66);
     wGroup.add(spoke1, spoke2, spoke3);
-    if (detail === 'high') {
+    if (detail !== 'lite') {
       for (let i = 0; i < 7; i++) {
         const spoke = new THREE.Mesh(new THREE.BoxGeometry(wheelWidth * 1.10, wheelRadius * 1.18, 0.028), rimMat);
         spoke.rotateX((i / 7) * Math.PI);
@@ -622,7 +680,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     }
 
     // Brake Disk Rotor
-    const diskGeo = new THREE.CylinderGeometry(wheelRadius * 0.62, wheelRadius * 0.62, 0.04, detail === 'high' ? 32 : 16);
+    const diskGeo = new THREE.CylinderGeometry(wheelRadius * 0.62, wheelRadius * 0.62, 0.04, detail !== 'lite' ? 32 : 16);
     diskGeo.rotateZ(Math.PI * 0.5);
     const disk = new THREE.Mesh(diskGeo, brakeDiskMat);
     disk.position.x = isLeft ? 0.06 : -0.06;

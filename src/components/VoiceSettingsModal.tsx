@@ -61,7 +61,11 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
 
   const handleTestCurrentCustom = () => {
     audio.playMenuClick();
-    voiceGuide.speak('Xin chào các bạn nhỏ, đây là giọng đọc với cao độ và tốc độ bạn đã chọn!', 'high');
+    if (settings.voiceStyle === 'female_gentle') {
+      voiceGuide.playKey('common.welcome', 'high');
+    } else {
+      voiceGuide.speak('Xin chào các bạn nhỏ, đây là giọng đọc với cao độ và tốc độ bạn đã chọn!', 'high');
+    }
   };
 
   const voiceOptions: {
@@ -79,10 +83,10 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
       id: 'female_gentle',
       name: 'Chị Phương Nhã',
       title: 'Giọng Nữ Dịu Dàng',
-      description: 'Trong trẻo, ngọt ngào, ấm áp như cô giáo mầm non hướng dẫn bé từng động tác.',
-      pitchDesc: 'Cao độ mặc định 1.20x (Nữ dịu dàng)',
+      description: 'Giọng nữ tiếng Việt đã đóng sẵn trong game: 343 câu MP3 offline, phát giống nhau trên điện thoại, PC và TV.',
+      pitchDesc: 'MP3 OFFLINE • Không phụ thuộc giọng hệ thống',
       emoji: '👩‍🏫',
-      badge: 'Khuyên Dùng',
+      badge: 'Thu Sẵn • Mặc Định',
       icon: Heart,
       color: 'border-pink-300 bg-pink-50/70 text-pink-700',
     },
@@ -274,7 +278,11 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
           <div className="flex items-start gap-2 bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 text-[11px] text-amber-900 leading-snug">
             <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <strong>Giọng đang dùng:</strong> {settings.selectedVoiceName || 'Tự động tiếng Việt trên thiết bị'}. Ứng dụng ưu tiên đúng biến thể nữ/nam tiếng Việt khi hệ điều hành cung cấp. Nếu điện thoại chưa cài giọng nữ tiếng Việt, app sẽ dùng giọng Việt phù hợp nhất và điều chỉnh cao độ; có thể mở phần nâng cao để chọn trực tiếp một giọng hệ thống khác.
+              {settings.voiceStyle === 'female_gentle' ? (
+                <><strong>Giọng Nữ Thu Sẵn:</strong> game ưu tiên 343 câu MP3 tiếng Việt đóng sẵn, nên điện thoại/PC/TV không còn phụ thuộc giọng nam mặc định của Chrome cho các câu đã ánh xạ.</>
+              ) : (
+                <><strong>Giọng hệ thống:</strong> {settings.selectedVoiceName || 'Tự động tiếng Việt trên thiết bị'}. Hai kiểu Nam/Em bé vẫn dùng Web Speech của thiết bị.</>
+              )}
             </div>
           </div>
 

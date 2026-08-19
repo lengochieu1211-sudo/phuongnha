@@ -1162,4 +1162,734 @@ export const VOICE_MANIFEST: Record<string, Record<string, VoiceManifestEntry>> 
       cooldownMs: 10000,
     },
   },
+
+  extra: {
+    line_001: {
+      path: '/audio/voice/vi-female/extra_001.mp3',
+      text: 'Xin chào bạn nhỏ! Mình là Bara. Hôm nay chúng mình cùng vận động và phiêu lưu nhé!',
+      cooldownMs: 4500,
+    },
+    line_002: {
+      path: '/audio/voice/vi-female/extra_002.mp3',
+      text: 'Chào mừng bạn đến với vương quốc kỳ diệu! Cùng Bara bắt đầu thôi nào!',
+      cooldownMs: 4500,
+    },
+    line_003: {
+      path: '/audio/voice/vi-female/extra_003.mp3',
+      text: 'Bara rất vui được gặp bạn! Hôm nay chúng mình sẽ có thật nhiều niềm vui!',
+      cooldownMs: 4500,
+    },
+    line_004: {
+      path: '/audio/voice/vi-female/extra_004.mp3',
+      text: 'Bạn hãy đứng trước camera và lùi lại một chút để mình nhìn thấy toàn thân nhé!',
+      cooldownMs: 4500,
+    },
+    line_005: {
+      path: '/audio/voice/vi-female/extra_005.mp3',
+      text: 'Bạn ơi, lùi ra sau một chút nha!',
+      cooldownMs: 4500,
+    },
+    line_006: {
+      path: '/audio/voice/vi-female/extra_006.mp3',
+      text: 'Tiến lại gần mình một chút nhé!',
+      cooldownMs: 4500,
+    },
+    line_007: {
+      path: '/audio/voice/vi-female/extra_007.mp3',
+      text: 'Mình chưa nhìn thấy đôi chân của bạn. Bạn lùi ra sau một chút nhé!',
+      cooldownMs: 4500,
+    },
+    line_008: {
+      path: '/audio/voice/vi-female/extra_008.mp3',
+      text: 'Bạn đứng vào giữa màn hình nào!',
+      cooldownMs: 4500,
+    },
+    line_009: {
+      path: '/audio/voice/vi-female/extra_009.mp3',
+      text: 'Tuyệt vời! Mình đã nhìn thấy bạn rất rõ rồi!',
+      cooldownMs: 4500,
+    },
+    line_010: {
+      path: '/audio/voice/vi-female/extra_010.mp3',
+      text: 'Ba...',
+      cooldownMs: 4500,
+    },
+    line_011: {
+      path: '/audio/voice/vi-female/extra_011.mp3',
+      text: 'Hai...',
+      cooldownMs: 4500,
+    },
+    line_012: {
+      path: '/audio/voice/vi-female/extra_012.mp3',
+      text: 'Một...',
+      cooldownMs: 4500,
+    },
+    line_013: {
+      path: '/audio/voice/vi-female/extra_013.mp3',
+      text: 'Bắt đầu phiêu lưu!',
+      cooldownMs: 4500,
+    },
+    line_014: {
+      path: '/audio/voice/vi-female/extra_014.mp3',
+      text: 'Đứng thẳng người và sẵn sàng nhé!',
+      cooldownMs: 4500,
+    },
+    line_015: {
+      path: '/audio/voice/vi-female/extra_015.mp3',
+      text: 'Giơ tay trái lên nào!',
+      cooldownMs: 4500,
+    },
+    line_016: {
+      path: '/audio/voice/vi-female/extra_016.mp3',
+      text: 'Bây giờ là tay phải nha!',
+      cooldownMs: 4500,
+    },
+    line_017: {
+      path: '/audio/voice/vi-female/extra_017.mp3',
+      text: 'Hai tay lên cao thật đẹp!',
+      cooldownMs: 4500,
+    },
+    line_018: {
+      path: '/audio/voice/vi-female/extra_018.mp3',
+      text: 'Dang hai tay thật rộng như cánh chim nào!',
+      cooldownMs: 4500,
+    },
+    line_019: {
+      path: '/audio/voice/vi-female/extra_019.mp3',
+      text: 'Chuẩn bị... Nhảy!',
+      cooldownMs: 4500,
+    },
+    line_020: {
+      path: '/audio/voice/vi-female/extra_020.mp3',
+      text: 'Cúi thấp người xuống nào!',
+      cooldownMs: 4500,
+    },
+    line_021: {
+      path: '/audio/voice/vi-female/extra_021.mp3',
+      text: 'Nghiêng người sang bên trái nhé!',
+      cooldownMs: 4500,
+    },
+    line_022: {
+      path: '/audio/voice/vi-female/extra_022.mp3',
+      text: 'Sang bên phải nào!',
+      cooldownMs: 4500,
+    },
+    line_023: {
+      path: '/audio/voice/vi-female/extra_023.mp3',
+      text: 'Vỗ tay thật to nào!',
+      cooldownMs: 4500,
+    },
+    line_024: {
+      path: '/audio/voice/vi-female/extra_024.mp3',
+      text: 'Vẫy tay chào bạn bè nào!',
+      cooldownMs: 4500,
+    },
+    line_025: {
+      path: '/audio/voice/vi-female/extra_025.mp3',
+      text: 'Tuyệt quá! Cầu vồng lấp lánh đã xuất hiện!',
+      cooldownMs: 4500,
+    },
+    line_026: {
+      path: '/audio/voice/vi-female/extra_026.mp3',
+      text: 'Tuyệt vời quá!',
+      cooldownMs: 4500,
+    },
+    line_027: {
+      path: '/audio/voice/vi-female/extra_027.mp3',
+      text: 'Giỏi quá bạn ơi!',
+      cooldownMs: 4500,
+    },
+    line_028: {
+      path: '/audio/voice/vi-female/extra_028.mp3',
+      text: 'Chính xác luôn!',
+      cooldownMs: 4500,
+    },
+    line_029: {
+      path: '/audio/voice/vi-female/extra_029.mp3',
+      text: 'Hay lắm!',
+      cooldownMs: 4500,
+    },
+    line_030: {
+      path: '/audio/voice/vi-female/extra_030.mp3',
+      text: 'Đúng rồi nè!',
+      cooldownMs: 4500,
+    },
+    line_031: {
+      path: '/audio/voice/vi-female/extra_031.mp3',
+      text: 'Bạn làm tốt lắm!',
+      cooldownMs: 4500,
+    },
+    line_032: {
+      path: '/audio/voice/vi-female/extra_032.mp3',
+      text: 'Wow, bạn dẻo dai quá!',
+      cooldownMs: 4500,
+    },
+    line_033: {
+      path: '/audio/voice/vi-female/extra_033.mp3',
+      text: 'Tiếp tục phát huy nhé!',
+      cooldownMs: 4500,
+    },
+    line_034: {
+      path: '/audio/voice/vi-female/extra_034.mp3',
+      text: 'Quá đỉnh luôn!',
+      cooldownMs: 4500,
+    },
+    line_035: {
+      path: '/audio/voice/vi-female/extra_035.mp3',
+      text: 'Gần đúng rồi, bạn thử lại một lần nữa nhé!',
+      cooldownMs: 4500,
+    },
+    line_036: {
+      path: '/audio/voice/vi-female/extra_036.mp3',
+      text: 'Một lần nữa nào, bạn làm được mà!',
+      cooldownMs: 4500,
+    },
+    line_037: {
+      path: '/audio/voice/vi-female/extra_037.mp3',
+      text: 'Giơ tay cao hơn một chút nữa nhé!',
+      cooldownMs: 4500,
+    },
+    line_038: {
+      path: '/audio/voice/vi-female/extra_038.mp3',
+      text: 'Cố lên nào, bạn sắp làm được rồi!',
+      cooldownMs: 4500,
+    },
+    line_039: {
+      path: '/audio/voice/vi-female/extra_039.mp3',
+      text: 'Nhớ đứng ở chỗ rộng và không có đồ vật xung quanh nhé!',
+      cooldownMs: 4500,
+    },
+    line_040: {
+      path: '/audio/voice/vi-female/extra_040.mp3',
+      text: 'Chuẩn bị hai tay nào!',
+      cooldownMs: 4500,
+    },
+    line_041: {
+      path: '/audio/voice/vi-female/extra_041.mp3',
+      text: 'Trái cây tới rồi! Chém trái cây nhé!',
+      cooldownMs: 4500,
+    },
+    line_042: {
+      path: '/audio/voice/vi-female/extra_042.mp3',
+      text: 'Chém nào!',
+      cooldownMs: 4500,
+    },
+    line_043: {
+      path: '/audio/voice/vi-female/extra_043.mp3',
+      text: 'Tuyệt vời! Chém trúng hai quả!',
+      cooldownMs: 4500,
+    },
+    line_044: {
+      path: '/audio/voice/vi-female/extra_044.mp3',
+      text: 'Wow! Ba quả cùng lúc!',
+      cooldownMs: 4500,
+    },
+    line_045: {
+      path: '/audio/voice/vi-female/extra_045.mp3',
+      text: 'Chuỗi chém siêu đỉnh x5!',
+      cooldownMs: 4500,
+    },
+    line_046: {
+      path: '/audio/voice/vi-female/extra_046.mp3',
+      text: 'Cầu vồng xuất hiện rồi! Quét sạch trái cây!',
+      cooldownMs: 4500,
+    },
+    line_047: {
+      path: '/audio/voice/vi-female/extra_047.mp3',
+      text: 'Ối! Mây đen rồi! Cẩn thận nhé!',
+      cooldownMs: 4500,
+    },
+    line_048: {
+      path: '/audio/voice/vi-female/extra_048.mp3',
+      text: 'Giỏi quá! Bạn chém được rất nhiều trái cây!',
+      cooldownMs: 4500,
+    },
+    line_049: {
+      path: '/audio/voice/vi-female/extra_049.mp3',
+      text: 'Đưa tay ngắm vào những chú gà tinh nghịch nhé! Bong bóng sẽ tự bắn!',
+      cooldownMs: 4500,
+    },
+    line_050: {
+      path: '/audio/voice/vi-female/extra_050.mp3',
+      text: 'Gà vàng kìa! Nhanh lên!',
+      cooldownMs: 4500,
+    },
+    line_051: {
+      path: '/audio/voice/vi-female/extra_051.mp3',
+      text: 'Bạn gà đội mũ cần hai bong bóng nè!',
+      cooldownMs: 4500,
+    },
+    line_052: {
+      path: '/audio/voice/vi-female/extra_052.mp3',
+      text: 'Né nào!',
+      cooldownMs: 4500,
+    },
+    line_053: {
+      path: '/audio/voice/vi-female/extra_053.mp3',
+      text: 'Oa! Gà khổng lồ tinh nghịch kìa! Bắn bong bóng thật khéo nhé!',
+      cooldownMs: 4500,
+    },
+    line_054: {
+      path: '/audio/voice/vi-female/extra_054.mp3',
+      text: 'Tuyệt lắm! Bạn đã đưa rất nhiều bạn gà về chuồng!',
+      cooldownMs: 4500,
+    },
+    line_055: {
+      path: '/audio/voice/vi-female/extra_055.mp3',
+      text: 'Các bạn quái vật bị buồn ngủ rồi! Dùng ánh sáng và kẹo phép thuật giúp các bạn ấy tỉnh lại nhé!',
+      cooldownMs: 4500,
+    },
+    line_056: {
+      path: '/audio/voice/vi-female/extra_056.mp3',
+      text: 'Quái vật đang tới!',
+      cooldownMs: 4500,
+    },
+    line_057: {
+      path: '/audio/voice/vi-female/extra_057.mp3',
+      text: 'Dùng phép màu cầu vồng nào!',
+      cooldownMs: 4500,
+    },
+    line_058: {
+      path: '/audio/voice/vi-female/extra_058.mp3',
+      text: 'Giỏi lắm! Bạn ấy tỉnh lại rồi!',
+      cooldownMs: 4500,
+    },
+    line_059: {
+      path: '/audio/voice/vi-female/extra_059.mp3',
+      text: 'Mây buồn ngủ bay tới, cúi thấp người xuống nào!',
+      cooldownMs: 4500,
+    },
+    line_060: {
+      path: '/audio/voice/vi-female/extra_060.mp3',
+      text: 'Nhảy qua vũng kẹo trơn nào!',
+      cooldownMs: 4500,
+    },
+    line_061: {
+      path: '/audio/voice/vi-female/extra_061.mp3',
+      text: 'Vua Quái Vật Buồn Ngủ xuất hiện rồi! Hãy làm đúng các động tác để đánh thức bạn ấy nhé!',
+      cooldownMs: 4500,
+    },
+    line_062: {
+      path: '/audio/voice/vi-female/extra_062.mp3',
+      text: 'Bạn ấy tỉnh rồi! Tuyệt quá! Cùng nhau ăn bánh kem thôi!',
+      cooldownMs: 4500,
+    },
+    line_063: {
+      path: '/audio/voice/vi-female/extra_063.mp3',
+      text: 'Xuất sắc! Tất cả quái vật đã vui vẻ tỉnh lại rồi!',
+      cooldownMs: 4500,
+    },
+    line_064: {
+      path: '/audio/voice/vi-female/extra_064.mp3',
+      text: 'Dùng đôi tay khéo léo để bắt thật nhiều ngôi sao lấp lánh nhé!',
+      cooldownMs: 4500,
+    },
+    line_065: {
+      path: '/audio/voice/vi-female/extra_065.mp3',
+      text: 'Oa, ngôi sao cầu vồng kìa! Bắt lấy mau!',
+      cooldownMs: 4500,
+    },
+    line_066: {
+      path: '/audio/voice/vi-female/extra_066.mp3',
+      text: 'Kim cương quý giá xuất hiện rồi, bắt lấy nào!',
+      cooldownMs: 4500,
+    },
+    line_067: {
+      path: '/audio/voice/vi-female/extra_067.mp3',
+      text: 'Một hộp quà bí mật! Tuyệt quá!',
+      cooldownMs: 4500,
+    },
+    line_068: {
+      path: '/audio/voice/vi-female/extra_068.mp3',
+      text: 'Chuỗi năm lần liên tiếp rồi! Giỏi quá!',
+      cooldownMs: 4500,
+    },
+    line_069: {
+      path: '/audio/voice/vi-female/extra_069.mp3',
+      text: 'Wow! Mười lần liên tiếp hoàn hảo!',
+      cooldownMs: 4500,
+    },
+    line_070: {
+      path: '/audio/voice/vi-female/extra_070.mp3',
+      text: 'Hoàn thành rồi! Bạn bắt được thật nhiều sao!',
+      cooldownMs: 4500,
+    },
+    line_071: {
+      path: '/audio/voice/vi-female/extra_071.mp3',
+      text: 'Cùng Bara khám phá Khu Rừng Kỳ Diệu nhé!',
+      cooldownMs: 4500,
+    },
+    line_072: {
+      path: '/audio/voice/vi-female/extra_072.mp3',
+      text: 'Chào mừng bạn đến với Thành Phố Kẹo Ngọt thơm lừng!',
+      cooldownMs: 4500,
+    },
+    line_073: {
+      path: '/audio/voice/vi-female/extra_073.mp3',
+      text: 'Cùng lặn xuống Đại Dương Xanh Thẳm ngắm san hô nào!',
+      cooldownMs: 4500,
+    },
+    line_074: {
+      path: '/audio/voice/vi-female/extra_074.mp3',
+      text: 'Chúng mình đang bay lên Lâu Đài Trên Mây bồng bềnh!',
+      cooldownMs: 4500,
+    },
+    line_075: {
+      path: '/audio/voice/vi-female/extra_075.mp3',
+      text: 'Khám phá Vũ Trụ bao la cùng các vì sao!',
+      cooldownMs: 4500,
+    },
+    line_076: {
+      path: '/audio/voice/vi-female/extra_076.mp3',
+      text: 'Xứ Sở Kỳ Lân lấp lánh cầu vồng kì diệu!',
+      cooldownMs: 4500,
+    },
+    line_077: {
+      path: '/audio/voice/vi-female/extra_077.mp3',
+      text: 'Mây Mưa Khổng Lồ xuất hiện! Hãy giơ hai tay tạo cầu vồng dọn sạch mây đen nhé!',
+      cooldownMs: 4500,
+    },
+    line_078: {
+      path: '/audio/voice/vi-female/extra_078.mp3',
+      text: 'Tuyệt vời! Chúng mình đã vượt qua màn chơi xuất sắc!',
+      cooldownMs: 4500,
+    },
+    line_079: {
+      path: '/audio/voice/vi-female/extra_079.mp3',
+      text: 'Hãy làm tư thế thật giống mình trên màn hình nhé!',
+      cooldownMs: 4500,
+    },
+    line_080: {
+      path: '/audio/voice/vi-female/extra_080.mp3',
+      text: 'Giữ nguyên tư thế trong ba giây nào...',
+      cooldownMs: 4500,
+    },
+    line_081: {
+      path: '/audio/voice/vi-female/extra_081.mp3',
+      text: 'Tư thế chuẩn không cần chỉnh luôn!',
+      cooldownMs: 4500,
+    },
+    line_082: {
+      path: '/audio/voice/vi-female/extra_082.mp3',
+      text: 'Cùng hòa vào điệu nhạc và nhảy múa cùng Bara nào!',
+      cooldownMs: 4500,
+    },
+    line_083: {
+      path: '/audio/voice/vi-female/extra_083.mp3',
+      text: 'Đúng nhịp điệu rồi, nhảy đẹp lắm!',
+      cooldownMs: 4500,
+    },
+    line_084: {
+      path: '/audio/voice/vi-female/extra_084.mp3',
+      text: 'Vũ điệu hoàn thành thật xuất sắc!',
+      cooldownMs: 4500,
+    },
+    line_085: {
+      path: '/audio/voice/vi-female/extra_085.mp3',
+      text: 'Bạn ấy thích được vuốt ve lắm đó!',
+      cooldownMs: 4500,
+    },
+    line_086: {
+      path: '/audio/voice/vi-female/extra_086.mp3',
+      text: 'Măm măm, món ăn ngon tuyệt!',
+      cooldownMs: 4500,
+    },
+    line_087: {
+      path: '/audio/voice/vi-female/extra_087.mp3',
+      text: 'Xà phòng thơm ngát, sạch sẽ mát mẻ rồi!',
+      cooldownMs: 4500,
+    },
+    line_088: {
+      path: '/audio/voice/vi-female/extra_088.mp3',
+      text: 'Bộ lông mượt mà lấp lánh rồi nè!',
+      cooldownMs: 4500,
+    },
+    line_089: {
+      path: '/audio/voice/vi-female/extra_089.mp3',
+      text: 'Chúc mừng! Bạn thú cưng đã lên cấp mới!',
+      cooldownMs: 4500,
+    },
+    line_090: {
+      path: '/audio/voice/vi-female/extra_090.mp3',
+      text: 'Chào mừng bạn đến với buổi vận động 5 phút vui khỏe mỗi ngày!',
+      cooldownMs: 4500,
+    },
+    line_091: {
+      path: '/audio/voice/vi-female/extra_091.mp3',
+      text: 'Cùng thử thách với bài tập năng động 10 phút tràn đầy năng lượng nhé!',
+      cooldownMs: 4500,
+    },
+    line_092: {
+      path: '/audio/voice/vi-female/extra_092.mp3',
+      text: 'Bạn đang làm rất tốt, cố gắng lên nào!',
+      cooldownMs: 4500,
+    },
+    line_093: {
+      path: '/audio/voice/vi-female/extra_093.mp3',
+      text: 'Nghỉ giải lao một chút uống nước nhé!',
+      cooldownMs: 4500,
+    },
+    line_094: {
+      path: '/audio/voice/vi-female/extra_094.mp3',
+      text: 'Hoàn thành xuất sắc bài tập hôm nay! Bạn thật là tuyệt vời!',
+      cooldownMs: 4500,
+    },
+    line_095: {
+      path: '/audio/voice/vi-female/extra_095.mp3',
+      text: 'Trò chơi tiếp sức gia đình! Bố mẹ và bé cùng phối hợp nhé!',
+      cooldownMs: 4500,
+    },
+    line_096: {
+      path: '/audio/voice/vi-female/extra_096.mp3',
+      text: 'Lượt của bé, bé chuẩn bị làm động tác nhé!',
+      cooldownMs: 4500,
+    },
+    line_097: {
+      path: '/audio/voice/vi-female/extra_097.mp3',
+      text: 'Bây giờ tới lượt bố hoặc mẹ làm động tác nè!',
+      cooldownMs: 4500,
+    },
+    line_098: {
+      path: '/audio/voice/vi-female/extra_098.mp3',
+      text: 'Gia đình mình phối hợp thật là ăn ý và tuyệt vời!',
+      cooldownMs: 4500,
+    },
+    line_099: {
+      path: '/audio/voice/vi-female/extra_099.mp3',
+      text: 'Chào mừng các bạn đến với Cờ Cá Ngựa - Đường Đua Kỳ Diệu! Cùng tung xúc xắc và đua nào!',
+      cooldownMs: 4500,
+    },
+    line_100: {
+      path: '/audio/voice/vi-female/extra_100.mp3',
+      text: 'Bạn có thể đưa một quân ra khỏi chuồng nè!',
+      cooldownMs: 4500,
+    },
+    line_101: {
+      path: '/audio/voice/vi-female/extra_101.mp3',
+      text: 'Hãy chạm vào quân bạn muốn di chuyển nhé!',
+      cooldownMs: 4500,
+    },
+    line_102: {
+      path: '/audio/voice/vi-female/extra_102.mp3',
+      text: 'Tung được sáu điểm! Bạn được tung thêm một lần nữa nè!',
+      cooldownMs: 4500,
+    },
+    line_103: {
+      path: '/audio/voice/vi-female/extra_103.mp3',
+      text: 'Ồ! Đi trúng ô Cầu Vồng, tiến thêm hai bước!',
+      cooldownMs: 4500,
+    },
+    line_104: {
+      path: '/audio/voice/vi-female/extra_104.mp3',
+      text: 'Bạn nhận được một ngôi sao may mắn lấp lánh!',
+      cooldownMs: 4500,
+    },
+    line_105: {
+      path: '/audio/voice/vi-female/extra_105.mp3',
+      text: 'Trận đấu hoàn thành rồi! Cả nhóm chơi rất tuyệt vời!',
+      cooldownMs: 4500,
+    },
+    line_106: {
+      path: '/audio/voice/vi-female/extra_106.mp3',
+      text: 'Chào mừng bạn đến với Gara Bara Speed Racing! Hãy chọn chiếc xe yêu thích nhé!',
+      cooldownMs: 4500,
+    },
+    line_107: {
+      path: '/audio/voice/vi-female/extra_107.mp3',
+      text: 'Đặt hai tay ra phía trước như đang cầm vô lăng nhé!',
+      cooldownMs: 4500,
+    },
+    line_108: {
+      path: '/audio/voice/vi-female/extra_108.mp3',
+      text: 'Nghiêng hai tay sang trái nào!',
+      cooldownMs: 4500,
+    },
+    line_109: {
+      path: '/audio/voice/vi-female/extra_109.mp3',
+      text: 'Bây giờ nghiêng sang phải nha!',
+      cooldownMs: 4500,
+    },
+    line_110: {
+      path: '/audio/voice/vi-female/extra_110.mp3',
+      text: 'Tuyệt rồi! Vô lăng đã sẵn sàng! Chúng mình cùng đua nhé!',
+      cooldownMs: 4500,
+    },
+    line_111: {
+      path: '/audio/voice/vi-female/extra_111.mp3',
+      text: 'Cua trái phía trước! Ôm cua nào!',
+      cooldownMs: 4500,
+    },
+    line_112: {
+      path: '/audio/voice/vi-female/extra_112.mp3',
+      text: 'Chuẩn bị rẽ phải!',
+      cooldownMs: 4500,
+    },
+    line_113: {
+      path: '/audio/voice/vi-female/extra_113.mp3',
+      text: 'Drift đẹp lắm!',
+      cooldownMs: 4500,
+    },
+    line_114: {
+      path: '/audio/voice/vi-female/extra_114.mp3',
+      text: 'Drift hoàn hảo tuyệt đỉnh!',
+      cooldownMs: 4500,
+    },
+    line_115: {
+      path: '/audio/voice/vi-female/extra_115.mp3',
+      text: 'Nitro đã sẵn sàng!',
+      cooldownMs: 4500,
+    },
+    line_116: {
+      path: '/audio/voice/vi-female/extra_116.mp3',
+      text: 'Tăng tốc thần tốc nào!',
+      cooldownMs: 4500,
+    },
+    line_117: {
+      path: '/audio/voice/vi-female/extra_117.mp3',
+      text: 'Đã qua Checkpoint! Cộng thêm thời gian!',
+      cooldownMs: 4500,
+    },
+    line_118: {
+      path: '/audio/voice/vi-female/extra_118.mp3',
+      text: 'Vòng cuối cùng rồi! Cố lên bạn ơi!',
+      cooldownMs: 4500,
+    },
+    line_119: {
+      path: '/audio/voice/vi-female/extra_119.mp3',
+      text: 'Bảo vệ phép thuật đã kích hoạt!',
+      cooldownMs: 4500,
+    },
+    line_120: {
+      path: '/audio/voice/vi-female/extra_120.mp3',
+      text: 'Ngôi sao may mắn cộng điểm tốc độ!',
+      cooldownMs: 4500,
+    },
+    line_121: {
+      path: '/audio/voice/vi-female/extra_121.mp3',
+      text: 'Tuyệt vời! Bạn đã xuất sắc về nhất cuộc đua!',
+      cooldownMs: 4500,
+    },
+    line_122: {
+      path: '/audio/voice/vi-female/extra_122.mp3',
+      text: 'Bạn lái xe rất cừ! Lần sau chúng mình sẽ về nhất nhé!',
+      cooldownMs: 4500,
+    }
+  },
+  runtime: {
+    line_001: {
+      path: '/audio/voice/vi-female/runtime_001.mp3',
+      text: 'Bé hãy lùi ra xa camera một chút để hiển thị đầy đủ cơ thể, từ đầu đến chân nhé!',
+      cooldownMs: 2500,
+    },
+    line_002: {
+      path: '/audio/voice/vi-female/runtime_002.mp3',
+      text: 'Bé hãy đưa hai tay ra trước như đang cầm vô lăng và đứng thẳng nhé!',
+      cooldownMs: 2500,
+    },
+    line_003: {
+      path: '/audio/voice/vi-female/runtime_003.mp3',
+      text: 'Bé hãy đứng thẳng trước camera để thấy phần thân trên và hai vai nhé!',
+      cooldownMs: 2500,
+    },
+    line_004: {
+      path: '/audio/voice/vi-female/runtime_004.mp3',
+      text: 'Bé hãy đứng trước camera và đưa cổ tay sẵn sàng nhé!',
+      cooldownMs: 2500,
+    },
+    line_005: {
+      path: '/audio/voice/vi-female/runtime_005.mp3',
+      text: 'Thành công rồi! Chuẩn bị bắt đầu nào!',
+      cooldownMs: 2500,
+    },
+    line_006: {
+      path: '/audio/voice/vi-female/runtime_006.mp3',
+      text: 'Cùng nhảy múa theo điệu nhạc vui nhộn nào!',
+      cooldownMs: 2500,
+    },
+    line_007: {
+      path: '/audio/voice/vi-female/runtime_007.mp3',
+      text: 'Hãy làm theo các tư thế mẫu siêu dễ thương nào!',
+      cooldownMs: 2500,
+    },
+    line_008: {
+      path: '/audio/voice/vi-female/runtime_008.mp3',
+      text: 'Xuất sắc! Bạn đã vượt qua tất cả thử thách tư thế!',
+      cooldownMs: 2500,
+    },
+    line_009: {
+      path: '/audio/voice/vi-female/runtime_009.mp3',
+      text: 'Xin chào các bạn nhỏ, đây là giọng đọc với cao độ và tốc độ bạn đã chọn!',
+      cooldownMs: 2500,
+    },
+    line_010: {
+      path: '/audio/voice/vi-female/runtime_010.mp3',
+      text: 'Lùi lại một chút để mình nhìn thấy toàn thân nhé!',
+      cooldownMs: 2500,
+    },
+    line_011: {
+      path: '/audio/voice/vi-female/runtime_011.mp3',
+      text: 'Toàn thân đã sẵn sàng!',
+      cooldownMs: 2500,
+    },
+    line_012: {
+      path: '/audio/voice/vi-female/runtime_012.mp3',
+      text: 'Hãy tạo dáng theo hình mẫu trên màn hình nhé!',
+      cooldownMs: 2500,
+    },
+    line_013: {
+      path: '/audio/voice/vi-female/runtime_013.mp3',
+      text: 'Ba, hai, một... cười lên nào!',
+      cooldownMs: 2500,
+    },
+    line_014: {
+      path: '/audio/voice/vi-female/runtime_014.mp3',
+      text: 'Fashion Show hoàn thành! Bé trình diễn rất tuyệt vời!',
+      cooldownMs: 2500,
+    },
+    line_015: {
+      path: '/audio/voice/vi-female/runtime_015.mp3',
+      text: 'Chào mừng đến với Gương Phép Thuật!',
+      cooldownMs: 2500,
+    },
+    line_016: {
+      path: '/audio/voice/vi-female/runtime_016.mp3',
+      text: 'Đã mở khóa một trang phục mới!',
+      cooldownMs: 2500,
+    },
+    line_017: {
+      path: '/audio/voice/vi-female/runtime_017.mp3',
+      text: 'Đã lưu bộ trang phục cá tính của bé!',
+      cooldownMs: 2500,
+    },
+    line_018: {
+      path: '/audio/voice/vi-female/runtime_018.mp3',
+      text: 'Phối đồ bất ngờ thành công!',
+      cooldownMs: 2500,
+    },
+    line_019: {
+      path: '/audio/voice/vi-female/runtime_019.mp3',
+      text: 'Đã cất hết quần áo!',
+      cooldownMs: 2500,
+    },
+    line_020: {
+      path: '/audio/voice/vi-female/runtime_020.mp3',
+      text: 'Ba, hai, một... tạo dáng!',
+      cooldownMs: 2500,
+    },
+    line_021: {
+      path: '/audio/voice/vi-female/runtime_021.mp3',
+      text: 'Chào mừng trở lại! Mình tiếp tục chơi nhé!',
+      cooldownMs: 2500,
+    },
+    line_022: {
+      path: '/audio/voice/vi-female/runtime_022.mp3',
+      text: 'Đã hoàn tác nước vừa chọn!',
+      cooldownMs: 2500,
+    },
+    line_023: {
+      path: '/audio/voice/vi-female/runtime_023.mp3',
+      text: 'Rất tiếc! Không có quân nào đi được. Đổi lượt tiếp theo nhé!',
+      cooldownMs: 2500,
+    },
+  },
 };

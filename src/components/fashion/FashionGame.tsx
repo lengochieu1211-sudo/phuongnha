@@ -338,7 +338,7 @@ export default function FashionGame({
         diamonds: prev.diamonds - item.costDiamonds,
         unlockedWardrobe: [...prev.unlockedWardrobe, item.id]
       }));
-      speakVoice(`Đã mở khóa thành công ${item.name}!`);
+      speakVoice('Đã mở khóa một trang phục mới!');
     } else {
       audio.playFail();
     }

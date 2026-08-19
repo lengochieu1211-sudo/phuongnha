@@ -1,8 +1,10 @@
 {
-  "recordedPackAvailable": false,
-  "totalFiles": 221,
-  "validFiles": 0,
-  "invalidFiles": 221,
+  "recordedPackAvailable": true,
+  "voiceStyle": "female_offline_vi",
+  "generator": "offline Vietnamese female-formant TTS",
+  "totalFiles": 366,
+  "validFiles": 366,
+  "invalidFiles": 0,
   "missingFiles": 0,
-  "note": "All bundled MP3 files are placeholder/invalid; runtime uses selected Web Speech TTS until real audio replaces them."
+  "note": "Bundled valid MP3 voice pack. Female mode is offline-only and never falls back to the device system male voice."
 }

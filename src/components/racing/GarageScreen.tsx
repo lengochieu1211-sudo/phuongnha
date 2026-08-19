@@ -12,6 +12,7 @@ import {
   CarUpgrades,
   PlayerRaceProfile,
   PlayerProgress,
+  RaceSettings,
 } from '../../types';
 import {
   CAR_CATALOG,
@@ -26,7 +27,7 @@ import {
 } from '../../lib/racing/CarData';
 import { buildCar3D, Car3DInstance } from '../../lib/racing/Car3DBuilder';
 import { raceAudio } from '../../lib/racing/RaceAudio';
-import { detectGraphicsProfile } from '../../utils/graphicsQuality';
+import { resolveRacingGraphicsProfile } from '../../utils/graphicsQuality';
 import {
   Sparkles,
   Zap,
@@ -52,6 +53,7 @@ interface GarageScreenProps {
   onUpdatePlayerProgress: (newProgress: PlayerProgress) => void;
   onBack: () => void;
   onSelectCarAndRace: (carId: CarModelId) => void;
+  qualitySetting: RaceSettings['quality'];
 }
 
 function createStudioEnvironment(): THREE.CubeTexture {
@@ -83,6 +85,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   onUpdatePlayerProgress,
   onBack,
   onSelectCarAndRace,
+  qualitySetting,
 }) => {
   const [selectedCarIndex, setSelectedCarIndex] = useState(() => {
     const idx = CAR_CATALOG.findIndex((c) => c.id === profile.selectedCarId);
@@ -110,7 +113,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const carInstanceRef = useRef<Car3DInstance | null>(null);
-  const graphicsProfile = useRef(detectGraphicsProfile()).current;
+  const graphicsProfile = useRef(resolveRacingGraphicsProfile(qualitySetting)).current;
   const isDraggingRef = useRef(false);
   const prevMouseXRef = useRef(0);
   const turntableAngleRef = useRef(0.6);

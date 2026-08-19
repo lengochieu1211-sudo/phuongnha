@@ -139,7 +139,7 @@ export default function LudoGame({
     updateState();
     setShowSetupModal(false);
     audio.playPowerup();
-    speakVoice(`Chào mừng trở lại! Tiếp tục lượt của ${engine.getCurrentPlayer().name}`);
+    speakVoice('Chào mừng trở lại! Mình tiếp tục chơi nhé!');
   };
 
   // Execute Dice Roll

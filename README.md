@@ -4,6 +4,16 @@
 
 # Run and deploy your AI Studio app
 
+## V5.4 – Giọng nữ offline + Racing Ultra + cấu hình Điện thoại/TV/PC
+
+- **Giọng nữ đóng sẵn trong app:** 366 MP3 hợp lệ (~4.4 MB audio), không còn 221 placeholder cũ. Các câu thoại tĩnh và hướng dẫn hiện có đã được ánh xạ sang pack offline. Khi chọn **Giọng nữ**, app không tự rơi về Web Speech của thiết bị nữa để tránh đổi sang giọng nam giữa game.
+- Lưu ý chất lượng: pack hiện tại là **giọng nữ tổng hợp offline (female-formant)**, không phải giọng người thật/neural studio. Male/Em bé vẫn dùng Web Speech theo voice có trên thiết bị.
+- **GitHub Pages:** audio offline tự ghép `BASE_URL`, nên đường dẫn vẫn đúng khi app chạy dưới `/phuongnha/`.
+- **Xe đua:** thêm mức `ultra` trên PC với thân xe aerodynamic nhiều segment hơn, canopy kính, nội thất, intake, diffuser fin, DRL, panel line, mâm/phanh chi tiết, vật liệu clearcoat và phản xạ môi trường. Camera `Close Chase` đưa xe gần hơn để nhìn rõ.
+- **Đồ họa:** có 4 nút `Tự động / Điện thoại / TV-Mi Box / PC đẹp`. Tự động nhận nhóm thiết bị. Trong lúc đua, nếu FPS giảm, renderer tự hạ pixel ratio; nếu cần sẽ tắt shadow trước khi giảm chi tiết xe người chơi.
+- **Ưu tiên hiệu năng:** điện thoại/TV vẫn giữ xe người chơi ở mức High nhưng giảm shadow, mật độ cảnh, texture và chi tiết xe AI. PC đẹp mới bật Ultra + bóng 2048 + cảnh dày hơn.
+
+
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/23852ece-ae4d-444b-a6ac-86708908f446

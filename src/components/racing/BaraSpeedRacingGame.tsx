@@ -72,6 +72,29 @@ type RacingSubScreen =
   | 'calibration'
   | 'pass_and_play';
 
+
+const RACE_SETTINGS_STORAGE_KEY = 'phuong_nha_race_settings_v54';
+const DEFAULT_RACE_SETTINGS: RaceSettings = {
+  controlMode: 'camera_motion',
+  autoSteerAssist: true,
+  autoThrottle: true,
+  steeringSensitivity: 'normal',
+  deadZoneAngle: 5,
+  cameraShake: 'normal',
+  reducedMotion: false,
+  cameraView: 'close_chase',
+  quality: 'auto',
+  soundVolume: 1.0,
+  engineVolume: 0.8,
+};
+
+const QUALITY_PRESETS: { id: RaceSettings['quality']; label: string; hint: string }[] = [
+  { id: 'auto', label: '✨ Tự động', hint: 'Tự nhận PC / điện thoại / TV' },
+  { id: 'low', label: '📱 Điện thoại', hint: 'Xe đẹp, giảm cảnh + bóng để mượt' },
+  { id: 'medium', label: '📺 TV / Mi Box', hint: 'Cân bằng cho màn hình lớn' },
+  { id: 'high', label: '🖥️ PC đẹp', hint: 'Xe Ultra + bóng + cảnh chi tiết' },
+];
+
 export default function BaraSpeedRacingGame({
   progress,
   onUpdateProgress,
@@ -88,20 +111,24 @@ export default function BaraSpeedRacingGame({
   const [raceMode, setRaceMode] = useState<RaceMode>('quick_race');
   const [cameraView, setCameraView] = useState<CameraViewMode>('close_chase');
 
-  // 3. Settings State
-  const [raceSettings, setRaceSettings] = useState<RaceSettings>({
-    controlMode: 'camera_motion',
-    autoSteerAssist: true,
-    autoThrottle: true,
-    steeringSensitivity: 'normal',
-    deadZoneAngle: 5,
-    cameraShake: 'normal',
-    reducedMotion: false,
-    cameraView: 'close_chase',
-    quality: 'auto',
-    soundVolume: 1.0,
-    engineVolume: 0.8,
+  // 3. Settings State — persisted so the chosen Phone / TV / PC profile survives refreshes.
+  const [raceSettings, setRaceSettings] = useState<RaceSettings>(() => {
+    if (typeof window === 'undefined') return DEFAULT_RACE_SETTINGS;
+    try {
+      const saved = localStorage.getItem(RACE_SETTINGS_STORAGE_KEY);
+      return saved ? { ...DEFAULT_RACE_SETTINGS, ...JSON.parse(saved) } : DEFAULT_RACE_SETTINGS;
+    } catch {
+      return DEFAULT_RACE_SETTINGS;
+    }
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RACE_SETTINGS_STORAGE_KEY, JSON.stringify(raceSettings));
+    } catch {
+      // Storage may be unavailable in private/locked-down browser modes.
+    }
+  }, [raceSettings]);
 
   // 4. Engine & HUD State
   const [engine, setEngine] = useState<RaceEngine | null>(null);
@@ -738,6 +765,37 @@ export default function BaraSpeedRacingGame({
             </div>
           </div>
 
+          {/* Device-aware graphics presets. Runtime FPS protection can still lower render scale if needed. */}
+          <div className="w-full max-w-4xl mx-auto mb-4 rounded-2xl border border-slate-700 bg-slate-900/80 p-3">
+            <div className="flex flex-col md:flex-row md:items-center gap-3">
+              <div className="shrink-0">
+                <div className="text-xs font-black text-white uppercase tracking-wide">Đồ họa đua xe</div>
+                <div className="text-[10px] text-slate-400">Ưu tiên xe rõ, tự hạ tải nếu FPS thấp</div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 flex-1">
+                {QUALITY_PRESETS.map((preset) => {
+                  const active = raceSettings.quality === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setRaceSettings((prev) => ({ ...prev, quality: preset.id }))}
+                      title={preset.hint}
+                      className={`rounded-xl px-2.5 py-2 text-left border transition active:scale-95 ${
+                        active
+                          ? 'border-cyan-400 bg-cyan-500/20 text-cyan-100 shadow-md shadow-cyan-950/40'
+                          : 'border-slate-700 bg-slate-950/70 text-slate-300 hover:border-slate-500'
+                      }`}
+                    >
+                      <div className="text-[11px] font-black">{preset.label}</div>
+                      <div className="text-[9px] mt-0.5 opacity-70 leading-tight">{preset.hint}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
           {/* Quick Footer Controls Info */}
           <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-800/80 text-xs text-slate-400">
             <div className="flex items-center gap-2">
@@ -881,6 +939,7 @@ export default function BaraSpeedRacingGame({
           onUpdateProfile={handleUpdateProfile}
           onUpdatePlayerProgress={onUpdateProgress}
           onBack={() => setCurrentSubScreen('mode_select')}
+          qualitySetting={raceSettings.quality}
           onSelectCarAndRace={(carId) => {
             setSelectedCarId(carId);
             handleStartRace(selectedTrackId, carId, raceMode);
@@ -927,6 +986,7 @@ export default function BaraSpeedRacingGame({
             car={currentCar}
             customization={currentCustomization}
             cameraView={cameraView}
+            qualitySetting={raceSettings.quality}
           />
 
           {/* In-Game HUD Overlay */}

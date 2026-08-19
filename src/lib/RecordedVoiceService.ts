@@ -25,6 +25,12 @@ class RecordedVoiceService {
   private lastPlayTime: Record<string, number> = {};
   private preloadedCategories: Set<string> = new Set();
 
+  private resolveAssetPath(path: string): string {
+    const base = ((import.meta as any).env?.BASE_URL || '/');
+    const cleanBase = base.endsWith('/') ? base : `${base}/`;
+    return path.startsWith('/') ? `${cleanBase}${path.slice(1)}` : `${cleanBase}${path}`;
+  }
+
   constructor() {
     // AI Studio exports may contain placeholder .mp3 files that are not valid MPEG audio.
     // Start in TTS-only mode and enable/preload the recorded pack only after integrity validation.
@@ -44,7 +50,7 @@ class RecordedVoiceService {
         voiceGuide.registerRecordedVoicePlayer(this);
       } else {
         this.enabled = false;
-        console.info('[Voice] Recorded pack is placeholder/invalid; using configured Web Speech TTS.');
+        console.info('[Voice] Recorded female pack is unavailable; using configured Web Speech TTS.');
       }
     } catch {
       this.enabled = false;
@@ -77,7 +83,7 @@ class RecordedVoiceService {
     Object.entries(cat).forEach(([subKey, entry]) => {
       const fullKey = `${category}.${subKey}`;
       if (!this.audioCache[fullKey]) {
-        const audioObj = new Audio(entry.path);
+        const audioObj = new Audio(this.resolveAssetPath(entry.path));
         audioObj.preload = 'auto';
         this.audioCache[fullKey] = audioObj;
       }
@@ -124,7 +130,7 @@ class RecordedVoiceService {
     // Use cached HTML5 Audio or create new one
     let audioObj = this.audioCache[key];
     if (!audioObj) {
-      audioObj = new Audio(entry.path);
+      audioObj = new Audio(this.resolveAssetPath(entry.path));
       this.audioCache[key] = audioObj;
     }
 
@@ -150,16 +156,12 @@ class RecordedVoiceService {
     audioObj.onerror = () => {
       if (fallbackTriggered) return;
       fallbackTriggered = true;
-      // Offline file is missing/failed: fall back immediately to Google Female Web Speech TTS
-      console.log(`[Voice] Offline file failed for ${key}, falling back to Web Speech synthesis.`);
-      voiceGuide.speakSynthesized(entry.text, priority === 'critical' ? 'high' : priority === 'instruction' ? 'high' : 'medium', {
-        onStart: callbacks?.onStart,
-        onEnd: () => {
-          audio.duckMusic(false);
-          callbacks?.onEnd?.();
-        }
-      });
+      // The bundled female pack must stay female. If one file cannot be played,
+      // stop this sentence instead of falling back to an unpredictable device TTS voice.
+      console.warn(`[Voice] Offline female file failed for ${key}; sentence skipped.`);
+      audio.duckMusic(false);
       this.activeAudio = null;
+      callbacks?.onEnd?.();
     };
 
     try {

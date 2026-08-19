@@ -234,13 +234,19 @@ class VoiceGuideService {
   public previewVoiceStyle(style: VoiceStyle) {
     this.applyVoiceStyleConfig(style);
     this.stop();
+    // The female preview must use the bundled recording, not a device TTS voice.
+    // This prevents Android/Chrome from previewing a male Vietnamese system voice.
+    if (style === 'female_gentle' && this.recordedVoicePlayer) {
+      this.playKey('common.welcome', 'high');
+      return;
+    }
     let sampleText = 'Xin chào bé yêu! Chị Phương Nhã rất vui được cùng em phiêu lưu và vận động nhé!';
     if (style === 'male_warm') {
       sampleText = 'Chào bạn nhỏ dũng cảm! Hãy cùng chú vươn vai và bắt đầu nào!';
     } else if (style === 'baby_cute') {
       sampleText = 'Oa chào bạn nha! Mình cùng nhảy và bắt trái cây thật vui nà!';
     }
-    this.speak(sampleText, 'high');
+    this.speakSynthesized(sampleText, 'high');
   }
 
   public subscribeSpeakingState(listener: (isSpeaking: boolean, text: string) => void): () => void {
@@ -271,6 +277,13 @@ class VoiceGuideService {
         this.recordedVoicePlayer.play(manifestKey, mappedPriority, callbacks);
         return;
       }
+      // Female mode is intentionally OFFLINE-ONLY. Never fall back to the
+      // device Web Speech voice because many Android/Chrome devices expose a
+      // Vietnamese male voice as the default. An unmapped dynamic sentence is
+      // skipped instead of unexpectedly changing speaker/gender mid-game.
+      console.warn('[VoiceGuide] Female offline line is not mapped:', text);
+      callbacks?.onEnd?.();
+      return;
     }
 
     this.speakSynthesized(text, priority, callbacks);

@@ -10,11 +10,12 @@ import {
   CarConfig,
   CameraViewMode,
   CarCustomization,
+  RaceSettings,
 } from '../../types';
 import { RaceEngine } from '../../lib/racing/RaceEngine';
 import { buildCar3D, Car3DInstance } from '../../lib/racing/Car3DBuilder';
 import { getInterpolatedTrackPoint } from '../../lib/racing/TrackData';
-import { createAsphaltTexture, detectGraphicsProfile, GraphicsProfile } from '../../utils/graphicsQuality';
+import { createAsphaltTexture, resolveRacingGraphicsProfile, GraphicsProfile } from '../../utils/graphicsQuality';
 
 interface Race3DCanvasProps {
   engine: RaceEngine;
@@ -22,6 +23,7 @@ interface Race3DCanvasProps {
   car: CarConfig;
   customization: CarCustomization;
   cameraView: CameraViewMode;
+  qualitySetting: RaceSettings['quality'];
 }
 
 export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
@@ -30,6 +32,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
   car,
   customization,
   cameraView,
+  qualitySetting,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -47,7 +50,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
 
-    const profile = detectGraphicsProfile();
+    const profile = resolveRacingGraphicsProfile(qualitySetting);
 
     // 1. Three.js Scene & Camera
     const scene = new THREE.Scene();
@@ -55,9 +58,9 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
     // Sky & Fog setup based on environment
     setupEnvironmentTheme(scene, track);
-    if (profile.quality === 'high') {
-      scene.environment = createProceduralRaceEnvironment(track.environmentType);
-    }
+    // Even phone/TV gets a tiny reflection environment so clearcoat paint does not look flat.
+    const envSize = profile.quality === 'high' ? 256 : profile.quality === 'balanced' ? 128 : 64;
+    scene.environment = createProceduralRaceEnvironment(track.environmentType, envSize);
 
     const camera = new THREE.PerspectiveCamera(54, width / height, 0.5, 1400);
     cameraRef.current = camera;
@@ -102,6 +105,17 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     scene.add(playerCar.root);
     playerCarRef.current = playerCar;
 
+    // Cheap contact shadow keeps the car visually planted even when realtime shadows
+    // are disabled on phones/TV. This costs one transparent quad instead of a shadow map.
+    const contactShadow = new THREE.Mesh(
+      new THREE.CircleGeometry(1.0, profile.quality === 'high' ? 36 : 20),
+      new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false })
+    );
+    contactShadow.scale.set(1.15, 2.25, 1);
+    contactShadow.rotation.x = -Math.PI / 2;
+    contactShadow.renderOrder = 2;
+    scene.add(contactShadow);
+
     // 6. Build AI 3D Cars
     const aiCars: { id: string; instance: Car3DInstance }[] = [];
     engine.physics.aiRacers.forEach((ai) => {
@@ -114,7 +128,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         neonUnderglow: 'cyan',
         windowTint: 'smoke',
         decal: 'none',
-      }, profile.quality === 'high' ? 'lite' : 'lite');
+      }, profile.aiCarDetail);
       scene.add(aiInstance.root);
       aiCars.push({ id: ai.id, instance: aiInstance });
     });
@@ -188,6 +202,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       const pz = pt.pos.z + pt.normal.z * engine.physics.player.lateralOffset;
 
       playerCar.root.position.set(px, py, pz);
+      contactShadow.position.set(px, py + 0.025, pz);
 
       // Car orientation along track tangent
       const targetLook = new THREE.Vector3(
@@ -245,15 +260,22 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       // Update Camera Tracking View
       updateCameraPosition(camera, px, py, pz, pt.tangent, cameraView, engine.physics.player.isNitroActive);
 
-      // Runtime safety net: if a nominally capable device cannot sustain smooth rendering,
-      // lower render resolution automatically without restarting the race.
+      // Runtime safety net for PC / phone / Android TV. Do not wait for a crash:
+      // reduce render resolution progressively if FPS falls below the profile target.
       fpsFrames += 1;
-      if (!autoDowngraded && time - fpsWindowStart >= 4500) {
+      if (time - fpsWindowStart >= 3200) {
         const fps = (fpsFrames * 1000) / (time - fpsWindowStart);
-        if (fps < 38 && profile.quality !== 'lite') {
-          autoDowngraded = true;
-          renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.15));
-          renderer.shadowMap.enabled = false;
+        const currentRatio = renderer.getPixelRatio();
+        if (fps < profile.targetFps - 9) {
+          const nextRatio = Math.max(profile.pixelRatioFloor, currentRatio - 0.16);
+          if (nextRatio < currentRatio - 0.01) {
+            renderer.setPixelRatio(nextRatio);
+            renderer.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight, false);
+          }
+          if (fps < profile.targetFps - 16 && renderer.shadowMap.enabled) {
+            renderer.shadowMap.enabled = false;
+            autoDowngraded = true;
+          }
         }
         fpsFrames = 0;
         fpsWindowStart = time;
@@ -288,7 +310,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       });
       renderer.dispose();
     };
-  }, [track.id, car.id]);
+  }, [track.id, car.id, qualitySetting]);
 
   // Update Customization in real-time if changed
   useEffect(() => {
@@ -306,7 +328,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
   );
 };
 
-function createProceduralRaceEnvironment(environmentType: string): THREE.CubeTexture {
+function createProceduralRaceEnvironment(environmentType: string, size = 128): THREE.CubeTexture {
   const palette: Record<string, [string, string]> = {
     city_night: ['#07111f', '#38bdf8'], sunset_coast: ['#2b0b18', '#fb923c'],
     mountain: ['#111827', '#93c5fd'], candy: ['#3b082b', '#f9a8d4'],
@@ -315,13 +337,13 @@ function createProceduralRaceEnvironment(environmentType: string): THREE.CubeTex
   const [dark, glow] = palette[environmentType] || palette.city_night;
   const faces: HTMLCanvasElement[] = [];
   for (let face = 0; face < 6; face++) {
-    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const c = document.createElement('canvas'); c.width = c.height = size;
     const ctx = c.getContext('2d')!;
-    const g = ctx.createLinearGradient(0, 0, 256, 256);
+    const g = ctx.createLinearGradient(0, 0, size, size);
     g.addColorStop(0, dark); g.addColorStop(0.55, glow); g.addColorStop(1, '#ffffff');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 256, 256);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
     ctx.globalAlpha = 0.22; ctx.fillStyle = '#fff';
-    for (let i = 0; i < 28; i++) ctx.fillRect(Math.random()*256, Math.random()*256, 1 + Math.random()*4, 1 + Math.random()*4);
+    for (let i = 0; i < Math.max(10, size / 8); i++) ctx.fillRect(Math.random()*size, Math.random()*size, 1 + Math.random()*4, 1 + Math.random()*4);
     faces.push(c);
   }
   const tex = new THREE.CubeTexture(faces);
@@ -341,17 +363,17 @@ function updateCameraPosition(
 ) {
   // Keep the car visually prominent on phones. Nitro widens the view, but not so
   // much that the player car becomes tiny.
-  const fovTarget = isNitro ? 62 : 54;
+  const fovTarget = isNitro ? 56 : 49;
   camera.fov += (fovTarget - camera.fov) * 0.1;
   camera.updateProjectionMatrix();
 
   switch (viewMode) {
     case 'close_chase': {
-      const camX = px - tangent.x * 4.05;
-      const camY = py + 1.75;
-      const camZ = pz - tangent.z * 4.05;
+      const camX = px - tangent.x * 3.25;
+      const camY = py + 1.48;
+      const camZ = pz - tangent.z * 3.25;
       camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.2);
-      camera.lookAt(px + tangent.x * 4.2, py + 0.9, pz + tangent.z * 4.2);
+      camera.lookAt(px + tangent.x * 5.0, py + 0.78, pz + tangent.z * 5.0);
       break;
     }
     case 'hood': {
@@ -521,6 +543,30 @@ function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: Graph
   }
   dashes.instanceMatrix.needsUpdate = true;
   scene.add(dashes);
+
+  // Low-cost metallic guard rails make the road read as a real circuit instead of a floating ribbon.
+  const railCount = profile.quality === 'high' ? 64 : profile.quality === 'balanced' ? 42 : 26;
+  const railGeo = new THREE.BoxGeometry(0.10, 0.46, 4.8);
+  const railMat = new THREE.MeshStandardMaterial({ color: 0xa7adb5, roughness: 0.38, metalness: 0.72 });
+  const rails = new THREE.InstancedMesh(railGeo, railMat, railCount * 2);
+  let railIdx = 0;
+  for (let i = 0; i < railCount; i++) {
+    const prog = (i + 0.5) / railCount;
+    const pt = getInterpolatedTrackPoint(engine.waypoints, prog);
+    const yaw = Math.atan2(pt.tangent.x, pt.tangent.z);
+    for (const side of [-1, 1]) {
+      dummy.position.set(
+        pt.pos.x + pt.normal.x * side * (roadWidth * 0.5 + 1.65),
+        pt.pos.y + 0.42,
+        pt.pos.z + pt.normal.z * side * (roadWidth * 0.5 + 1.65)
+      );
+      dummy.rotation.set(0, yaw, 0);
+      dummy.updateMatrix();
+      rails.setMatrixAt(railIdx++, dummy.matrix);
+    }
+  }
+  rails.instanceMatrix.needsUpdate = true;
+  scene.add(rails);
 
   // Give non-floating tracks a believable ground surface beyond the asphalt.
   if (!['sky_clouds', 'cosmic_space', 'sunset_coast'].includes(track.environmentType)) {
