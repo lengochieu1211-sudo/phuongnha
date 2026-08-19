@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  
+  .glass-card-dark {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(236, 72, 153, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(236, 72, 153, 0.6);
+  }
+}
+
+@keyframes rainbowShine {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+.animate-float-slow {
+  animation: floatSlow 3.5s ease-in-out infinite;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2.5s infinite;
+}
+
+.animate-rainbow-shine {
+  animation: rainbowShine 8s linear infinite;
+}
+
+/* Custom joyful scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 240, 245, 0.6);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(244, 114, 182, 0.5);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(236, 72, 153, 0.8);
+}
+
+
+/* Racing HUD: landscape phones are often >768px wide, so Tailwind's md: rules
+   would otherwise enlarge desktop controls on a very short screen. */
+@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
+  #race-hud-overlay { padding: 6px 8px 4px !important; gap: 2px; }
+  #race-steering-wheel { width: 58px !important; height: 58px !important; border-width: 2px !important; opacity: 0.72; }
+  #race-brake-btn, #race-gas-btn, #race-nitro-boost-btn { width: 52px !important; height: 64px !important; border-radius: 12px !important; font-size: 9px !important; }
+  #race-drift-feedback { top: 17% !important; transform: translateX(-50%) scale(0.82); transform-origin: top center; white-space: nowrap; }
+  #race-voice-subtitle { top: 29% !important; max-width: min(62vw, 520px) !important; padding: 5px 12px !important; font-size: 11px !important; line-height: 1.25 !important; border-radius: 12px !important; }
+  #race-camera-toggle-btn, #race-sound-toggle-btn { width: 38px !important; height: 38px !important; border-radius: 12px !important; }
+  #race-exit-btn { padding: 6px 10px !important; border-radius: 12px !important; font-size: 10px !important; }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Phương Nhã - Phiêu lưu kỳ diệu",
+  "description": "Trò chơi vận động tương tác qua Camera dành cho trẻ em với Bara Speed Racing 3D, phiêu lưu kỳ diệu và nhân vật dễ thương.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

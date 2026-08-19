@@ -1,0 +1,9 @@
+import React from 'react';
+export default function MagicalWorldHub({onRace,onFashion,onGames,onWorlds}:{onRace:()=>void;onFashion:()=>void;onGames:()=>void;onWorlds:()=>void}){
+ const zones=[['🏎️','Thành Phố Tốc Độ','Xe 3D · Drift · Nitro',onRace],['👗','Studio Thời Trang AR','Tóc · Mặt nạ · Phụ kiện',onFashion],['🥷','Sân Vận Động Camera','Ninja · Thủ môn · Dance',onGames],['🏰','Cổng Phiêu Lưu','Khám phá các thế giới',onWorlds]] as const;
+ return <section className="relative overflow-hidden rounded-[2rem] border-4 border-violet-200 bg-gradient-to-br from-indigo-950 via-violet-900 to-fuchsia-900 p-4 md:p-6 text-white shadow-2xl">
+   <div className="absolute inset-0 opacity-30 hidden lg:block" style={{backgroundImage:'radial-gradient(circle at 15% 20%,#67e8f9 0 2px,transparent 3px),radial-gradient(circle at 75% 35%,#fde68a 0 2px,transparent 3px)',backgroundSize:'90px 90px,130px 130px'}}/>
+   <div className="relative flex items-end justify-between gap-3 mb-4"><div><span className="text-[10px] md:text-xs font-black tracking-[.22em] text-cyan-300">PHƯƠNG NHÃ • MAGIC WORLD</span><h2 className="text-xl md:text-3xl font-black">Chọn khu vui chơi ✨</h2></div><span className="hidden md:block text-xs text-violet-200">PC: hiệu ứng HD · Mobile: tự tối ưu nhẹ</span></div>
+   <div className="relative grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3">{zones.map(([icon,title,sub,go])=><button key={title} onClick={go} className="group min-h-[112px] md:min-h-[145px] rounded-2xl border border-white/20 bg-white/10 hover:bg-white/20 backdrop-blur-md p-3 text-left transition active:scale-[.98] overflow-hidden relative"><span className="absolute right-1 bottom-0 text-6xl md:text-7xl opacity-20 group-hover:scale-110 transition">{icon}</span><span className="text-2xl md:text-3xl">{icon}</span><h3 className="font-black text-sm md:text-base mt-2">{title}</h3><p className="text-[10px] md:text-xs text-violet-200 mt-1">{sub}</p></button>)}</div>
+ </section>;
+}

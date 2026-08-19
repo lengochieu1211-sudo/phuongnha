@@ -1,0 +1,8 @@
+{
+  "recordedPackAvailable": false,
+  "totalFiles": 221,
+  "validFiles": 0,
+  "invalidFiles": 221,
+  "missingFiles": 0,
+  "note": "All bundled MP3 files are placeholder/invalid; runtime uses selected Web Speech TTS until real audio replaces them."
+}
