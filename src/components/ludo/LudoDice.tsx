@@ -190,7 +190,7 @@ export default function LudoDice({
       {enableCameraClap && canRoll && (
         <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200 rounded-full text-[11px] font-bold text-amber-800 animate-pulse">
           <Hand className="w-3.5 h-3.5 text-amber-600" />
-          <span>Vỗ tay hoặc giơ 2 tay trước camera để tung!</span>
+          <span>Vỗ tay • giơ 2 tay • dang 2 tay để tung!</span>
         </div>
       )}
     </div>

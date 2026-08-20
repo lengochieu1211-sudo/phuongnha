@@ -22,6 +22,7 @@ import FittedSleeveOverlay from './FittedSleeveOverlay';
 import CameraReadinessBadge from '../CameraReadinessBadge';
 import AvatarMirrorMode from './AvatarMirrorMode';
 import { detectGraphicsProfile } from '../../utils/graphicsQuality';
+import { drawImageContain, NormalizedContentRect, mapPointToContent } from '../../utils/cameraFrame';
 
 interface FashionGameProps {
   progress: PlayerProgress;
@@ -97,6 +98,7 @@ export default function FashionGame({
 
   // References for camera canvas
   const cameraCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraContentRectRef = useRef<NormalizedContentRect>({ x: 0, y: 0, width: 1, height: 1 });
 
   // Engines
   const anchorEngineRef = useRef<FashionBodyAnchorEngine>(new FashionBodyAnchorEngine());
@@ -144,12 +146,15 @@ export default function FashionGame({
         const camCanvas = cameraCanvasRef.current;
         const ctx = camCanvas.getContext('2d');
         if (ctx) {
-          ctx.save();
-          // Always mirror video for a mirror-like experience
-          ctx.translate(camCanvas.width, 0);
-          ctx.scale(-1, 1);
-          ctx.drawImage(videoElement, 0, 0, camCanvas.width, camCanvas.height);
-          ctx.restore();
+          // Preserve the REAL camera aspect ratio. The returned content rectangle
+          // is also used below to map pose anchors into the letterboxed stage.
+          cameraContentRectRef.current = drawImageContain(
+            ctx,
+            videoElement,
+            camCanvas.width,
+            camCanvas.height,
+            true,
+          );
         }
       }
 
@@ -165,9 +170,12 @@ export default function FashionGame({
 
       if (anchors && latest.bodyDetected && gameState === 'dressing') {
         // Adjust guidance feedback text
-        const newFeedback = !latest.fullBodyDetected
-          ? 'Lùi lại một chút để mình nhìn thấy đôi chân nhé! 🧍'
-          : 'Toàn thân hoàn hảo! Sẵn sàng tạo dáng thôi bé ơi! ✨';
+        const upperBodyReady = latest.bodyDetected && latest.leftWrist.visible && latest.rightWrist.visible;
+        const newFeedback = latest.fullBodyDetected
+          ? 'Toàn thân rõ nét! Có thể thử cả trang phục và giày dép ✨'
+          : upperBodyReady
+          ? 'Chế độ nửa người trên + 2 tay: tóc, kính, áo và phụ kiện vẫn bám chính xác 👐'
+          : 'Đưa đầu, vai và cả hai tay vào khung camera nhé 📷';
         if (lastFeedbackTextRef.current !== newFeedback) {
           lastFeedbackTextRef.current = newFeedback;
           setFeedbackText(newFeedback);
@@ -179,15 +187,17 @@ export default function FashionGame({
           if (!el) return;
 
           if (pos.confidence >= 0.45) {
+            const contentRect = cameraContentRectRef.current;
+            const mapped = mapPointToContent(pos.x, pos.y + yOffset, contentRect);
             el.style.display = 'flex';
-            el.style.left = `${pos.x * 100}%`;
-            el.style.top = `${(pos.y + yOffset) * 100}%`;
-            // Body anchors are normalized (0..1), while CSS dimensions use percent (0..100).
-            // Clamp to sane AR sizes so a noisy frame cannot make clothes explode across the screen.
-            const widthPct = Math.max(3, Math.min(95, widthNormalized * 100));
+            el.style.left = `${mapped.x * 100}%`;
+            el.style.top = `${mapped.y * 100}%`;
+            // Scale garments inside the actual visible camera content, not the full
+            // letterboxed stage, so overlays stay aligned without distorting the video.
+            const widthPct = Math.max(3, Math.min(95, widthNormalized * contentRect.width * 100));
             el.style.width = `${widthPct}%`;
             if (heightNormalized !== undefined) {
-              const heightPct = Math.max(3, Math.min(95, heightNormalized * 100));
+              const heightPct = Math.max(3, Math.min(95, heightNormalized * contentRect.height * 100));
               el.style.height = `${heightPct}%`;
             }
             
@@ -225,16 +235,19 @@ export default function FashionGame({
             el.style.opacity = '0';
             return;
           }
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
+          const contentRect = cameraContentRectRef.current;
+          const ma = mapPointToContent(a.x, a.y, contentRect);
+          const mb = mapPointToContent(b.x, b.y, contentRect);
+          const dx = mb.x - ma.x;
+          const dy = mb.y - ma.y;
           const len = Math.sqrt(dx * dx + dy * dy);
           const angle = Math.atan2(dy, dx) * (180 / Math.PI);
           el.style.display = 'flex';
           el.style.opacity = '1';
-          el.style.left = `${((a.x + b.x) * 0.5) * 100}%`;
-          el.style.top = `${((a.y + b.y) * 0.5) * 100}%`;
+          el.style.left = `${((ma.x + mb.x) * 0.5) * 100}%`;
+          el.style.top = `${((ma.y + mb.y) * 0.5) * 100}%`;
           el.style.width = `${Math.max(4, Math.min(55, len * 112))}%`;
-          el.style.height = `${Math.max(2.8, Math.min(18, thickness * 100))}%`;
+          el.style.height = `${Math.max(2.8, Math.min(18, thickness * contentRect.height * 100))}%`;
           const depthScale = Math.max(0.86, 1 - Math.min(55, Math.abs(yaw)) / 420);
           el.style.transformOrigin = '50% 50%';
           el.style.transformStyle = 'preserve-3d';
@@ -324,12 +337,22 @@ export default function FashionGame({
 
         // Draw debug skeleton if active
         if (showSkeletonDebug && debugSkeletonRef.current) {
-          const ctx = debugSkeletonRef.current.getContext('2d');
+          const debugCanvas = debugSkeletonRef.current;
+          const ctx = debugCanvas.getContext('2d');
           if (ctx) {
-            ctx.clearRect(0, 0, 640, 480);
+            const cw = debugCanvas.width;
+            const ch = debugCanvas.height;
+            const contentRect = cameraContentRectRef.current;
+            ctx.clearRect(0, 0, cw, ch);
             ctx.strokeStyle = '#22d3ee';
             ctx.lineWidth = 2.2;
             ctx.fillStyle = '#f43f5e';
+
+            const mapLm = (lm: {x:number;y:number}) => ({
+              x: (contentRect.x + lm.x * contentRect.width) * cw,
+              y: (contentRect.y + lm.y * contentRect.height) * ch,
+            });
+
             const connections = [
               [1,2],[2,3],[4,5],[5,6],[3,7],[6,8],[9,10],
               [11,12],[11,13],[13,15],[15,17],[17,19],[19,21],[15,19],
@@ -340,13 +363,18 @@ export default function FashionGame({
             for (const [a,b] of connections) {
               const p1=latest.landmarks[a], p2=latest.landmarks[b];
               if ((p1?.visibility ?? 0) > 0.35 && (p2?.visibility ?? 0) > 0.35) {
-                ctx.beginPath(); ctx.moveTo(p1.x*640,p1.y*480); ctx.lineTo(p2.x*640,p2.y*480); ctx.stroke();
+                const a2 = mapLm(p1);
+                const b2 = mapLm(p2);
+                ctx.beginPath();
+                ctx.moveTo(a2.x, a2.y);
+                ctx.lineTo(b2.x, b2.y);
+                ctx.stroke();
               }
             }
             latest.landmarks.forEach((lm, idx) => {
               if ((lm.visibility ?? 0) > 0.35) {
-                const cx = lm.x * 640, cy = lm.y * 480;
-                ctx.beginPath(); ctx.arc(cx, cy, idx <= 10 ? 4 : 5, 0, 2 * Math.PI); ctx.fill();
+                const m = mapLm(lm);
+                ctx.beginPath(); ctx.arc(m.x, m.y, idx <= 10 ? 4 : 5, 0, 2 * Math.PI); ctx.fill();
               }
             });
             // Dedicated face anchors make it obvious where glasses/mask/hat are attached.
@@ -565,7 +593,7 @@ export default function FashionGame({
       )}
 
       {/* Top Header Panel - Respecting HUD parameters */}
-      <div className="p-4 bg-[#16161a] border-b border-purple-900/30 flex items-center justify-between z-30">
+      <div className="p-3 sm:p-4 bg-[#16161a] border-b border-purple-900/30 grid grid-cols-[auto_1fr_auto] items-center gap-2 z-30">
         <button
           onClick={onBack}
           className="flex items-center gap-2 px-3.5 py-1.5 rounded-full font-bold bg-purple-950 text-purple-300 border border-purple-800/40 hover:bg-purple-900 transition text-xs"
@@ -574,37 +602,39 @@ export default function FashionGame({
           Quay lại
         </button>
 
-        <div className="text-center">
+        <div className="text-center min-w-0">
           <h1 className="text-base sm:text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-300 to-cyan-300 flex items-center justify-center gap-1">
             🪞 GƯƠNG PHÉP THUẬT AR
           </h1>
           <p className="text-[10px] text-purple-300 font-bold tracking-tight">Fashion Show – Thử đồ thông minh</p>
         </div>
 
-        <div className="flex items-center gap-2 bg-purple-950/80 px-3.5 py-1 rounded-full border border-purple-800 font-black text-[10px]">
-          <span className="text-amber-400 flex items-center gap-0.5">★ {progress.stars}</span>
-          <span className="text-cyan-400">💎 {progress.diamonds}</span>
+        <div className="flex items-center justify-end gap-2">
+          <div className="hidden sm:flex items-center gap-2 bg-purple-950/80 px-3.5 py-1 rounded-full border border-purple-800 font-black text-[10px]">
+            <span className="text-amber-400 flex items-center gap-0.5">★ {progress.stars}</span>
+            <span className="text-cyan-400">💎 {progress.diamonds}</span>
+          </div>
+          <button
+            onClick={() => setShowAvatarMirror(true)}
+            className="hidden md:block px-3 py-1.5 rounded-full border border-cyan-300/30 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-100 font-black text-[10px] sm:text-xs shadow-lg"
+          >
+            🤖 Avatar 3D
+          </button>
         </div>
-        <button
-          onClick={() => setShowAvatarMirror(true)}
-          className="px-3 py-1.5 rounded-full border border-cyan-300/30 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-100 font-black text-[10px] sm:text-xs shadow-lg"
-        >
-          🤖 Avatar 3D
-        </button>
       </div>
 
       {/* Main AR Display Area - LANDSCAPE GRID */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 relative overflow-hidden">
         
         {/* Left Grid: CAMERA AR PREVIEW CANVAS */}
-        <div className="lg:col-span-8 bg-slate-950 flex items-center justify-center relative aspect-[4/3] w-full max-w-2xl mx-auto rounded-2xl overflow-hidden shadow-2xl">
+        <div className="lg:col-span-8 bg-slate-950 flex items-center justify-center relative aspect-[4/3] w-full lg:max-w-none mx-auto overflow-hidden shadow-2xl">
           
           {/* Real-time Camera Stream Canvas */}
           <canvas
             ref={cameraCanvasRef}
             width={graphicsProfile.quality === 'lite' ? 480 : graphicsProfile.quality === 'high' ? 960 : 640}
             height={graphicsProfile.quality === 'lite' ? 360 : graphicsProfile.quality === 'high' ? 720 : 480}
-            className="absolute inset-0 w-full h-full object-cover z-0"
+            className="absolute inset-0 w-full h-full object-contain bg-black z-0"
           />
 
           {/* CAMERA STAGE OVERLAYS (IMPERATIVE DOM REFS) */}
@@ -722,7 +752,7 @@ export default function FashionGame({
               ref={debugSkeletonRef}
               width={640}
               height={480}
-              className="absolute inset-0 w-full h-full object-cover z-20 pointer-events-none opacity-60"
+              className="absolute inset-0 w-full h-full object-contain z-20 pointer-events-none opacity-60"
             />
           )}
 
@@ -783,7 +813,7 @@ export default function FashionGame({
         </div>
 
         {/* Right Grid: CONTROLS & WARDROBE CHOICE */}
-        <div className="lg:col-span-4 bg-[#121214] border-t lg:border-t-0 lg:border-l border-purple-900/30 p-4 flex flex-col gap-4 z-30 overflow-y-auto max-h-[50vh] lg:max-h-none">
+        <div className="lg:col-span-4 bg-[#121214] border-t lg:border-t-0 lg:border-l border-purple-900/30 p-3 sm:p-4 flex flex-col gap-3 z-30 overflow-y-auto max-h-[48vh] lg:max-h-none">
           
           {/* Main Action Hub */}
           <div className="grid grid-cols-2 gap-2.5">
@@ -820,37 +850,62 @@ export default function FashionGame({
             </button>
           </div>
 
-          {/* Category Scroller */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin border-b border-purple-950/40">
-          <div className="mb-2">
-            <div className="text-[10px] font-black text-purple-300 mb-1.5">✨ ĐỔI NHANH CẢ BỘ</div>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+          {/* Outfit presets: separate from categories so mobile scrolling is predictable. */}
+          <div className="rounded-2xl border border-fuchsia-900/30 bg-fuchsia-950/15 p-2.5">
+            <div className="text-[10px] font-black text-fuchsia-200 mb-2 flex items-center justify-between gap-2">
+              <span>✨ ĐỔI NHANH CẢ BỘ</span>
+              <span className="text-[9px] text-slate-500 font-bold">Vuốt ngang</span>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory">
               {OUTFIT_PRESETS.map((preset) => (
-                <button key={preset.name} onClick={() => applyOutfitPreset(preset)} className="shrink-0 rounded-xl border border-fuchsia-700/50 bg-fuchsia-950/40 hover:bg-fuchsia-900/50 px-3 py-1.5 text-[10px] font-black text-fuchsia-100">
+                <button
+                  key={preset.name}
+                  onClick={() => applyOutfitPreset(preset)}
+                  className="shrink-0 snap-start rounded-xl border border-fuchsia-700/50 bg-fuchsia-950/40 hover:bg-fuchsia-900/50 px-3 py-2 text-[10px] font-black text-fuchsia-100 min-h-10"
+                >
                   {preset.icon} {preset.name}
                 </button>
               ))}
             </div>
           </div>
 
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className={`flex-shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black transition ${
-                  activeCategory === cat.id
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-purple-950/50 text-purple-300 hover:bg-purple-900/40'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-              </button>
-            ))}
+          {/* Categories: independent sticky strip. */}
+          <div className="sticky top-0 z-10 -mx-1 px-1 py-1 bg-[#121214]/95 backdrop-blur">
+            <div className="flex gap-1.5 overflow-x-auto pb-1 snap-x">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={`shrink-0 snap-start flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-black transition min-h-10 ${
+                    activeCategory === cat.id
+                      ? 'bg-purple-600 text-white shadow-md ring-2 ring-purple-300/30'
+                      : 'bg-purple-950/50 text-purple-300 hover:bg-purple-900/40'
+                  }`}
+                >
+                  <span className="text-base leading-none">{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Đang chọn</p>
+              <p className="text-xs font-black text-purple-200 truncate">
+                {CATEGORIES.find((cat) => cat.id === activeCategory)?.icon} {CATEGORIES.find((cat) => cat.id === activeCategory)?.label}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAvatarMirror(true)}
+              className="md:hidden shrink-0 px-3 py-2 rounded-xl border border-cyan-300/30 bg-cyan-500/15 text-cyan-100 font-black text-[10px]"
+            >
+              🤖 Avatar 3D
+            </button>
           </div>
 
           {/* Active Category Item Card grid */}
-          <div className="flex-1 grid grid-cols-2 gap-2.5">
+          <div className="flex-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-2 gap-2">
             {activeCategoryItems.map((item) => {
               const isUnlocked = progress.unlockedWardrobe.includes(item.id) || item.costStars === 0;
               const isEquipped = equippedIds[item.category] === item.id;
@@ -860,7 +915,7 @@ export default function FashionGame({
                 <div
                   key={item.id}
                   onClick={() => handleItemSelect(item)}
-                  className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden select-none ${
+                  className={`p-2.5 min-h-[104px] rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between relative overflow-hidden select-none ${
                     isEquipped
                       ? 'bg-purple-950/70 border-purple-500 shadow-md transform scale-102'
                       : 'bg-[#18181b] border-slate-800/80 hover:border-slate-700'
@@ -868,7 +923,7 @@ export default function FashionGame({
                 >
                   {/* Status indicators */}
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-2xl">{item.icon}</span>
+                    <span className="text-2xl sm:text-3xl">{item.icon}</span>
                     {isEquipped && (
                       <span className="w-5 h-5 rounded-full bg-purple-500 text-white flex items-center justify-center text-[10px]">
                         ✓

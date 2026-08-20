@@ -132,9 +132,9 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
         // Modified stadium oval with chicanes
         let x = Math.sin(t) * rX + Math.sin(t * 3) * 35;
         let z = Math.cos(t) * rZ + Math.sin(t * 2) * 45;
-        let y = Math.sin(t * 2) * 8; // gentle overpass rise
+        let y = Math.sin(t * 2) * 1.8; // gentle city grade, no roller-coaster motion
         let tunnel = (i >= 22 && i <= 36); // Cyber Tunnel section
-        if (tunnel) y -= 12; // Underground dip
+        // Tunnel is visual only; do not create a sudden road drop.
         let isCheckpoint = i % 18 === 0;
 
         points.push({
@@ -144,7 +144,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
           width: tunnel ? 20 : 24,
           isCheckpoint,
           tunnel,
-          bankAngle: Math.sin(t * 3) * 0.12,
+          bankAngle: Math.sin(t * 3) * 0.035,
         });
       }
       break;
@@ -156,7 +156,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
         const t = (i / count) * Math.PI * 2;
         let x = Math.sin(t) * 320 + Math.cos(t * 2) * 60;
         let z = Math.cos(t) * 380 + Math.sin(t * 3) * 30;
-        let y = Math.sin(t) * 15 + Math.cos(t * 2) * 10; // cliff hill elevation
+        let y = Math.sin(t) * 3.2 + Math.cos(t * 2) * 1.6; // gentle coastal grade
         let isCheckpoint = i % 18 === 0;
 
         points.push({
@@ -165,7 +165,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
           z,
           width: 24,
           isCheckpoint,
-          bankAngle: Math.cos(t * 2) * 0.15,
+          bankAngle: Math.cos(t * 2) * 0.045,
         });
       }
       break;
@@ -177,7 +177,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
         const t = (i / count) * Math.PI * 2;
         let x = Math.sin(t) * 260 + Math.sin(t * 5) * 80;
         let z = Math.cos(t) * 340 + Math.cos(t * 4) * 60;
-        let y = Math.sin(t * 3) * 24; // High mountain climb and descent
+        let y = Math.sin(t * 3) * 5.5; // mountain road: visible slope but still drivable
         let isCheckpoint = i % 12 === 0;
 
         points.push({
@@ -186,7 +186,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
           z,
           width: 22,
           isCheckpoint,
-          bankAngle: Math.sin(t * 5) * 0.2, // dynamic camber banking for drifting
+          bankAngle: Math.sin(t * 5) * 0.055, // subtle visual camber
         });
       }
       break;
@@ -198,7 +198,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
         const t = (i / count) * Math.PI * 2;
         let x = Math.sin(t) * 240 + Math.sin(t * 3) * 40;
         let z = Math.cos(t) * 300 + Math.cos(t * 2) * 35;
-        let y = Math.sin(t * 4) * 12; // undulating roller-coaster humps
+        let y = Math.sin(t * 4) * 2.4; // soft candy hills
         let isCheckpoint = i % 18 === 0;
 
         points.push({
@@ -207,7 +207,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
           z,
           width: 26,
           isCheckpoint,
-          bankAngle: Math.sin(t * 3) * 0.1,
+          bankAngle: Math.sin(t * 3) * 0.035,
         });
       }
       break;
@@ -219,7 +219,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
         const t = (i / count) * Math.PI * 2;
         let x = Math.sin(t) * 300 + Math.cos(t * 3) * 50;
         let z = Math.cos(t) * 360 + Math.sin(t * 2) * 60;
-        let y = 40 + Math.sin(t * 2) * 18; // elevated high altitude
+        let y = 40 + Math.sin(t * 2) * 3.8; // floating road with slow gentle elevation
         let isCheckpoint = i % 18 === 0;
 
         points.push({
@@ -228,7 +228,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
           z,
           width: 26,
           isCheckpoint,
-          bankAngle: Math.sin(t * 2) * 0.14,
+          bankAngle: Math.sin(t * 2) * 0.04,
         });
       }
       break;
@@ -240,7 +240,7 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
         const t = (i / count) * Math.PI * 2;
         let x = Math.sin(t) * 340 + Math.sin(t * 4) * 70;
         let z = Math.cos(t) * 420 + Math.cos(t * 3) * 80;
-        let y = 60 + Math.sin(t * 3) * 30;
+        let y = 60 + Math.sin(t * 3) * 5.5;
         let isCheckpoint = i % 18 === 0;
         let tunnel = (i >= 15 && i <= 28) || (i >= 50 && i <= 62);
 
@@ -251,10 +251,48 @@ export function generateTrackWaypoints(trackId: RacingTrackId): Waypoint3D[] {
           width: 28,
           isCheckpoint,
           tunnel,
-          bankAngle: Math.sin(t * 4) * 0.25,
+          bankAngle: Math.sin(t * 4) * 0.05,
         });
       }
       break;
+    }
+  }
+
+  // V5.16: road-grade stabilization.
+  // The previous profiles intentionally used roller-coaster amplitudes and a hard
+  // tunnel dip. That looked like the road was jumping up/down, especially from a
+  // close chase camera. Smooth Y as a closed loop and cap adjacent elevation steps.
+  const maxStepByTrack: Record<RacingTrackId, number> = {
+    neon_city: 0.65,
+    coastal_highway: 0.85,
+    mountain_pass: 1.15,
+    candy_city: 0.75,
+    sky_road: 0.90,
+    space_race: 1.10,
+  };
+  const maxStep = maxStepByTrack[trackId] ?? 0.9;
+
+  for (let pass = 0; pass < 4; pass++) {
+    const previousY = points.map((p) => p.y);
+    for (let i = 0; i < points.length; i++) {
+      const prev = previousY[(i - 1 + points.length) % points.length];
+      const cur = previousY[i];
+      const next = previousY[(i + 1) % points.length];
+      points[i].y = prev * 0.22 + cur * 0.56 + next * 0.22;
+    }
+  }
+
+  // Forward and backward passes stop a single Catmull segment from creating a sharp grade.
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 1; i < points.length; i++) {
+      const lo = points[i - 1].y - maxStep;
+      const hi = points[i - 1].y + maxStep;
+      points[i].y = Math.max(lo, Math.min(hi, points[i].y));
+    }
+    for (let i = points.length - 2; i >= 0; i--) {
+      const lo = points[i + 1].y - maxStep;
+      const hi = points[i + 1].y + maxStep;
+      points[i].y = Math.max(lo, Math.min(hi, points[i].y));
     }
   }
 
@@ -304,14 +342,21 @@ export function getInterpolatedTrackPoint(
 
   // Position
   const x = catmullRom(pPrev.x, p0.x, p1.x, pNext.x, t);
-  const y = catmullRom(pPrev.y, p0.y, p1.y, pNext.y, t);
+
+  // X/Z benefit from Catmull-Rom corner smoothing, but Y must never overshoot.
+  // Smoothstep interpolation is monotonic between adjacent waypoint elevations,
+  // preventing small source height changes from turning into roller-coaster humps.
+  const smoothT = t * t * (3 - 2 * t);
+  const y = p0.y * (1 - smoothT) + p1.y * smoothT;
+
   const z = catmullRom(pPrev.z, p0.z, p1.z, pNext.z, t);
 
   // Derivative for forward tangent vector
   const dt = 0.01;
   const nextT = Math.min(1.0, t + dt);
   const nx = catmullRom(pPrev.x, p0.x, p1.x, pNext.x, nextT);
-  const ny = catmullRom(pPrev.y, p0.y, p1.y, pNext.y, nextT);
+  const nextSmoothT = nextT * nextT * (3 - 2 * nextT);
+  const ny = p0.y * (1 - nextSmoothT) + p1.y * nextSmoothT;
   const nz = catmullRom(pPrev.z, p0.z, p1.z, pNext.z, nextT);
 
   let dx = nx - x;

@@ -31,6 +31,8 @@ import { MotionSteeringEngine, SteeringState } from '../../lib/racing/MotionStee
 import { VOICE_LINES } from '../../lib/voiceLines.vi';
 import { poseDetector, WristPosition, PoseLandmark } from '../../utils/poseDetector';
 import { voiceGuide } from '../../lib/VoiceGuideService';
+import { isExternalCar, prefetchExternalCarAsset, shouldUseExternalCar } from '../../lib/racing/ExternalCarModelLoader';
+import { detectDeviceClass } from '../../utils/graphicsQuality';
 
 import { GarageScreen } from './GarageScreen';
 import { Race3DCanvas } from './Race3DCanvas';
@@ -130,12 +132,40 @@ export default function BaraSpeedRacingGame({
     }
   }, [raceSettings]);
 
+  // V5.16: warm NETWORK cache only while choosing a track. Do not parse a 20–40 MB
+  // ASCII FBX in the background because FBXLoader parsing itself runs on the main thread.
+  useEffect(() => {
+    const deviceClass = detectDeviceClass();
+    if (
+      currentSubScreen !== 'track_select' ||
+      !isExternalCar(selectedCarId) ||
+      !shouldUseExternalCar(selectedCarId, deviceClass)
+    ) return;
+
+    const timer = window.setTimeout(() => {
+      prefetchExternalCarAsset(selectedCarId).catch(() => undefined);
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [selectedCarId, currentSubScreen]);
+
+  // Warm the small PC asphalt file in browser cache without uploading it to WebGL yet.
+  useEffect(() => {
+    if (detectDeviceClass() !== 'desktop') return;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = `${((import.meta as any).env?.BASE_URL || '/')}assets/pc-hd/asphalt-hd.webp`;
+  }, []);
+
   // 4. Engine & HUD State
   const [engine, setEngine] = useState<RaceEngine | null>(null);
   const [raceResult, setRaceResult] = useState<RaceResult | null>(null);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
   const [activeVoiceText, setActiveVoiceText] = useState<string>('');
   const [showExitModal, setShowExitModal] = useState(false);
+  const [raceSceneReady, setRaceSceneReady] = useState(false);
+  const [raceLoadingText, setRaceLoadingText] = useState('Đang chuẩn bị đường đua...');
+  const countdownStartedRef = useRef(false);
   const savedPhaseRef = useRef<RaceStatePhase>('racing');
 
   // Pause and Exit Handlers
@@ -385,17 +415,33 @@ export default function BaraSpeedRacingGame({
       }
     });
 
+    countdownStartedRef.current = false;
+    setRaceSceneReady(false);
+    setRaceLoadingText(
+      isExternalCar(carId)
+        ? 'Đang nạp xe 3D và tối ưu đường đua...'
+        : 'Đang dựng đường đua và cảnh vật...'
+    );
+
     setEngine(newEngine);
     setCurrentSubScreen('in_race');
+  };
 
+  const handleRaceSceneReady = useCallback(() => {
+    if (!engine || countdownStartedRef.current) return;
+
+    countdownStartedRef.current = true;
+    setRaceSceneReady(true);
+    setRaceLoadingText('Sẵn sàng!');
+
+    // Countdown begins only AFTER FBX parsing + shader compilation + first scene render.
+    // This turns the old "3...2..." stutter into a controlled loading phase.
     audio.playRaceStartJingle();
-
-    newEngine.startCountdown(() => {
+    engine.startCountdown(() => {
       speakVoice(VOICE_LINES.racing.go);
     });
-
     speakVoice(VOICE_LINES.racing.countdown3);
-  };
+  }, [engine]);
 
   // Check race finish polling in requestAnimationFrame loop
   useEffect(() => {
@@ -987,7 +1033,24 @@ export default function BaraSpeedRacingGame({
             customization={currentCustomization}
             cameraView={cameraView}
             qualitySetting={raceSettings.quality}
+            onReady={handleRaceSceneReady}
           />
+
+          {!raceSceneReady && (
+            <div className="absolute inset-0 z-40 bg-slate-950 flex items-center justify-center p-6">
+              <div className="w-full max-w-md rounded-3xl border border-cyan-400/30 bg-slate-900/95 p-6 text-center shadow-2xl">
+                <div className="mx-auto h-14 w-14 rounded-full border-4 border-cyan-300/20 border-t-cyan-300 animate-spin" />
+                <h3 className="mt-5 text-xl font-black text-white">Chuẩn Bị Đường Đua</h3>
+                <p className="mt-2 text-sm font-bold text-cyan-200">{raceLoadingText}</p>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 animate-pulse" />
+                </div>
+                <p className="mt-3 text-[10px] text-slate-400">
+                  Countdown chỉ bắt đầu sau khi scene đã render ổn định.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* In-Game HUD Overlay */}
           <RaceHUD

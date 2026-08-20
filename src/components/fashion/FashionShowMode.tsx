@@ -15,6 +15,7 @@ import RealisticWardrobeOverlay from './RealisticWardrobeOverlay';
 import FittedSleeveOverlay from './FittedSleeveOverlay';
 import { FashionBodyAnchorEngine } from './FashionBodyAnchorEngine';
 import { detectGraphicsProfile } from '../../utils/graphicsQuality';
+import { drawImageContain, NormalizedContentRect, mapPointToContent } from '../../utils/cameraFrame';
 
 interface FashionShowModeProps {
   progress: PlayerProgress;
@@ -71,6 +72,7 @@ export default function FashionShowMode({
   const wingsRef = useRef<HTMLDivElement | null>(null);
   const backpackRef = useRef<HTMLDivElement | null>(null);
   const cameraCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraContentRectRef = useRef<NormalizedContentRect>({ x: 0, y: 0, width: 1, height: 1 });
 
   const anchorEngineRef = useRef<FashionBodyAnchorEngine>(new FashionBodyAnchorEngine());
 
@@ -99,12 +101,15 @@ export default function FashionShowMode({
         const camCanvas = cameraCanvasRef.current;
         const ctx = camCanvas.getContext('2d');
         if (ctx) {
-          ctx.save();
-          // Always mirror video for a mirror-like experience
-          ctx.translate(camCanvas.width, 0);
-          ctx.scale(-1, 1);
-          ctx.drawImage(videoElement, 0, 0, camCanvas.width, camCanvas.height);
-          ctx.restore();
+          // Preserve the REAL camera aspect ratio. The returned content rectangle
+          // is also used below to map pose anchors into the letterboxed stage.
+          cameraContentRectRef.current = drawImageContain(
+            ctx,
+            videoElement,
+            camCanvas.width,
+            camCanvas.height,
+            true,
+          );
         }
       }
 
@@ -125,13 +130,15 @@ export default function FashionShowMode({
           if (!el) return;
 
           if (pos.confidence >= 0.45) {
+            const contentRect = cameraContentRectRef.current;
+            const mapped = mapPointToContent(pos.x, pos.y + yOffset, contentRect);
             el.style.display = 'flex';
-            el.style.left = `${pos.x * 100}%`;
-            el.style.top = `${(pos.y + yOffset) * 100}%`;
-            const safeWidth = Math.max(3, Math.min(95, widthPct * 100));
+            el.style.left = `${mapped.x * 100}%`;
+            el.style.top = `${mapped.y * 100}%`;
+            const safeWidth = Math.max(3, Math.min(95, widthPct * contentRect.width * 100));
             el.style.width = `${safeWidth}%`;
             if (heightPct !== undefined) {
-              const safeHeight = Math.max(3, Math.min(95, heightPct * 100));
+              const safeHeight = Math.max(3, Math.min(95, heightPct * contentRect.height * 100));
               el.style.height = `${safeHeight}%`;
             }
             
@@ -163,16 +170,19 @@ export default function FashionShowMode({
             el.style.opacity = '0';
             return;
           }
-          const dx = b.x - a.x;
-          const dy = b.y - a.y;
+          const contentRect = cameraContentRectRef.current;
+          const ma = mapPointToContent(a.x, a.y, contentRect);
+          const mb = mapPointToContent(b.x, b.y, contentRect);
+          const dx = mb.x - ma.x;
+          const dy = mb.y - ma.y;
           const len = Math.sqrt(dx * dx + dy * dy);
           const angle = Math.atan2(dy, dx) * (180 / Math.PI);
           el.style.display = 'flex';
           el.style.opacity = '1';
-          el.style.left = `${((a.x + b.x) * 0.5) * 100}%`;
-          el.style.top = `${((a.y + b.y) * 0.5) * 100}%`;
+          el.style.left = `${((ma.x + mb.x) * 0.5) * 100}%`;
+          el.style.top = `${((ma.y + mb.y) * 0.5) * 100}%`;
           el.style.width = `${Math.max(4, Math.min(55, len * 112))}%`;
-          el.style.height = `${Math.max(2.8, Math.min(18, thickness * 100))}%`;
+          el.style.height = `${Math.max(2.8, Math.min(18, thickness * contentRect.height * 100))}%`;
           const depthScale = Math.max(0.86, 1 - Math.min(55, Math.abs(yaw)) / 420);
           el.style.transformOrigin = '50% 50%';
           el.style.transformStyle = 'preserve-3d';
@@ -284,8 +294,8 @@ export default function FashionShowMode({
   const [showConfetti, setShowConfetti] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
 
-  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activePose = FASHION_POSES[currentPoseIndex] || FASHION_POSES[0];
 
   // Speak when a new pose starts
@@ -484,7 +494,7 @@ export default function FashionShowMode({
               ref={cameraCanvasRef}
               width={640}
               height={480}
-              className="absolute inset-0 w-full h-full object-cover z-0"
+              className="absolute inset-0 w-full h-full object-contain bg-black z-0"
             />
 
             {/* CAMERA STAGE OVERLAYS (IMPERATIVE DOM REFS) */}

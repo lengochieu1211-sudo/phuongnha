@@ -131,18 +131,33 @@ export default function App() {
   // Calibration requirement helper
   const getRequiredCalibrationProfile = (screen: GameScreen): string => {
     if (trackingMode === 'keyboard_only') return 'none';
-    if (['mimic', 'adventure', 'workout', 'randomworkout', 'workout_session', 'ninja', 'goalkeeper'].includes(screen)) {
-      return 'full_body';
+
+    // Most motion games only need a stable torso + two hands. Requiring feet
+    // blocked play on phone front cameras that cannot frame a full body indoors.
+    if ([
+      'mimic',
+      'adventure',
+      'workout',
+      'randomworkout',
+      'workout_session',
+      'ninja',
+      'goalkeeper',
+      'magicacademy',
+      'dance',
+      'parentplay',
+      'ludo',
+    ].includes(screen)) {
+      return 'upper_body';
     }
+
     if (['racing'].includes(screen)) {
       return 'racing_two_hands';
     }
-    if (['dance', 'parentplay', 'magicacademy'].includes(screen)) {
-      return 'upper_body';
-    }
+
     if (['fruitslash', 'chickenblaster', 'sweetzombie', 'starcatcher'].includes(screen)) {
       return 'wrist';
     }
+
     return 'none';
   };
 
@@ -227,7 +242,7 @@ export default function App() {
     const cameraScreens: GameScreen[] = [
       'adventure', 'racing', 'starcatcher', 'mimic', 'dance', 'fruitslash',
       'chickenblaster', 'sweetzombie', 'workout_session', 'parentplay',
-      'dressing', 'ninja', 'goalkeeper', 'magicacademy', 'cameratest', 'calibration'
+      'dressing', 'ninja', 'goalkeeper', 'magicacademy', 'ludo', 'cameratest', 'calibration'
     ];
     const needsCamera = showCalibration || cameraScreens.includes(currentScreen);
     if (trackingMode === 'keyboard_only' || !needsCamera) {
@@ -247,7 +262,7 @@ export default function App() {
       }}
     >
       {/* Landscape notice & PIP Camera Controls toggle */}
-      {['chickenblaster', 'fruitslash', 'sweetzombie', 'starcatcher', 'mimic', 'dance', 'racing', 'workout_session', 'adventure', 'parentplay', 'ninja', 'goalkeeper', 'magicacademy'].includes(currentScreen) && (
+      {['chickenblaster', 'fruitslash', 'sweetzombie', 'starcatcher', 'mimic', 'dance', 'racing', 'workout_session', 'adventure', 'parentplay', 'ninja', 'goalkeeper', 'magicacademy', 'ludo'].includes(currentScreen) && (
         <LandscapeNotice showPip={showPipCamera} onTogglePip={setShowPipCamera} />
       )}
 

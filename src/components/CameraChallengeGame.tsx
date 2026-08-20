@@ -429,7 +429,7 @@ export default function CameraChallengeGame({ mode, progress, onUpdateProgress, 
       </div>
 
       <div className="relative z-20 mt-2 flex items-center justify-center gap-2 text-[10px] text-white/55">
-        <Shield className="w-3.5 h-3.5" /><span>Camera nhận diện toàn thân</span><Sparkles className="w-3.5 h-3.5" />
+        <Shield className="w-3.5 h-3.5" /><span>Camera: nửa người trên + 2 tay • toàn thân nếu có</span><Sparkles className="w-3.5 h-3.5" />
       </div>
     </div>
   );

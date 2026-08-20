@@ -38,6 +38,7 @@ export default function FashionCalibration({
 
   const [stabilityProgress, setStabilityProgress] = useState(0); // 0 to 100%
   const [fullBodyReady, setFullBodyReady] = useState(false);
+  const [upperBodyReady, setUpperBodyReady] = useState(false);
   const [anyBodyDetected, setAnyBodyDetected] = useState(false);
   
   const stabilityStartRef = useRef<number | null>(null);
@@ -54,9 +55,8 @@ export default function FashionCalibration({
     if (!voiceTriggeredRef.current) {
       voiceTriggeredRef.current = true;
       audio.playCollect();
-      // "Lùi lại một chút để mình nhìn thấy toàn thân nhé!"
       setTimeout(() => {
-        voiceGuide.speak('Lùi lại một chút để mình nhìn thấy toàn thân nhé!', 'high');
+        voiceGuide.speak('Chỉ cần thấy rõ mặt, vai, khuỷu tay và hai cổ tay là có thể thử đồ nửa người. Nếu thấy thêm chân, gương sẽ tự mở chế độ toàn thân nhé!', 'high');
       }, 500);
     }
   }, []);
@@ -90,6 +90,9 @@ export default function FashionCalibration({
       }
       if (fullBodyReady !== false) {
         setFullBodyReady(false);
+      }
+      if (upperBodyReady !== false) {
+        setUpperBodyReady(false);
       }
       return;
     }
@@ -150,22 +153,29 @@ export default function FashionCalibration({
       });
     }
 
-    // Full body condition
-    const isFullBodyValid = faceVis && lsVis && rsVis && leVis && reVis && lwVis && rwVis && lhVis && rhVis && lkVis && rkVis && laVis && raVis;
+    // Adaptive fashion calibration:
+    // Upper body is sufficient for hair/face/shirt/gloves/necklace/backpack.
+    // Full body simply unlocks lower-body fitting such as shoes.
+    const isUpperBodyValid = faceVis && lsVis && rsVis && leVis && reVis && lwVis && rwVis;
+    const isFullBodyValid = isUpperBodyValid && lhVis && rhVis && lkVis && rkVis && laVis && raVis;
+
+    if (upperBodyReady !== isUpperBodyValid) {
+      setUpperBodyReady(isUpperBodyValid);
+    }
     if (fullBodyReady !== isFullBodyValid) {
       setFullBodyReady(isFullBodyValid);
     }
 
     const now = performance.now();
 
-    if (isFullBodyValid) {
+    if (isUpperBodyValid) {
       if (!stabilityStartRef.current) {
         stabilityStartRef.current = now;
         audio.playCombo();
       }
 
       const elapsed = now - stabilityStartRef.current;
-      const duration = 1500; // Hold for 1.5 seconds stable
+      const duration = 1200;
       const percentage = Math.min(100, Math.floor((elapsed / duration) * 100));
       if (stabilityProgress !== percentage) {
         setStabilityProgress(percentage);
@@ -174,14 +184,17 @@ export default function FashionCalibration({
       if (elapsed >= duration && !lastCheckSuccessRef.current) {
         lastCheckSuccessRef.current = true;
         audio.playSuccess();
-        
-        // Announce ready
-        voiceGuide.speak('Toàn thân đã sẵn sàng!', 'high');
-        
-        // Auto trigger success
+
+        voiceGuide.speak(
+          isFullBodyValid
+            ? 'Toàn thân đã sẵn sàng!'
+            : 'Nửa người trên và hai tay đã sẵn sàng!',
+          'high'
+        );
+
         setTimeout(() => {
-          onCalibrationSuccessRef.current(true);
-        }, 500);
+          onCalibrationSuccessRef.current(isFullBodyValid);
+        }, 350);
       }
     } else {
       stabilityStartRef.current = null;
@@ -202,12 +215,26 @@ export default function FashionCalibration({
       <div className="text-center mt-4">
         <h3 className="text-xl md:text-2xl font-black text-purple-800">Căn Chỉnh Gương Phép Thuật</h3>
         <p className="text-xs text-slate-500 font-bold mt-1 max-w-md mx-auto leading-relaxed">
-          Đứng lùi camera khoảng 1.5m - 2m. Gương sẽ kiểm tra khuôn mặt, vai, khuỷu tay, cổ tay, hông, gối và bàn chân trước khi thử đồ.
+          Không ép khoảng cách cố định. Chỉ cần camera thấy rõ mặt, vai, khuỷu tay và hai cổ tay là chơi được. Hông, gối và bàn chân là phần nâng cao để thử đồ toàn thân.
         </p>
       </div>
 
+      <div className={`mt-4 w-full rounded-2xl border px-3 py-2 text-xs font-black text-center ${
+        fullBodyReady
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+          : upperBodyReady
+          ? 'bg-cyan-50 border-cyan-200 text-cyan-700'
+          : 'bg-amber-50 border-amber-200 text-amber-700'
+      }`}>
+        {fullBodyReady
+          ? '✅ TOÀN THÂN — thử được cả trang phục và giày'
+          : upperBodyReady
+          ? '✅ NỬA NGƯỜI + 2 TAY — đủ để thử tóc, kính, áo và phụ kiện'
+          : '📷 Đưa mặt, vai, khuỷu tay và hai tay vào khung'}
+      </div>
+
       {/* Checklist items list */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full my-6 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full my-4 p-4 bg-purple-50/50 rounded-2xl border border-purple-100">
         <CheckItem label="Mặt (mắt/mũi/tai/miệng)" checked={checklist.face} />
         <CheckItem label="Vai trái" checked={checklist.leftShoulder} />
         <CheckItem label="Vai phải" checked={checklist.rightShoulder} />
@@ -225,11 +252,11 @@ export default function FashionCalibration({
 
       {/* Stability bar or guidance */}
       <div className="w-full flex flex-col gap-2">
-        {fullBodyReady ? (
+        {upperBodyReady ? (
           <div className="flex flex-col items-center gap-2">
             <span className="text-xs font-black text-emerald-600 flex items-center gap-1.5 animate-bounce">
               <Sparkles className="w-4 h-4 text-amber-500 fill-amber-400" />
-              Đứng yên giữ nguyên tư thế toàn thân!
+              {fullBodyReady ? 'Giữ tư thế toàn thân!' : 'Giữ nửa người trên và hai tay!'}
             </span>
             <div className="w-full h-3.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200 shadow-inner">
               <div 
@@ -243,9 +270,9 @@ export default function FashionCalibration({
           <div className="flex items-center justify-center gap-2 text-amber-600 bg-amber-50/60 p-3.5 rounded-xl border border-amber-100">
             <AlertCircle className="w-5 h-5 flex-shrink-0 animate-pulse" />
             <span className="text-xs font-bold leading-relaxed">
-              {!anyBodyDetected 
-                ? 'Đang tìm kiếm cơ thể trước camera...' 
-                : 'Đứng xa ra một chút để camera nhận diện cả chân bé nhé!'}
+              {!anyBodyDetected
+                ? 'Đang tìm người trước camera...'
+                : 'Không cần thấy chân: hãy đưa rõ mặt, hai vai, khuỷu tay và hai cổ tay vào khung.'}
             </span>
           </div>
         )}

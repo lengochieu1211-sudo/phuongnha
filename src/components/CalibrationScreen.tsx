@@ -10,6 +10,7 @@ import { audio } from '../lib/AudioEngine';
 import { voiceGuide } from '../lib/VoiceGuideService';
 import { poseDetector, POSE_LANDMARKS } from '../utils/poseDetector';
 import { useCameraPose } from '../providers/CameraPoseContext';
+import { drawImageContain } from '../utils/cameraFrame';
 
 interface CalibrationScreenProps {
   videoRef?: React.RefObject<HTMLVideoElement | null>;
@@ -84,13 +85,12 @@ export default function CalibrationScreen({
       if (isStreaming && localCanvasRef.current && canvasElement) {
         const destCtx = localCanvasRef.current.getContext('2d');
         if (destCtx && canvasElement.width > 0 && canvasElement.height > 0) {
-          destCtx.clearRect(0, 0, localCanvasRef.current.width, localCanvasRef.current.height);
-          destCtx.drawImage(
+          drawImageContain(
+            destCtx,
             canvasElement,
-            0,
-            0,
             localCanvasRef.current.width,
-            localCanvasRef.current.height
+            localCanvasRef.current.height,
+            false,
           );
         }
       }
@@ -101,9 +101,23 @@ export default function CalibrationScreen({
   }, [isStreaming, canvasElement]);
 
   // Profile classification
-  const isFullBodyRequired = ['mimic', 'adventure', 'workout', 'randomworkout', 'workout_session', 'ninja', 'goalkeeper', 'magicacademy'].includes(targetScreen || '');
+  // V5.14: phone-friendly capability profiles.
+  // All gesture games below work from head/shoulders/two hands; feet are optional.
+  const isFullBodyRequired = false;
   const isRacingRequired = ['racing'].includes(targetScreen || '');
-  const isUpperBodyRequired = ['dance', 'parentplay'].includes(targetScreen || '');
+  const isUpperBodyRequired = [
+    'mimic',
+    'adventure',
+    'workout',
+    'randomworkout',
+    'workout_session',
+    'ninja',
+    'goalkeeper',
+    'magicacademy',
+    'dance',
+    'parentplay',
+    'ludo',
+  ].includes(targetScreen || '');
   const isWristOnlyRequired = ['fruitslash', 'chickenblaster', 'sweetzombie', 'starcatcher'].includes(targetScreen || '');
 
   // Body position checklist state
@@ -116,14 +130,16 @@ export default function CalibrationScreen({
 
   // Speak greeting guide on mount
   useEffect(() => {
-    if (isFullBodyRequired) {
-      voiceGuide.speak('Bé hãy lùi ra xa camera một chút để hiển thị đầy đủ cơ thể, từ đầu đến chân nhé!', 'high');
+    if ((targetScreen || '') === 'ludo') {
+      voiceGuide.speak('Cờ Cá Ngựa dùng cử chỉ để tung xúc xắc. Bé hãy để camera thấy rõ đầu, hai vai và hai tay nhé!', 'high');
     } else if (isRacingRequired) {
-      voiceGuide.speak('Bé hãy đưa hai tay ra trước như đang cầm vô lăng và đứng thẳng nhé!', 'high');
+      voiceGuide.speak('Bé hãy để camera thấy rõ nửa người trên và đưa hai tay ra trước như đang cầm vô lăng nhé!', 'high');
     } else if (isUpperBodyRequired) {
-      voiceGuide.speak('Bé hãy đứng thẳng trước camera để thấy phần thân trên và hai vai nhé!', 'high');
+      voiceGuide.speak('Bé chỉ cần để camera thấy rõ nửa người trên và cả hai tay. Không bắt buộc phải thấy bàn chân nhé!', 'high');
+    } else if (isFullBodyRequired) {
+      voiceGuide.speak('Bé hãy lùi ra xa camera để hiển thị đầy đủ cơ thể từ đầu đến chân nhé!', 'high');
     } else {
-      voiceGuide.speak('Bé hãy đứng trước camera và đưa cổ tay sẵn sàng nhé!', 'high');
+      voiceGuide.speak('Bé hãy đứng trước camera và đưa tay vào khung hình nhé!', 'high');
     }
   }, [targetScreen, isFullBodyRequired, isUpperBodyRequired, isRacingRequired]);
 
@@ -194,26 +210,33 @@ export default function CalibrationScreen({
       const bothWristsOk = lWristOk && rWristOk;
       const wristOk = lWristOk || rWristOk;
 
-      // Update UI checklists dynamically
+      // Update UI checklists dynamically.
+      // For upper-body/racing profiles the last two rows represent HANDS and
+      // torso readiness instead of hips/feet.
       setChecks({
         head: headOk,
-        shoulders: isFullBodyRequired || isRacingRequired || isUpperBodyRequired ? bothShouldersOk : (lShoulderOk || rShoulderOk),
-        hips: isFullBodyRequired ? bothHipsOk : (lHipOk || rHipOk || res.bodyDetected),
-        feet: isRacingRequired ? bothWristsOk : (isFullBodyRequired ? bothFeetOk : (lAnkleOk || rAnkleOk || res.fullBodyDetected)),
+        shoulders: isFullBodyRequired || isRacingRequired || isUpperBodyRequired
+          ? bothShouldersOk
+          : (lShoulderOk || rShoulderOk),
+        hips: isRacingRequired || isUpperBodyRequired
+          ? bothWristsOk
+          : (isFullBodyRequired ? bothHipsOk : wristOk),
+        feet: isRacingRequired || isUpperBodyRequired
+          ? (headOk && bothShouldersOk && bothWristsOk)
+          : (isFullBodyRequired ? bothFeetOk : wristOk),
       });
 
-      // Strict check criteria based on target game requirement
+      // Strict check criteria based on target game requirement.
       let pass = false;
       if (isFullBodyRequired) {
         pass = headOk && bothShouldersOk && bothHipsOk && bothFeetOk;
-      } else if (isRacingRequired) {
-        pass = bothShouldersOk && bothWristsOk;
-      } else if (isUpperBodyRequired) {
-        pass = headOk && bothShouldersOk;
+      } else if (isRacingRequired || isUpperBodyRequired) {
+        // New default for motion games: head + two shoulders + TWO visible hands.
+        pass = headOk && bothShouldersOk && bothWristsOk;
       } else if (isWristOnlyRequired) {
         pass = headOk && (lShoulderOk || rShoulderOk) && wristOk;
       } else {
-        pass = headOk && bothShouldersOk && (bothHipsOk || bothFeetOk || res.bodyDetected);
+        pass = headOk && bothShouldersOk && wristOk;
       }
 
       if (pass) {
@@ -285,7 +308,7 @@ export default function CalibrationScreen({
             Sẵn Sàng Phiêu Lưu!
           </h2>
           <p className="text-xs text-slate-500 font-bold mt-0.5">
-            Bé hãy đứng thẳng vào giữa khung hình khoảng 2 giây để nhận diện nhé!
+            Giữ đúng tỷ lệ camera • thấy rõ đầu, vai và hai tay khoảng 2 giây là chơi được!
           </p>
         </div>
 
@@ -306,16 +329,24 @@ export default function CalibrationScreen({
               <>
                 <canvas ref={localCanvasRef} width={640} height={480} className="w-full h-full object-contain bg-black" />
 
-                {/* Silhouette framing guide overlay */}
+                {/* Framing guide follows the capability required by the game.
+                    It is only a guide; the camera image itself is never stretched/cropped. */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <svg viewBox="0 0 200 300" className="h-5/6 opacity-40 stroke-emerald-300 stroke-2 fill-none animate-pulse">
-                    {/* Head */}
-                    <circle cx="100" cy="50" r="28" strokeDasharray="4 4" />
-                    {/* Shoulders & Arms */}
-                    <path d="M50,110 L150,110 M100,78 L100,190" strokeDasharray="4 4" />
-                    {/* Hips & Legs */}
-                    <path d="M70,190 L60,280 M130,190 L140,280" strokeDasharray="4 4" />
-                  </svg>
+                  {isUpperBodyRequired || isRacingRequired || isWristOnlyRequired ? (
+                    <svg viewBox="0 0 200 220" className="h-4/5 opacity-40 stroke-emerald-300 stroke-2 fill-none animate-pulse">
+                      <circle cx="100" cy="46" r="27" strokeDasharray="4 4" />
+                      <path d="M48,105 L152,105 M100,75 L100,188" strokeDasharray="4 4" />
+                      <path d="M48,105 L24,165 M152,105 L176,165" strokeDasharray="4 4" />
+                      <circle cx="22" cy="170" r="10" strokeDasharray="4 4" />
+                      <circle cx="178" cy="170" r="10" strokeDasharray="4 4" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 200 300" className="h-5/6 opacity-40 stroke-emerald-300 stroke-2 fill-none animate-pulse">
+                      <circle cx="100" cy="50" r="28" strokeDasharray="4 4" />
+                      <path d="M50,110 L150,110 M100,78 L100,190" strokeDasharray="4 4" />
+                      <path d="M70,190 L60,280 M130,190 L140,280" strokeDasharray="4 4" />
+                    </svg>
+                  )}
                 </div>
 
                 {/* Hold Timer Progress Bar */}
@@ -390,6 +421,14 @@ export default function CalibrationScreen({
             Kiểm Tra Vị Trí Bé
           </h3>
 
+          <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-3 py-2 text-[11px] font-black text-cyan-800">
+            {isRacingRequired || isUpperBodyRequired
+              ? '📷 CHẾ ĐỘ: NỬA NGƯỜI TRÊN + 2 TAY'
+              : isWristOnlyRequired
+              ? '📷 CHẾ ĐỘ: TAY / CỔ TAY'
+              : '📷 CHẾ ĐỘ: TOÀN THÂN'}
+          </div>
+
           <div className="flex flex-col gap-3">
             <div className={`flex items-center justify-between p-3 rounded-2xl border ${checks.head ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
               <span className="font-bold text-sm text-slate-700 flex items-center gap-2">
@@ -415,7 +454,7 @@ export default function CalibrationScreen({
 
             <div className={`flex items-center justify-between p-3 rounded-2xl border ${checks.hips ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
               <span className="font-bold text-sm text-slate-700 flex items-center gap-2">
-                🦵 Hông & Đầu Gối
+                {isUpperBodyRequired || isRacingRequired ? '👐 Hai Tay' : '🦵 Hông & Đầu Gối'}
               </span>
               {checks.hips ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-100" />
@@ -426,7 +465,7 @@ export default function CalibrationScreen({
 
             <div className={`flex items-center justify-between p-3 rounded-2xl border ${checks.feet ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
               <span className="font-bold text-sm text-slate-700 flex items-center gap-2">
-                👟 Bàn Chân
+                {isUpperBodyRequired || isRacingRequired ? '✅ Nửa Người Trên Sẵn Sàng' : '👟 Bàn Chân'}
               </span>
               {checks.feet ? (
                 <CheckCircle2 className="w-5 h-5 text-emerald-500 fill-emerald-100" />

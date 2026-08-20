@@ -14,21 +14,25 @@ export interface ExternalCarHandle {
 
 type DeviceClass = 'phone' | 'tablet' | 'tv' | 'desktop';
 type VehicleKind = 'car' | 'motorcycle';
+type ForwardAxis = '+x' | '-x' | '+z' | '-z';
+type WheelMode = 'named' | 'none';
 
 interface ExternalVehicleConfig {
   file: string;
   targetLength: number;
-  defaultYaw: number;
+  forwardAxis: ForwardAxis;
   kind: VehicleKind;
   policy: 'tv_up' | 'desktop_only';
   rideHeight: number;
-  wheelMode?: 'named' | 'infer' | 'none';
+  wheelMode: WheelMode;
 }
 
 interface WheelRigNode {
-  obj: THREE.Object3D;
+  spinPivot: THREE.Group;
+  steerPivot: THREE.Group;
   axis: 'x' | 'y' | 'z';
-  baseY: number;
+  steer: boolean;
+  baseSteerY: number;
 }
 
 const WHITE_PIXEL =
@@ -40,7 +44,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   canis_mesa_3d: {
     file: 'assets/cars/canis-mesa-cronoz.fbx',
     targetLength: 4.65,
-    defaultYaw: 0,
+    // Verified from source geometry: bonnet/front is toward +Z; rear bumper is toward -Z.
+    forwardAxis: '+z',
     kind: 'car',
     policy: 'tv_up',
     rideHeight: 0.18,
@@ -49,7 +54,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   v12_sv_3d: {
     file: 'assets/cars/v12-sv-supercar.fbx',
     targetLength: 4.75,
-    defaultYaw: 0,
+    // Verified: steering wheel/front cabin is at larger Z; engine is toward smaller Z.
+    forwardAxis: '+z',
     kind: 'car',
     policy: 'desktop_only',
     rideHeight: 0.14,
@@ -58,22 +64,23 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   roadster_883_3d: {
     file: 'assets/cars/roadster-883-3d.fbx',
     targetLength: 2.22,
-    // Trust FBX +Z forward; X-long sources are normalized below.
-    defaultYaw: 0,
+    // Verified from side silhouette: front wheel/fork is toward -X.
+    forwardAxis: '-x',
     kind: 'motorcycle',
     policy: 'tv_up',
     rideHeight: 0.10,
-    // Node names are generic Group/Mesh. Do not guess wheels or the handlebar/fork can rotate by mistake.
+    // Generic SketchUp hierarchy splits wheel parts across groups; keep static rather than jump.
     wheelMode: 'none',
   },
   vespa_studio_3d: {
     file: 'assets/cars/vespa-studio-3d.fbx',
     targetLength: 1.86,
-    // Trust FBX +Z forward; X-long sources are normalized below.
-    defaultYaw: 0,
+    // Verified: front wheel is near X=-4453; engine/rear wheel is near X=-3290.
+    forwardAxis: '-x',
     kind: 'motorcycle',
     policy: 'tv_up',
     rideHeight: 0.09,
+    // Source wheel pivots are at world origin; keep static until a clean separated wheel rig is supplied.
     wheelMode: 'none',
   },
 };
@@ -172,108 +179,186 @@ function hideProceduralVisuals(instance: Car3DInstance) {
   });
 }
 
-function namedWheelNodes(root: THREE.Object3D): THREE.Object3D[] {
-  const candidates: THREE.Object3D[] = [];
-  root.traverse((obj) => {
-    const n = obj.name.toLowerCase();
-    if (/wheel|pneu|tire|tyre|gomma|ruota|roda|w2[_-]?\d/.test(n)) candidates.push(obj);
+function sanitizeFbxScene(root: THREE.Object3D) {
+  // Current uploaded FBXs contain only Mesh/Null nodes, but keep the loader safe
+  // for future files that may contain cameras, lights, helpers, lines or point clouds.
+  root.traverse((obj: any) => {
+    if (
+      obj.isCamera ||
+      obj.isLight ||
+      obj.isLine ||
+      obj.isLineSegments ||
+      obj.isPoints ||
+      obj.type?.toLowerCase?.().includes('helper')
+    ) {
+      obj.visible = false;
+      obj.userData.apHiddenAsNonVehicle = true;
+    }
   });
-  return candidates
-    .filter((obj) => !candidates.some((other) => other !== obj && obj.parent === other))
-    .slice(0, 8);
 }
 
-function inferWheelNodes(root: THREE.Object3D, kind: VehicleKind): WheelRigNode[] {
-  root.updateWorldMatrix(true, true);
-  const total = new THREE.Box3().setFromObject(root);
-  const totalSize = total.getSize(new THREE.Vector3());
-  const totalCenter = total.getCenter(new THREE.Vector3());
-  const horizontalLength = Math.max(totalSize.x, totalSize.z, 0.001);
-  const totalHeight = Math.max(totalSize.y, 0.001);
-  const expected = kind === 'motorcycle' ? 2 : 4;
+function forwardYaw(axis: ForwardAxis): number {
+  // Race root.lookAt() points local +Z along the track tangent.
+  switch (axis) {
+    case '+z': return 0;
+    case '-z': return Math.PI;
+    case '+x': return -Math.PI / 2;
+    case '-x': return Math.PI / 2;
+    default: return 0;
+  }
+}
 
-  const scored: { obj: THREE.Object3D; axis: 'x'|'y'|'z'; center: THREE.Vector3; score: number }[] = [];
+interface WheelCandidate {
+  obj: THREE.Object3D;
+  center: THREE.Vector3;
+  size: THREE.Vector3;
+  axis: 'x' | 'y' | 'z';
+}
+
+function smallestAxis(size: THREE.Vector3): 'x' | 'y' | 'z' {
+  const dims = [
+    { axis: 'x' as const, value: Math.abs(size.x) },
+    { axis: 'y' as const, value: Math.abs(size.y) },
+    { axis: 'z' as const, value: Math.abs(size.z) },
+  ].sort((a, b) => a.value - b.value);
+  return dims[0].axis;
+}
+
+function sourceForwardScore(center: THREE.Vector3, axis: ForwardAxis): number {
+  switch (axis) {
+    case '+x': return center.x;
+    case '-x': return -center.x;
+    case '+z': return center.z;
+    case '-z': return -center.z;
+  }
+}
+
+function namedRoadWheelCandidates(
+  root: THREE.Object3D,
+  kind: VehicleKind,
+): WheelCandidate[] {
+  const raw: WheelCandidate[] = [];
+
+  root.updateWorldMatrix(true, true);
 
   root.traverse((obj) => {
-    if (obj === root || !(obj as any).isGroup) return;
+    const n = obj.name.toLowerCase();
+
+    // Explicitly reject steering wheel / handlebar related nodes.
+    if (/steer|steering|handlebar/.test(n)) return;
+
+    if (!/wheel|pneu|tire|tyre|gomma|ruota|roda|w2[_-]?\d/.test(n)) return;
+
     const box = new THREE.Box3().setFromObject(obj);
     if (box.isEmpty()) return;
 
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    const dims = [
-      { axis: 'x' as const, value: Math.abs(size.x) },
-      { axis: 'y' as const, value: Math.abs(size.y) },
-      { axis: 'z' as const, value: Math.abs(size.z) },
-    ].sort((a,b) => a.value - b.value);
+    const largest = Math.max(size.x, size.y, size.z);
+    if (!Number.isFinite(largest) || largest <= 1e-5) return;
 
-    const thin = dims[0].value;
-    const mid = dims[1].value;
-    const large = dims[2].value;
-    if (large <= 1e-6) return;
-
-    const circularity = mid / large;
-    const thinness = thin / large;
-    const diameterRatio = large / horizontalLength;
-    const yRatio = (center.y - total.min.y) / totalHeight;
-
-    if (circularity < 0.68 || thinness > 0.48) return;
-    if (diameterRatio < 0.07 || diameterRatio > (kind === 'motorcycle' ? 0.48 : 0.34)) return;
-    if (yRatio > 0.62) return;
-
-    const endDistance = Math.max(
-      Math.abs(center.x - totalCenter.x) / Math.max(totalSize.x, 0.001),
-      Math.abs(center.z - totalCenter.z) / Math.max(totalSize.z, 0.001),
-    );
-
-    const score =
-      circularity * 3.1 +
-      (1 - thinness) * 2.2 +
-      Math.min(1, endDistance * 2.2) * 1.7 +
-      (1 - yRatio) * 0.7;
-
-    scored.push({ obj, axis: dims[0].axis, center, score });
+    raw.push({
+      obj,
+      center,
+      size,
+      axis: smallestAxis(size),
+    });
   });
 
-  scored.sort((a,b) => b.score - a.score);
-  const chosen: typeof scored = [];
-  const minSep = horizontalLength * (kind === 'motorcycle' ? 0.24 : 0.12);
+  const expected = kind === 'motorcycle' ? 2 : 4;
 
-  for (const cand of scored) {
-    if (chosen.every((c) => c.center.distanceTo(cand.center) > minSep)) {
-      chosen.push(cand);
-      if (chosen.length >= expected) break;
-    }
+  // Deduplicate nested/duplicate names by center. Prefer the candidate with
+  // the larger bbox because it is more likely to be the complete wheel assembly.
+  const clusters: WheelCandidate[][] = [];
+  const modelBox = new THREE.Box3().setFromObject(root);
+  const modelSize = modelBox.getSize(new THREE.Vector3());
+  const horizontalLength = Math.max(modelSize.x, modelSize.z, 0.001);
+  const mergeDistance = horizontalLength * 0.035;
+
+  for (const cand of raw) {
+    const cluster = clusters.find((items) => items[0].center.distanceTo(cand.center) < mergeDistance);
+    if (cluster) cluster.push(cand);
+    else clusters.push([cand]);
   }
 
-  return chosen.map((c) => ({
-    obj: c.obj,
-    axis: c.axis,
-    baseY: c.obj.rotation.y,
-  }));
+  let unique = clusters.map((items) =>
+    items.sort((a, b) => {
+      const av = a.size.x * a.size.y * a.size.z;
+      const bv = b.size.x * b.size.y * b.size.z;
+      return bv - av;
+    })[0]
+  );
+
+  if (unique.length > expected) {
+    // Canis contains 5 named wheels: 4 road wheels + 1 high-mounted spare.
+    // Road wheels are the lowest wheel centers in the vehicle.
+    unique = unique
+      .sort((a, b) => a.center.y - b.center.y)
+      .slice(0, expected);
+  }
+
+  return unique;
 }
 
-function collectWheelRig(
+function createCenteredWheelRig(
+  candidate: WheelCandidate,
+  steer: boolean,
+): WheelRigNode | null {
+  const obj = candidate.obj;
+  const parent = obj.parent;
+  if (!parent) return null;
+
+  // Critical fix: SketchUp-exported FBX wheel groups often have pivot=(0,0,0)
+  // while wheel geometry is far away. Rotating the original node makes the wheel
+  // orbit around the whole vehicle. Create a new pivot at the actual bbox center.
+  parent.updateWorldMatrix(true, false);
+  obj.updateWorldMatrix(true, true);
+
+  const centerWorld = candidate.center.clone();
+  const centerLocal = parent.worldToLocal(centerWorld.clone());
+
+  const steerPivot = new THREE.Group();
+  steerPivot.name = `AP_SteerPivot_${obj.name}`;
+  steerPivot.position.copy(centerLocal);
+  parent.add(steerPivot);
+  steerPivot.updateWorldMatrix(true, false);
+
+  const spinPivot = new THREE.Group();
+  spinPivot.name = `AP_SpinPivot_${obj.name}`;
+  steerPivot.add(spinPivot);
+  spinPivot.updateWorldMatrix(true, false);
+
+  // attach() preserves the object's world transform while re-parenting.
+  spinPivot.attach(obj);
+
+  return {
+    spinPivot,
+    steerPivot,
+    axis: candidate.axis,
+    steer,
+    baseSteerY: steerPivot.rotation.y,
+  };
+}
+
+function buildNamedWheelRig(
   root: THREE.Object3D,
   kind: VehicleKind,
-  mode: 'named' | 'infer' | 'none' = 'infer',
+  forwardAxis: ForwardAxis,
 ): WheelRigNode[] {
-  if (mode === 'none') return [];
+  const candidates = namedRoadWheelCandidates(root, kind);
+  const expected = kind === 'motorcycle' ? 2 : 4;
+  if (candidates.length !== expected) return [];
 
-  const named = namedWheelNodes(root);
-  if (named.length >= (kind === 'motorcycle' ? 2 : 4)) {
-    return named.slice(0, kind === 'motorcycle' ? 2 : 4).map((obj) => ({
-      obj,
-      axis: 'x' as const,
-      baseY: obj.rotation.y,
-    }));
-  }
+  // Mark the most-forward half as steerable.
+  const sortedForward = [...candidates].sort(
+    (a, b) => sourceForwardScore(b.center, forwardAxis) - sourceForwardScore(a.center, forwardAxis)
+  );
+  const steerCount = kind === 'motorcycle' ? 1 : 2;
+  const steerSet = new Set(sortedForward.slice(0, steerCount).map((c) => c.obj));
 
-  if (mode === 'named') return [];
-
-  // Only opt-in models may use geometric inference. Generic SketchUp Group/Mesh
-  // hierarchies can otherwise mistake handlebars/forks/body groups for wheels.
-  return inferWheelNodes(root, kind);
+  return candidates
+    .map((cand) => createCenteredWheelRig(cand, steerSet.has(cand.obj)))
+    .filter((x): x is WheelRigNode => Boolean(x));
 }
 
 function disposeObject(root: THREE.Object3D) {
@@ -289,11 +374,85 @@ function disposeObject(root: THREE.Object3D) {
   });
 }
 
-function spinWheel(wheel: WheelRigNode, spin: number, steerAngleRad: number, allowSteer: boolean) {
-  const rot: any = wheel.obj.rotation;
-  rot[wheel.axis] -= spin;
-  if (allowSteer && wheel.axis !== 'y') {
-    rot.y = wheel.baseY + steerAngleRad * 0.35;
+function spinWheel(
+  wheel: WheelRigNode,
+  spin: number,
+  steerAngleRad: number,
+) {
+  const spinRot: any = wheel.spinPivot.rotation;
+  spinRot[wheel.axis] -= spin;
+
+  wheel.steerPivot.rotation.y = wheel.baseSteerY + (wheel.steer ? steerAngleRad * 0.35 : 0);
+}
+
+
+function createExternalLoadingManager(): THREE.LoadingManager {
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((url) => {
+    if (/\.(png|jpe?g|bmp|tga|gif|webp)(\?.*)?$/i.test(url)) return WHITE_PIXEL;
+    return url;
+  });
+  return manager;
+}
+
+function getExternalVehicleUrl(modelId: CarModelId): string | null {
+  const cfg = EXTERNAL_CARS[modelId];
+  if (!cfg) return null;
+  const base = ((import.meta as any).env?.BASE_URL || '/');
+  return `${base}${cfg.file}`;
+}
+
+function loadExternalTemplate(modelId: CarModelId): Promise<THREE.Group> | null {
+  const url = getExternalVehicleUrl(modelId);
+  if (!url) return null;
+
+  let cached = FBX_CACHE.get(url);
+  if (!cached) {
+    const loader = new FBXLoader(createExternalLoadingManager());
+    cached = new Promise<THREE.Group>((resolve, reject) => {
+      loader.load(
+        url,
+        resolve,
+        undefined,
+        (error) => {
+          FBX_CACHE.delete(url);
+          reject(error);
+        },
+      );
+    });
+    FBX_CACHE.set(url, cached);
+  }
+  return cached;
+}
+
+/**
+ * Warm only the browser HTTP cache. Unlike FBX parsing, fetch does not block the
+ * UI with a large synchronous ASCII-FBX parse. Useful while the player chooses a track.
+ */
+export async function prefetchExternalCarAsset(modelId: CarModelId): Promise<boolean> {
+  const url = getExternalVehicleUrl(modelId);
+  if (!url) return false;
+  try {
+    const response = await fetch(url, { cache: 'force-cache' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Parse the selected external FBX into the in-memory Three.js cache.
+ * Garage already does this naturally; race loading uses the same cache.
+ */
+export async function preloadExternalCarModel(modelId: CarModelId): Promise<boolean> {
+  const pending = loadExternalTemplate(modelId);
+  if (!pending) return false;
+  try {
+    await pending;
+    return true;
+  } catch (error) {
+    console.warn('FBX preload failed; race will use the procedural fallback.', error);
+    return false;
   }
 }
 
@@ -306,44 +465,31 @@ export async function attachExternalCarModel(
   const cfg = EXTERNAL_CARS[modelId];
   if (!cfg || detail === 'lite') return null;
 
-  const manager = new THREE.LoadingManager();
-  manager.setURLModifier((url) => {
-    // Missing external FBX textures must never break the model.
-    if (/\.(png|jpe?g|bmp|tga|gif|webp)(\?.*)?$/i.test(url)) return WHITE_PIXEL;
-    return url;
-  });
-
-  const loader = new FBXLoader(manager);
-  const base = ((import.meta as any).env?.BASE_URL || '/');
-  const url = `${base}${cfg.file}`;
-
-  let cached = FBX_CACHE.get(url);
-  if (!cached) {
-    cached = new Promise<THREE.Group>((resolve, reject) => {
-      loader.load(url, resolve, undefined, reject);
-    });
-    FBX_CACHE.set(url, cached);
-  }
+  const cached = loadExternalTemplate(modelId);
+  if (!cached) return null;
 
   const template = await cached;
   const fbx = template.clone(true) as THREE.Group;
 
   const holder = new THREE.Group();
   holder.name = `ExternalVehicle_${modelId}`;
-  holder.rotation.y = cfg.defaultYaw;
   holder.add(fbx);
+
+  sanitizeFbxScene(fbx);
+
+  // Build wheel pivots while the FBX is still in its native coordinate system.
+  // This lets us classify the real spin axis and repair SketchUp pivots safely.
+  const wheelRig =
+    cfg.wheelMode === 'named'
+      ? buildNamedWheelRig(fbx, cfg.kind, cfg.forwardAxis)
+      : [];
+
+  // Do NOT guess the visual front from bbox length. Different FBX exporters use
+  // different forward signs. V5.15 stores the verified source forward axis per model.
+  holder.rotation.y = forwardYaw(cfg.forwardAxis);
 
   let box = new THREE.Box3().setFromObject(holder);
   let size = box.getSize(new THREE.Vector3());
-
-  // Long axis should run along Z in the racing world.
-  if (size.x > size.z * 1.15) {
-    // If a SketchUp/FBX export arrives lengthwise on X, map +X -> +Z.
-    // The old +90deg mapping sent +X -> -Z and made every such model face backward.
-    holder.rotation.y -= Math.PI / 2;
-    box = new THREE.Box3().setFromObject(holder);
-    size = box.getSize(new THREE.Vector3());
-  }
 
   const horizontalLength = Math.max(size.x, size.z, 0.001);
   const scale = cfg.targetLength / horizontalLength;
@@ -371,7 +517,6 @@ export async function attachExternalCarModel(
   });
 
   holder.updateWorldMatrix(true, true);
-  const wheelRig = collectWheelRig(fbx, cfg.kind, cfg.wheelMode ?? 'infer');
   const originalUpdate = instance.updateAnimation;
   const baseHolderZ = holder.rotation.z;
 
@@ -379,8 +524,8 @@ export async function attachExternalCarModel(
     originalUpdate(speed, steerAngleRad, isDrifting, isNitro, delta);
 
     const spin = Math.max(-1.0, Math.min(1.0, speed / 90)) * delta * (cfg.kind === 'motorcycle' ? 15.5 : 10.5);
-    wheelRig.forEach((wheel, index) => {
-      spinWheel(wheel, spin, steerAngleRad, index < (cfg.kind === 'motorcycle' ? 1 : 2));
+    wheelRig.forEach((wheel) => {
+      spinWheel(wheel, spin, steerAngleRad);
     });
 
     if (cfg.kind === 'motorcycle') {

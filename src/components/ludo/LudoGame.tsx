@@ -41,6 +41,7 @@ import { VOICE_MANIFEST } from '../../lib/voiceManifest';
 import LudoBoard from './LudoBoard';
 import LudoDice from './LudoDice';
 import LudoSetupModal from './LudoSetupModal';
+import { useCameraPose } from '../../providers/CameraPoseContext';
 
 interface LudoGameProps {
   progress: PlayerProgress;
@@ -58,6 +59,13 @@ export default function LudoGame({
   const [engine] = useState<LudoGameEngine>(() => new LudoGameEngine());
   const [gameState, setGameState] = useState<LudoGameState>(engine.state);
   const [showSetupModal, setShowSetupModal] = useState<boolean>(true);
+  const {
+    isStreaming: isCameraStreaming,
+    startCamera,
+    stopCamera,
+    trackingMode,
+    trackingFeedback,
+  } = useCameraPose();
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [previewCoords, setPreviewCoords] = useState<{ x: number; y: number }[]>([]);
   const [movingPieceInfo, setMovingPieceInfo] = useState<{
@@ -341,7 +349,26 @@ export default function LudoGame({
     showSetupModal,
   ]);
 
-  // Camera Gesture (Clap / Both Arms Up) for Rolling Dice
+  // V5.13: After the player confirms Ludo rules, keep camera running only when
+  // gesture dice-roll is enabled. App.tsx still treats Ludo as a camera-capable screen
+  // so entering the game/calibration can initialize the stream reliably.
+  useEffect(() => {
+    if (showSetupModal || trackingMode === 'keyboard_only') return;
+
+    if (gameState.rules.enableCameraClap) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+  }, [
+    showSetupModal,
+    gameState.rules.enableCameraClap,
+    trackingMode,
+    startCamera,
+    stopCamera,
+  ]);
+
+  // Camera Gesture (Clap / Both Arms Up / Hands Spread) for Rolling Dice
   useEffect(() => {
     if (!gesture || !gameState.rules.enableCameraClap || showSetupModal || isPaused) return;
 
@@ -359,7 +386,14 @@ export default function LudoGame({
     if (gesture === 'standing') {
       lastGestureRef.current = '';
     }
-  }, [gesture, gameState.hasRolled, gameState.isRolling, showSetupModal, isPaused]);
+  }, [
+    gesture,
+    gameState.rules.enableCameraClap,
+    gameState.hasRolled,
+    gameState.isRolling,
+    showSetupModal,
+    isPaused,
+  ]);
 
   // Handle Game Over & Reward Stars
   const handleGameOver = () => {
@@ -515,6 +549,36 @@ export default function LudoGame({
               LƯỢT: {currentPlayer.name}
             </h3>
           </div>
+
+          <div
+            className={`w-full max-w-[240px] flex items-center justify-between gap-2 px-3 py-2 rounded-2xl border text-[10px] font-black ${
+              !gameState.rules.enableCameraClap
+                ? 'bg-slate-100 border-slate-200 text-slate-500'
+                : isCameraStreaming
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-amber-50 border-amber-200 text-amber-700'
+            }`}
+          >
+            <span className="flex items-center gap-1.5">
+              {gameState.rules.enableCameraClap ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
+              CAMERA CỬ CHỈ
+            </span>
+            <span>
+              {!gameState.rules.enableCameraClap
+                ? 'TẮT'
+                : isCameraStreaming
+                ? 'BẬT'
+                : 'ĐANG MỞ...'}
+            </span>
+          </div>
+
+          {gameState.rules.enableCameraClap && (
+            <div className="w-full max-w-[240px] -mt-2 text-center text-[9px] text-slate-500">
+              {isCameraStreaming
+                ? `Nhận diện: ${gesture || 'standing'} • ${trackingFeedback.replaceAll('_', ' ')}`
+                : 'Camera sẽ tự mở để nhận cử chỉ tung xúc xắc.'}
+            </div>
+          )}
 
           <LudoDice
             value={gameState.diceValue}

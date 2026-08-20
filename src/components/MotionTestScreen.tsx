@@ -25,6 +25,7 @@ import { GameGesture } from '../types';
 import { audio } from '../lib/AudioEngine';
 import { voiceGuide } from '../lib/VoiceGuideService';
 import { useCameraPose } from '../providers/CameraPoseContext';
+import { drawImageContain } from '../utils/cameraFrame';
 import { TrackingMode } from '../utils/poseDetector';
 
 interface MotionTestScreenProps {
@@ -103,13 +104,12 @@ export default function MotionTestScreen({ onBack }: MotionTestScreenProps) {
       if (isStreaming && previewCanvasRef.current && canvasElement) {
         const destCtx = previewCanvasRef.current.getContext('2d');
         if (destCtx && canvasElement.width > 0 && canvasElement.height > 0) {
-          destCtx.clearRect(0, 0, previewCanvasRef.current.width, previewCanvasRef.current.height);
-          destCtx.drawImage(
+          drawImageContain(
+            destCtx,
             canvasElement,
-            0,
-            0,
             previewCanvasRef.current.width,
-            previewCanvasRef.current.height
+            previewCanvasRef.current.height,
+            false,
           );
         }
       }
@@ -228,7 +228,7 @@ export default function MotionTestScreen({ onBack }: MotionTestScreenProps) {
                   ref={previewCanvasRef}
                   width={640}
                   height={480}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain bg-black"
                 />
 
                 {/* Hand Target Zones Overlay */}

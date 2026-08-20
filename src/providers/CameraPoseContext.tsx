@@ -118,13 +118,13 @@ export function CameraPoseProvider({ children }: { children: ReactNode }) {
         streamRef.current = null;
       }
 
-      const portrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
       const videoConstraints: MediaTrackConstraints = {
-        // Keep a 4:3 sensor crop because it retains more vertical field-of-view than 16:9.
-        // On a portrait phone request the same 4:3 frame rotated to portrait.
-        width: { ideal: portrait ? 720 : 960 },
-        height: { ideal: portrait ? 960 : 720 },
-        aspectRatio: { ideal: portrait ? 0.75 : 4 / 3 },
+        // Ask for a 4:3 sensor mode instead of 16:9. 4:3 normally exposes more
+        // vertical sensor area on phone front cameras. The browser may rotate the
+        // returned video in portrait; all previews preserve the ACTUAL source ratio.
+        width: { ideal: 1280 },
+        height: { ideal: 960 },
+        aspectRatio: { ideal: 4 / 3 },
         facingMode: { ideal: 'user' },
         frameRate: { ideal: 30, max: 30 },
       };

@@ -25,6 +25,7 @@ interface Race3DCanvasProps {
   customization: CarCustomization;
   cameraView: CameraViewMode;
   qualitySetting: RaceSettings['quality'];
+  onReady?: () => void;
 }
 
 export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
@@ -34,6 +35,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
   customization,
   cameraView,
   qualitySetting,
+  onReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -60,6 +62,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
     // Sky & Fog setup based on environment
     setupEnvironmentTheme(scene, track);
+    addSkyDome(scene, track.environmentType, profile.quality);
     // Even phone/TV gets a tiny reflection environment so clearcoat paint does not look flat.
     const envSize = profile.quality === 'high' ? 256 : profile.quality === 'balanced' ? 128 : 64;
     scene.environment = createProceduralRaceEnvironment(track.environmentType, envSize);
@@ -111,11 +114,13 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     // Phones / Low mode keep the procedural fallback so initial loading and FPS stay safe.
     let externalPlayerHandle: ExternalCarHandle | null = null;
     let externalLoadCancelled = false;
+    let externalReadyPromise: Promise<void> = Promise.resolve();
+
     if (
       isExternalCar(car.id) &&
       shouldUseExternalCar(car.id, actualDeviceClass)
     ) {
-      attachExternalCarModel(playerCar, car.id, customization, profile.carDetail)
+      externalReadyPromise = attachExternalCarModel(playerCar, car.id, customization, profile.carDetail)
         .then((handle) => {
           if (!handle) return;
           if (externalLoadCancelled) {
@@ -203,6 +208,46 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
     particlesRef.current = particles;
+
+    // Put camera at the start grid before shader compilation so the first visible
+    // frame does not jump from the origin to the chase camera.
+    const startPt = getInterpolatedTrackPoint(engine.waypoints, 0);
+    updateCameraPosition(
+      camera,
+      startPt.pos.x,
+      startPt.pos.y,
+      startPt.pos.z,
+      startPt.tangent,
+      cameraView,
+      false,
+    );
+
+    // V5.17 warm-up: wait for the selected FBX (normally already preloaded), render a
+    // hidden frame and compile materials/shaders before starting the countdown.
+    let readyCancelled = false;
+    void (async () => {
+      await externalReadyPromise;
+      if (readyCancelled || externalLoadCancelled) return;
+
+      try {
+        renderer.render(scene, camera);
+        const compileAsync = (renderer as any).compileAsync;
+        if (typeof compileAsync === 'function') {
+          await compileAsync.call(renderer, scene, camera);
+        } else {
+          renderer.compile(scene, camera);
+        }
+      } catch (err) {
+        console.warn('Race scene warm-up compile skipped:', err);
+      }
+
+      // Give the browser two presentation frames after shader compilation. This avoids
+      // starting 3-2-1 in the same frame as the final GPU upload on slower PCs/TV boxes.
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+      if (!readyCancelled && !externalLoadCancelled) onReady?.();
+    })();
 
     // 9. Main Render & Animation Loop
     let lastTime = performance.now();
@@ -325,6 +370,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     resizeObserver.observe(container);
 
     return () => {
+      readyCancelled = true;
       externalLoadCancelled = true;
       externalPlayerHandle?.dispose();
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
@@ -468,6 +514,75 @@ function setupEnvironmentTheme(scene: THREE.Scene, track: RacingTrackConfig) {
   }
 }
 
+
+function addSkyDome(
+  scene: THREE.Scene,
+  environmentType: string,
+  quality: GraphicsProfile['quality'],
+) {
+  const palettes: Record<string, [string, string, string]> = {
+    city_night: ['#020617', '#0f2a44', '#1d4ed8'],
+    sunset_coast: ['#140815', '#7c2d12', '#fb923c'],
+    mountain: ['#0f172a', '#334155', '#93c5fd'],
+    candy: ['#2e0a2b', '#86198f', '#f9a8d4'],
+    sky_clouds: ['#082f49', '#0ea5e9', '#e0f2fe'],
+    cosmic_space: ['#02030a', '#1e1b4b', '#6d28d9'],
+  };
+  const [top, middle, horizon] = palettes[environmentType] || palettes.city_night;
+
+  const width = quality === 'high' ? 768 : quality === 'balanced' ? 512 : 256;
+  const c = document.createElement('canvas');
+  c.width = width;
+  c.height = Math.max(128, Math.floor(width / 2));
+  const ctx = c.getContext('2d');
+  if (!ctx) return;
+
+  const g = ctx.createLinearGradient(0, 0, 0, c.height);
+  g.addColorStop(0, top);
+  g.addColorStop(0.58, middle);
+  g.addColorStop(1, horizon);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  if (environmentType === 'city_night' || environmentType === 'cosmic_space') {
+    const starCount = quality === 'high' ? 180 : quality === 'balanced' ? 100 : 48;
+    for (let i = 0; i < starCount; i++) {
+      const a = 0.25 + Math.random() * 0.65;
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      const r = Math.random() > 0.9 ? 2 : 1;
+      ctx.fillRect(Math.random() * c.width, Math.random() * c.height * 0.72, r, r);
+    }
+  }
+
+  // Soft horizon glow makes the scene feel deeper than a flat background color.
+  const glow = ctx.createRadialGradient(
+    c.width * 0.52, c.height * 0.82, 2,
+    c.width * 0.52, c.height * 0.82, c.width * 0.38,
+  );
+  glow.addColorStop(0, 'rgba(255,255,255,0.18)');
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.needsUpdate = true;
+
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(720, quality === 'high' ? 36 : 24, quality === 'high' ? 18 : 12),
+    new THREE.MeshBasicMaterial({
+      map: tex,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false,
+    }),
+  );
+  dome.name = 'RaceSkyDome';
+  dome.rotation.y = Math.PI * 0.18;
+  scene.add(dome);
+}
+
 function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: GraphicsProfile, track: RacingTrackConfig) {
   const steps = 180;
   const roadWidth = 24;
@@ -523,8 +638,21 @@ function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: Graph
   scene.add(trackMesh);
 
   // Glowing Curb Edges
-  const curbMatLeft = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
-  const curbMatRight = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+  const neonRoad = ['city_night', 'cosmic_space', 'sky_clouds'].includes(track.environmentType);
+  const curbMatLeft = new THREE.MeshStandardMaterial({
+    color: neonRoad ? 0x22d3ee : 0xf8fafc,
+    emissive: neonRoad ? 0x0e7490 : 0x000000,
+    emissiveIntensity: neonRoad ? 0.45 : 0,
+    roughness: 0.56,
+    metalness: neonRoad ? 0.28 : 0.02,
+  });
+  const curbMatRight = new THREE.MeshStandardMaterial({
+    color: neonRoad ? 0xa78bfa : 0xdc2626,
+    emissive: neonRoad ? 0x6d28d9 : 0x000000,
+    emissiveIntensity: neonRoad ? 0.40 : 0,
+    roughness: 0.56,
+    metalness: neonRoad ? 0.28 : 0.02,
+  });
 
   const leftCurbGeo = new THREE.BufferGeometry();
   const rightCurbGeo = new THREE.BufferGeometry();
@@ -536,11 +664,11 @@ function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: Graph
     const pt = getInterpolatedTrackPoint(engine.waypoints, prog);
     const halfW = roadWidth * 0.5;
 
-    leftCurbVerts.push(pt.pos.x - pt.normal.x * halfW, pt.pos.y + 0.15, pt.pos.z - pt.normal.z * halfW);
-    leftCurbVerts.push(pt.pos.x - pt.normal.x * (halfW + 0.8), pt.pos.y + 0.15, pt.pos.z - pt.normal.z * (halfW + 0.8));
+    leftCurbVerts.push(pt.pos.x - pt.normal.x * halfW, pt.pos.y + 0.035, pt.pos.z - pt.normal.z * halfW);
+    leftCurbVerts.push(pt.pos.x - pt.normal.x * (halfW + 0.8), pt.pos.y + 0.035, pt.pos.z - pt.normal.z * (halfW + 0.8));
 
-    rightCurbVerts.push(pt.pos.x + pt.normal.x * halfW, pt.pos.y + 0.15, pt.pos.z + pt.normal.z * halfW);
-    rightCurbVerts.push(pt.pos.x + pt.normal.x * (halfW + 0.8), pt.pos.y + 0.15, pt.pos.z + pt.normal.z * (halfW + 0.8));
+    rightCurbVerts.push(pt.pos.x + pt.normal.x * halfW, pt.pos.y + 0.035, pt.pos.z + pt.normal.z * halfW);
+    rightCurbVerts.push(pt.pos.x + pt.normal.x * (halfW + 0.8), pt.pos.y + 0.035, pt.pos.z + pt.normal.z * (halfW + 0.8));
   }
 
   leftCurbGeo.setAttribute('position', new THREE.Float32BufferAttribute(leftCurbVerts, 3));
@@ -569,6 +697,60 @@ function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: Graph
   }
   dashes.instanceMatrix.needsUpdate = true;
   scene.add(dashes);
+
+  // Solid edge lines + segmented rumble strips. Two instanced draw calls add much
+  // stronger road definition on PC/TV without creating hundreds of Mesh objects.
+  const edgeCount = profile.quality === 'high' ? 110 : profile.quality === 'balanced' ? 78 : 46;
+  const edgeGeo = new THREE.BoxGeometry(0.16, 0.025, 4.2);
+  const edgeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.62, metalness: 0.02 });
+  const edgeLines = new THREE.InstancedMesh(edgeGeo, edgeMat, edgeCount * 2);
+
+  const rumbleGeo = new THREE.BoxGeometry(0.86, 0.045, 2.8);
+  const rumbleMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.60,
+    metalness: neonRoad ? 0.22 : 0.02,
+  });
+  const rumbles = new THREE.InstancedMesh(rumbleGeo, rumbleMat, edgeCount * 2);
+
+  let edgeIndex = 0;
+  let rumbleIndex = 0;
+  for (let i = 0; i < edgeCount; i++) {
+    const prog = (i + 0.5) / edgeCount;
+    const pt = getInterpolatedTrackPoint(engine.waypoints, prog);
+    const yaw = Math.atan2(pt.tangent.x, pt.tangent.z);
+
+    for (const side of [-1, 1]) {
+      dummy.position.set(
+        pt.pos.x + pt.normal.x * side * (roadWidth * 0.5 - 0.72),
+        pt.pos.y + 0.035,
+        pt.pos.z + pt.normal.z * side * (roadWidth * 0.5 - 0.72),
+      );
+      dummy.rotation.set(0, yaw, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      edgeLines.setMatrixAt(edgeIndex++, dummy.matrix);
+
+      dummy.position.set(
+        pt.pos.x + pt.normal.x * side * (roadWidth * 0.5 + 0.42),
+        pt.pos.y + 0.045,
+        pt.pos.z + pt.normal.z * side * (roadWidth * 0.5 + 0.42),
+      );
+      dummy.updateMatrix();
+      rumbles.setMatrixAt(rumbleIndex, dummy.matrix);
+
+      const alt = (i + (side > 0 ? 1 : 0)) % 2 === 0;
+      const color = neonRoad
+        ? new THREE.Color(alt ? 0x22d3ee : 0xa78bfa)
+        : new THREE.Color(alt ? 0xf8fafc : 0xdc2626);
+      rumbles.setColorAt(rumbleIndex, color);
+      rumbleIndex++;
+    }
+  }
+  edgeLines.instanceMatrix.needsUpdate = true;
+  rumbles.instanceMatrix.needsUpdate = true;
+  if (rumbles.instanceColor) rumbles.instanceColor.needsUpdate = true;
+  scene.add(edgeLines, rumbles);
 
   // Low-cost metallic guard rails make the road read as a real circuit instead of a floating ribbon.
   const railCount = profile.quality === 'high' ? 64 : profile.quality === 'balanced' ? 42 : 26;
@@ -631,116 +813,284 @@ function createBuildingFacadeTexture(): THREE.CanvasTexture {
 }
 
 function buildScenery(scene: THREE.Scene, track: RacingTrackConfig, engine: RaceEngine, profile: GraphicsProfile) {
-  const steps = Math.max(24, Math.round(52 * profile.sceneryDensity));
-  const palmTrunkGeo = new THREE.CylinderGeometry(0.45, 0.72, 8, profile.quality === 'lite' ? 6 : 10);
-  const candyDonutGeo = new THREE.TorusGeometry(6, 2.5, 12, 24);
-  const neonColors = [0x38bdf8, 0xa78bfa, 0xf472b6, 0xfbbf24, 0x34d399];
+  // V5.16: scenery uses instancing. The old version created dozens/hundreds of
+  // individual Mesh + Material objects on mount, causing a visible PC hitch before
+  // the countdown. Instancing is both prettier (denser scene) and much cheaper.
+  const steps = Math.max(26, Math.round(50 * profile.sceneryDensity));
+  const dummy = new THREE.Object3D();
 
-  const facade = track.environmentType === 'city_night' ? createBuildingFacadeTexture() : null;
-  const cityMat = facade ? new THREE.MeshStandardMaterial({
-    color: 0x202938,
-    map: facade,
-    emissive: 0xb9ddff,
-    emissiveMap: facade,
-    emissiveIntensity: profile.quality === 'high' ? 0.38 : 0.22,
-    roughness: 0.52,
-    metalness: 0.15,
-  }) : null;
-  const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
-  const poleGeo = new THREE.CylinderGeometry(0.08, 0.11, 5.8, 6);
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.45, metalness: 0.75 });
-  const lampMat = new THREE.MeshBasicMaterial({ color: 0xfff2c2 });
-  const lampGeo = new THREE.SphereGeometry(0.22, 8, 6);
+  const trackSample = (i: number) => {
+    const prog = ((i % steps) + 0.35) / steps;
+    return getInterpolatedTrackPoint(engine.waypoints, prog);
+  };
 
-  // Coast gets a reflective water plane beyond the roadside.
-  if (track.environmentType === 'sunset_coast') {
-    const water = new THREE.Mesh(
-      new THREE.PlaneGeometry(1800, 1800),
-      new THREE.MeshPhysicalMaterial({ color: 0x075985, roughness: 0.2, metalness: 0.1, clearcoat: 0.65, clearcoatRoughness: 0.22 })
-    );
-    water.rotation.x = -Math.PI / 2;
-    water.position.y = -0.32;
-    scene.add(water);
-  }
+  if (track.environmentType === 'city_night') {
+    const facade = createBuildingFacadeTexture();
+    const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+    const cityMat = new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      map: facade,
+      emissive: 0x8ec5ff,
+      emissiveMap: facade,
+      emissiveIntensity: profile.quality === 'high' ? 0.32 : 0.18,
+      roughness: 0.5,
+      metalness: 0.18,
+    });
 
-  for (let i = 0; i < steps; i++) {
-    const prog = i / steps;
-    const pt = getInterpolatedTrackPoint(engine.waypoints, prog);
-    const sides = track.environmentType === 'city_night' && profile.quality === 'high' ? [-1, 1] : [i % 2 === 0 ? 1 : -1];
+    const count = steps * 2;
+    const buildings = new THREE.InstancedMesh(buildingGeo, cityMat, count);
+    buildings.castShadow = profile.shadows;
+    buildings.receiveShadow = profile.shadows;
 
-    for (const side of sides) {
-      const dist = 27 + (i % 4) * 9;
-      const x = pt.pos.x + pt.normal.x * side * dist;
-      const z = pt.pos.z + pt.normal.z * side * dist;
-      const y = pt.pos.y;
+    const roofGeo = new THREE.CylinderGeometry(0.45, 0.55, 1, 6);
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: 0.48, metalness: 0.48 });
+    const roofs = new THREE.InstancedMesh(roofGeo, roofMat, profile.quality === 'high' ? Math.ceil(count / 3) : 0);
+    let roofIndex = 0;
 
-      if (track.environmentType === 'city_night' && cityMat) {
-        const height = 28 + ((i * 17) % 58);
-        const width = 10 + ((i * 7) % 13);
-        const depth = 11 + ((i * 11) % 15);
-        const bldg = new THREE.Mesh(buildingGeo, cityMat);
-        bldg.position.set(x, y + height * 0.5, z);
-        bldg.scale.set(width, height, depth);
-        bldg.castShadow = profile.shadows;
-        bldg.receiveShadow = profile.shadows;
-        scene.add(bldg);
+    let idx = 0;
+    for (let i = 0; i < steps; i++) {
+      const pt = trackSample(i);
+      const yaw = Math.atan2(pt.tangent.x, pt.tangent.z);
+      for (const side of [-1, 1]) {
+        const band = 30 + ((i * 13 + (side > 0 ? 9 : 0)) % 34);
+        const x = pt.pos.x + pt.normal.x * side * band;
+        const z = pt.pos.z + pt.normal.z * side * band;
+        const height = 24 + ((i * 23 + (side > 0 ? 11 : 0)) % 72);
+        const width = 9 + ((i * 7) % 13);
+        const depth = 10 + ((i * 11) % 17);
 
-        // Rooftop silhouette breaks up the primitive box shape on PC High.
-        if (profile.quality === 'high' && i % 3 === 0) {
-          const roof = new THREE.Mesh(new THREE.BoxGeometry(width * 0.35, 2.2, depth * 0.35), new THREE.MeshStandardMaterial({ color: 0x0b1018, roughness: 0.5, metalness: 0.45 }));
-          roof.position.set(x, y + height + 1.1, z);
-          scene.add(roof);
+        dummy.position.set(x, pt.pos.y + height * 0.5, z);
+        dummy.rotation.set(0, yaw + (side > 0 ? Math.PI : 0), 0);
+        dummy.scale.set(width, height, depth);
+        dummy.updateMatrix();
+        buildings.setMatrixAt(idx++, dummy.matrix);
+
+        if (profile.quality === 'high' && i % 3 === 0 && roofIndex < roofs.count) {
+          dummy.position.set(x, pt.pos.y + height + 1.6, z);
+          dummy.rotation.set(0, yaw, 0);
+          dummy.scale.set(width * 0.32, 3.2, depth * 0.32);
+          dummy.updateMatrix();
+          roofs.setMatrixAt(roofIndex++, dummy.matrix);
         }
-
-        // Street lamps near the road visually connect the city to the racing surface.
-        if (i % 2 === 0) {
-          const lampGroup = new THREE.Group();
-          const pole = new THREE.Mesh(poleGeo, poleMat); pole.position.y = 2.9; lampGroup.add(pole);
-          const bulb = new THREE.Mesh(lampGeo, lampMat); bulb.position.y = 5.75; lampGroup.add(bulb);
-          lampGroup.position.set(pt.pos.x + pt.normal.x * side * 13.5, y, pt.pos.z + pt.normal.z * side * 13.5);
-          scene.add(lampGroup);
-        }
-
-        if (pt.isTunnel && i % 2 === 0) {
-          const color = neonColors[i % neonColors.length];
-          const ringGeo = new THREE.TorusGeometry(13.5, 0.18, 8, 32);
-          const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75 });
-          const ring = new THREE.Mesh(ringGeo, ringMat);
-          ring.position.set(pt.pos.x, pt.pos.y + 4, pt.pos.z);
-          ring.lookAt(pt.pos.x + pt.tangent.x, pt.pos.y + pt.tangent.y + 4, pt.pos.z + pt.tangent.z);
-          scene.add(ring);
-        }
-      } else if (track.environmentType === 'sunset_coast') {
-        const palmGroup = new THREE.Group();
-        const trunk = new THREE.Mesh(palmTrunkGeo, new THREE.MeshStandardMaterial({ color: 0x6b3f1f, roughness: 0.95 }));
-        trunk.position.y = 4; palmGroup.add(trunk);
-        const leafMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.75 });
-        for (let leaf = 0; leaf < (profile.quality === 'high' ? 6 : 4); leaf++) {
-          const frond = new THREE.Mesh(new THREE.ConeGeometry(1.6, 5.4, 5), leafMat);
-          frond.position.y = 8.1; frond.rotation.z = Math.PI / 2.7; frond.rotation.y = leaf * (Math.PI * 2 / 6);
-          palmGroup.add(frond);
-        }
-        palmGroup.position.set(x, y, z); scene.add(palmGroup);
-      } else if (track.environmentType === 'mountain') {
-        const mountain = new THREE.Mesh(
-          new THREE.ConeGeometry(18 + (i % 3) * 7, 42 + (i % 4) * 12, profile.quality === 'lite' ? 7 : 12),
-          new THREE.MeshStandardMaterial({ color: i % 2 ? 0x334155 : 0x3f4d3d, roughness: 0.96 })
-        );
-        mountain.position.set(x, y + 16, z);
-        mountain.scale.z = 1.35;
-        mountain.rotation.y = (i * 0.73) % Math.PI;
-        scene.add(mountain);
-      } else if (track.environmentType === 'candy') {
-        const donut = new THREE.Mesh(candyDonutGeo, new THREE.MeshStandardMaterial({ color: neonColors[i % neonColors.length], roughness: 0.34, clearcoat: 0.35 }));
-        donut.position.set(x, y + 8, z); donut.rotation.x = Math.PI * 0.5; scene.add(donut);
-      } else if (track.environmentType === 'sky_clouds') {
-        const cloud = new THREE.Mesh(new THREE.SphereGeometry(8, 12, 12), new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.95 }));
-        cloud.position.set(x, y - 2, z); cloud.scale.set(2.5, 0.8, 1.8); scene.add(cloud);
-      } else if (track.environmentType === 'cosmic_space') {
-        const asteroid = new THREE.Mesh(new THREE.DodecahedronGeometry(6 + (i % 4) * 3), new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.86 }));
-        asteroid.position.set(x, y + 15 + (i % 3) * 10, z); scene.add(asteroid);
       }
     }
+    buildings.instanceMatrix.needsUpdate = true;
+    scene.add(buildings);
+    if (roofs.count > 0) {
+      roofs.instanceMatrix.needsUpdate = true;
+      scene.add(roofs);
+    }
+
+    // Street lights: two instanced draw calls instead of a Group per lamp.
+    const lampCount = Math.ceil(steps / 2) * 2;
+    const poleGeo = new THREE.CylinderGeometry(0.07, 0.10, 5.4, 6);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4, metalness: 0.78 });
+    const poles = new THREE.InstancedMesh(poleGeo, poleMat, lampCount);
+    const bulbGeo = new THREE.SphereGeometry(0.23, 8, 6);
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfff1b8 });
+    const bulbs = new THREE.InstancedMesh(bulbGeo, bulbMat, lampCount);
+
+    let li = 0;
+    for (let i = 0; i < steps; i += 2) {
+      const pt = trackSample(i);
+      for (const side of [-1, 1]) {
+        const lx = pt.pos.x + pt.normal.x * side * 14.5;
+        const lz = pt.pos.z + pt.normal.z * side * 14.5;
+
+        dummy.position.set(lx, pt.pos.y + 2.7, lz);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        poles.setMatrixAt(li, dummy.matrix);
+
+        dummy.position.set(lx, pt.pos.y + 5.35, lz);
+        dummy.updateMatrix();
+        bulbs.setMatrixAt(li, dummy.matrix);
+        li++;
+      }
+    }
+    poles.instanceMatrix.needsUpdate = true;
+    bulbs.instanceMatrix.needsUpdate = true;
+    scene.add(poles, bulbs);
+
+    // Sparse neon tunnel arches use one instanced torus material.
+    const tunnelSamples = [];
+    for (let i = 0; i < steps; i++) {
+      const pt = trackSample(i);
+      if (pt.isTunnel && i % 2 === 0) tunnelSamples.push(pt);
+    }
+    if (tunnelSamples.length) {
+      const ringGeo = new THREE.TorusGeometry(13.4, 0.16, 8, 28);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.72 });
+      const rings = new THREE.InstancedMesh(ringGeo, ringMat, tunnelSamples.length);
+      tunnelSamples.forEach((pt, i) => {
+        dummy.position.set(pt.pos.x, pt.pos.y + 4.0, pt.pos.z);
+        dummy.rotation.set(Math.PI / 2, Math.atan2(pt.tangent.x, pt.tangent.z), 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        rings.setMatrixAt(i, dummy.matrix);
+      });
+      rings.instanceMatrix.needsUpdate = true;
+      scene.add(rings);
+    }
+    return;
+  }
+
+  if (track.environmentType === 'sunset_coast') {
+    const water = new THREE.Mesh(
+      new THREE.PlaneGeometry(1800, 1800, 1, 1),
+      new THREE.MeshPhysicalMaterial({
+        color: 0x075985,
+        roughness: 0.22,
+        metalness: 0.08,
+        clearcoat: 0.7,
+        clearcoatRoughness: 0.22,
+      }),
+    );
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -0.45;
+    scene.add(water);
+
+    const trunkGeo = new THREE.CylinderGeometry(0.36, 0.56, 7.2, profile.quality === 'lite' ? 6 : 8);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b3f1f, roughness: 0.92 });
+    const crownGeo = new THREE.ConeGeometry(3.4, 2.0, profile.quality === 'high' ? 10 : 7);
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.72 });
+
+    const palms = new THREE.InstancedMesh(trunkGeo, trunkMat, steps);
+    const crowns = new THREE.InstancedMesh(crownGeo, crownMat, steps);
+    for (let i = 0; i < steps; i++) {
+      const pt = trackSample(i);
+      const side = i % 3 === 0 ? -1 : 1;
+      const dist = 27 + (i % 4) * 6;
+      const x = pt.pos.x + pt.normal.x * side * dist;
+      const z = pt.pos.z + pt.normal.z * side * dist;
+      const scale = 0.85 + (i % 5) * 0.06;
+
+      dummy.position.set(x, pt.pos.y + 3.6 * scale, z);
+      dummy.rotation.set(0, (i * 0.73) % Math.PI, 0);
+      dummy.scale.set(scale, scale, scale);
+      dummy.updateMatrix();
+      palms.setMatrixAt(i, dummy.matrix);
+
+      dummy.position.set(x, pt.pos.y + 7.45 * scale, z);
+      dummy.rotation.set(0, (i * 1.17) % Math.PI, Math.PI);
+      dummy.scale.set(scale * 1.15, scale * 0.75, scale * 1.15);
+      dummy.updateMatrix();
+      crowns.setMatrixAt(i, dummy.matrix);
+    }
+    palms.instanceMatrix.needsUpdate = true;
+    crowns.instanceMatrix.needsUpdate = true;
+    scene.add(palms, crowns);
+    return;
+  }
+
+  if (track.environmentType === 'mountain') {
+    const mountainGeo = new THREE.ConeGeometry(1, 1, profile.quality === 'lite' ? 7 : 10);
+    const mountainMat = new THREE.MeshStandardMaterial({ color: 0x35433a, roughness: 0.96 });
+    const mountains = new THREE.InstancedMesh(mountainGeo, mountainMat, steps);
+    const pineGeo = new THREE.ConeGeometry(1, 4, 7);
+    const pineMat = new THREE.MeshStandardMaterial({ color: 0x163b2a, roughness: 0.95 });
+    const pines = new THREE.InstancedMesh(pineGeo, pineMat, steps);
+
+    for (let i = 0; i < steps; i++) {
+      const pt = trackSample(i);
+      const side = i % 2 === 0 ? 1 : -1;
+      const dist = 48 + (i % 5) * 13;
+      const x = pt.pos.x + pt.normal.x * side * dist;
+      const z = pt.pos.z + pt.normal.z * side * dist;
+      const radius = 18 + (i % 4) * 7;
+      const height = 34 + (i % 5) * 9;
+
+      dummy.position.set(x, pt.pos.y + height * 0.42, z);
+      dummy.rotation.set(0, (i * 0.61) % Math.PI, 0);
+      dummy.scale.set(radius, height, radius * 1.25);
+      dummy.updateMatrix();
+      mountains.setMatrixAt(i, dummy.matrix);
+
+      const nearX = pt.pos.x + pt.normal.x * side * (19 + (i % 3) * 3);
+      const nearZ = pt.pos.z + pt.normal.z * side * (19 + (i % 3) * 3);
+      dummy.position.set(nearX, pt.pos.y + 2.1, nearZ);
+      dummy.rotation.set(0, i * 0.4, 0);
+      dummy.scale.set(1.4, 1.4, 1.4);
+      dummy.updateMatrix();
+      pines.setMatrixAt(i, dummy.matrix);
+    }
+    mountains.instanceMatrix.needsUpdate = true;
+    pines.instanceMatrix.needsUpdate = true;
+    scene.add(mountains, pines);
+    return;
+  }
+
+  if (track.environmentType === 'candy') {
+    const donutGeo = new THREE.TorusGeometry(5.5, 2.1, 10, 20);
+    const donutMat = new THREE.MeshPhysicalMaterial({ color: 0xf472b6, roughness: 0.3, clearcoat: 0.45 });
+    const donuts = new THREE.InstancedMesh(donutGeo, donutMat, steps);
+    for (let i = 0; i < steps; i++) {
+      const pt = trackSample(i);
+      const side = i % 2 === 0 ? 1 : -1;
+      dummy.position.set(
+        pt.pos.x + pt.normal.x * side * (28 + (i % 4) * 8),
+        pt.pos.y + 7.0,
+        pt.pos.z + pt.normal.z * side * (28 + (i % 4) * 8),
+      );
+      dummy.rotation.set(Math.PI / 2, i * 0.55, 0);
+      const sc = 0.7 + (i % 4) * 0.1;
+      dummy.scale.set(sc, sc, sc);
+      dummy.updateMatrix();
+      donuts.setMatrixAt(i, dummy.matrix);
+      donuts.setColorAt(i, new THREE.Color([0xf472b6, 0x38bdf8, 0xfacc15, 0xa78bfa][i % 4]));
+    }
+    donuts.instanceMatrix.needsUpdate = true;
+    if (donuts.instanceColor) donuts.instanceColor.needsUpdate = true;
+    scene.add(donuts);
+    return;
+  }
+
+  if (track.environmentType === 'sky_clouds') {
+    const cloudGeo = new THREE.SphereGeometry(1, profile.quality === 'high' ? 14 : 10, profile.quality === 'high' ? 10 : 8);
+    const cloudMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.96 });
+    const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, steps * 2);
+    let ci = 0;
+    for (let i = 0; i < steps; i++) {
+      const pt = trackSample(i);
+      for (const side of [-1, 1]) {
+        const dist = 30 + ((i * 7) % 42);
+        dummy.position.set(
+          pt.pos.x + pt.normal.x * side * dist,
+          pt.pos.y - 6 - (i % 3) * 2,
+          pt.pos.z + pt.normal.z * side * dist,
+        );
+        dummy.rotation.set(0, i * 0.31, 0);
+        dummy.scale.set(10 + (i % 4) * 3, 3.2 + (i % 3), 7 + (i % 4) * 2);
+        dummy.updateMatrix();
+        clouds.setMatrixAt(ci++, dummy.matrix);
+      }
+    }
+    clouds.instanceMatrix.needsUpdate = true;
+    scene.add(clouds);
+    return;
+  }
+
+  if (track.environmentType === 'cosmic_space') {
+    const asteroidGeo = new THREE.DodecahedronGeometry(1, 0);
+    const asteroidMat = new THREE.MeshStandardMaterial({ color: 0x596579, roughness: 0.86, metalness: 0.12 });
+    const asteroids = new THREE.InstancedMesh(asteroidGeo, asteroidMat, steps);
+    for (let i = 0; i < steps; i++) {
+      const pt = trackSample(i);
+      const side = i % 2 === 0 ? 1 : -1;
+      const r = 4 + (i % 5) * 1.8;
+      dummy.position.set(
+        pt.pos.x + pt.normal.x * side * (36 + (i % 5) * 12),
+        pt.pos.y + 10 + (i % 4) * 8,
+        pt.pos.z + pt.normal.z * side * (36 + (i % 5) * 12),
+      );
+      dummy.rotation.set(i * 0.3, i * 0.6, i * 0.17);
+      dummy.scale.set(r, r * 0.8, r * 1.1);
+      dummy.updateMatrix();
+      asteroids.setMatrixAt(i, dummy.matrix);
+    }
+    asteroids.instanceMatrix.needsUpdate = true;
+    scene.add(asteroids);
   }
 }
 

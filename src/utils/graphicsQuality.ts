@@ -61,17 +61,19 @@ function tvProfile(label = '📺 TV / Mi Box') : GraphicsProfile {
 
 function desktopBalancedProfile(label = '⚙️ PC cân bằng') : GraphicsProfile {
   return {
-    quality: 'balanced', deviceClass: 'desktop', pixelRatioCap: 1.45, pixelRatioFloor: 0.90,
-    shadows: true, shadowMapSize: 1024, sceneryDensity: 0.92, textureSize: 512,
-    carDetail: 'high', aiCarDetail: 'lite', targetFps: 55, label,
+    quality: 'balanced', deviceClass: 'desktop', pixelRatioCap: 1.38, pixelRatioFloor: 0.90,
+    shadows: true, shadowMapSize: 1024, sceneryDensity: 0.90, textureSize: 512,
+    carDetail: 'high', aiCarDetail: 'lite', targetFps: 58, label,
   };
 }
 
 function desktopHighProfile(label = '🖥️ PC đẹp') : GraphicsProfile {
   return {
-    quality: 'high', deviceClass: 'desktop', pixelRatioCap: 1.75, pixelRatioFloor: 0.95,
-    shadows: true, shadowMapSize: 2048, sceneryDensity: 1.28, textureSize: 1024,
-    carDetail: 'ultra', aiCarDetail: 'high', targetFps: 58, label,
+    // 1.60 DPR + 1536 shadow map looks almost identical in motion to the old
+    // 1.75/2048 preset but avoids a large first-frame GPU allocation spike.
+    quality: 'high', deviceClass: 'desktop', pixelRatioCap: 1.60, pixelRatioFloor: 0.95,
+    shadows: true, shadowMapSize: 1536, sceneryDensity: 1.10, textureSize: 1024,
+    carDetail: 'ultra', aiCarDetail: 'high', targetFps: 60, label,
   };
 }
 

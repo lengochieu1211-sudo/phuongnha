@@ -36,8 +36,8 @@ export default function CameraStatus({
   const statusConfig = {
     ok: { label: 'Đã nhận diện 🟢', color: 'bg-emerald-500 text-white border-emerald-400', desc: 'Bé đứng rất đẹp rồi!' },
     far: { label: 'Đứng gần hơn một chút 🟡', color: 'bg-amber-500 text-white border-amber-400', desc: 'Xích lại gần camera một xíu nhé.' },
-    near: { label: 'Đứng xa hơn một chút 🟡', color: 'bg-amber-600 text-white border-amber-500', desc: 'Lùi lại một chút để camera thấy hết người bé nha.' },
-    no_body: { label: 'Không thấy toàn thân 🔴', color: 'bg-rose-500 text-white border-rose-400', desc: 'Hãy đứng lùi ra xa, đảm bảo camera thấy cả tay và chân bé nhé!' },
+    near: { label: 'Đứng xa hơn một chút 🟡', color: 'bg-amber-600 text-white border-amber-500', desc: 'Chỉ cần lùi nếu đầu hoặc hai tay đang bị cắt khỏi khung.' },
+    no_body: { label: 'Chưa thấy người rõ 🔴', color: 'bg-rose-500 text-white border-rose-400', desc: 'Hãy để camera thấy rõ đầu, vai và ít nhất một tay. Nhiều game chỉ cần nửa người trên.' },
   };
 
   const gestureVN: { [key in GameGesture]: string } = {
@@ -103,7 +103,7 @@ export default function CameraStatus({
         <div id="camera-help-box" className="bg-pink-50 p-3.5 rounded-2xl text-xs text-pink-800 leading-relaxed border border-pink-100">
           <p className="font-semibold mb-1">💡 Làm sao để chơi tốt nhất?</p>
           <ol className="list-decimal pl-4 space-y-1">
-            <li>Đứng cách xa camera tầm 1.5 - 2.5 mét.</li>
+            <li>Không có khoảng cách cố định: ưu tiên để camera thấy rõ đầu, vai và hai tay; toàn thân chỉ cần cho chế độ tương ứng.</li>
             <li>Đảm bảo phòng đủ sáng, không đứng ngược sáng lớn.</li>
             <li>Đứng một mình trong khung hình để máy nhận diện đúng nhất.</li>
             <li>Nếu camera quá chậm hoặc không có camera, bé hãy chọn chế độ <b>"Giả lập bằng Bàn Phím"</b> bên dưới để chơi cực vui bằng phím nha!</li>

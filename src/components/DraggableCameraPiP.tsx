@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { GameGesture } from '../types';
 import { useCameraPose } from '../providers/CameraPoseContext';
+import { drawImageContain } from '../utils/cameraFrame';
 
 interface DraggableCameraPiPProps {
   visible: boolean;
@@ -32,6 +33,7 @@ export default function DraggableCameraPiP({
     gesture,
     poseStatus,
     bodyDetected,
+    fullBodyDetected,
     leftWrist,
     rightWrist,
     poseFps,
@@ -63,13 +65,12 @@ export default function DraggableCameraPiP({
       if (visible && isStreaming && !isMinimized && pipCanvasRef.current && canvasElement) {
         const destCtx = pipCanvasRef.current.getContext('2d');
         if (destCtx && canvasElement.width > 0 && canvasElement.height > 0) {
-          destCtx.clearRect(0, 0, pipCanvasRef.current.width, pipCanvasRef.current.height);
-          destCtx.drawImage(
+          drawImageContain(
+            destCtx,
             canvasElement,
-            0,
-            0,
             pipCanvasRef.current.width,
-            pipCanvasRef.current.height
+            pipCanvasRef.current.height,
+            false,
           );
         }
       }
@@ -81,6 +82,15 @@ export default function DraggableCameraPiP({
   }, [visible, isStreaming, isMinimized, canvasElement]);
 
   // Gesture translation for child
+  const upperBodyReady = bodyDetected && leftWrist.visible && rightWrist.visible;
+  const framingLabel = fullBodyDetected
+    ? 'TOÀN THÂN'
+    : upperBodyReady
+    ? 'NỬA NGƯỜI + 2 TAY'
+    : leftWrist.visible || rightWrist.visible
+    ? 'ĐANG TÌM 2 TAY'
+    : 'CHƯA SẴN SÀNG';
+
   const gestureLabel: { [key in GameGesture]?: string } = {
     standing: '🧍 ĐỨNG CHUẨN',
     left_arm_up: '✋ TAY TRÁI ↑',
@@ -265,7 +275,7 @@ export default function DraggableCameraPiP({
               ref={pipCanvasRef}
               width={320}
               height={240}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain bg-black"
             />
 
             {/* Gesture Badge */}
@@ -275,7 +285,7 @@ export default function DraggableCameraPiP({
 
             {/* Real Accurate Status Badge */}
             <div className={`absolute top-1.5 right-1.5 backdrop-blur-xs text-[8px] font-black px-1.5 py-0.5 rounded-md shadow-sm ${statusBadgeColor}`}>
-              {leftWrist.visible && rightWrist.visible ? '2 TAY' : leftWrist.visible ? '1 TAY' : rightWrist.visible ? '1 TAY' : '0 TAY'}
+              {framingLabel}
             </div>
 
             {/* Distance / Placement Feedback */}
@@ -284,7 +294,7 @@ export default function DraggableCameraPiP({
                 {trackingFeedback === 'too_far' && '🟡 TIẾN LẠI GẦN HƠN'}
                 {trackingFeedback === 'too_near' && '🟡 LÙI RA XA MỘT CHÚT'}
                 {trackingFeedback === 'no_body' && '🔴 CHƯA THẤY BÉ'}
-                {trackingFeedback === 'no_legs' && '🟡 LÙI THÊM ĐỂ THẤY CHÂN'}
+                {trackingFeedback === 'no_legs' && (upperBodyReady ? '🟢 NỬA NGƯỜI + 2 TAY — ĐỦ CHƠI' : '🟡 ĐƯA CẢ HAI TAY VÀO KHUNG')}
                 {trackingFeedback === 'not_centered' && '🟡 ĐỨNG VÀO GIỮA MÀN HÌNH'}
               </div>
             )}

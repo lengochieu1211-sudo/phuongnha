@@ -394,15 +394,39 @@ export class PoseDetectorManager {
 
     const canvas = this.canvasElement;
     const ctx = this.canvasCtx;
+
+    // V5.14: synchronize the master canvas to the REAL camera frame aspect.
+    // Never draw a portrait/4:3 source into a mismatched fixed canvas because that
+    // visually stretches the body and makes overlays look offset from landmarks.
+    if (canvas && results.image) {
+      const src: any = results.image;
+      const sourceW = Math.max(1, Number(src.videoWidth) || Number(src.width) || 640);
+      const sourceH = Math.max(1, Number(src.videoHeight) || Number(src.height) || 480);
+      const sourceAspect = sourceW / sourceH;
+      const canvasAspect = canvas.width / Math.max(1, canvas.height);
+
+      if (Math.abs(sourceAspect - canvasAspect) > 0.01) {
+        const maxSide = 720;
+        if (sourceW >= sourceH) {
+          canvas.width = maxSide;
+          canvas.height = Math.max(1, Math.round(maxSide / sourceAspect));
+        } else {
+          canvas.height = maxSide;
+          canvas.width = Math.max(1, Math.round(maxSide * sourceAspect));
+        }
+      }
+    }
+
     const width = canvas ? canvas.width : 640;
     const height = canvas ? canvas.height : 480;
 
     if (ctx && canvas) {
       ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
-      // Render camera image mirrored on canvas. Always restore the context even if
-      // MediaPipe returns a frame without an image to avoid leaking save() states.
+      // Source and master canvas now have the same aspect ratio: mirrored 1:1 fit,
+      // no crop and no geometric stretching.
       if (results.image) {
         ctx.translate(width, 0);
         ctx.scale(-1, 1);
@@ -552,9 +576,10 @@ export class PoseDetectorManager {
         trackingFeedback = 'too_near';
       } else if (shoulderWidth < 0.1) {
         trackingFeedback = 'too_far';
-      } else if (!lowerBodyVisible) {
-        trackingFeedback = 'no_legs';
       } else {
+        // V5.14: missing feet is NOT a camera error. Most games work from the
+        // upper body + hands. `fullBodyDetected` remains available separately
+        // for features that can use legs (e.g. full-body fashion fitting).
         const midX = ((leftShoulder?.x || 0.5) + (rightShoulder?.x || 0.5)) / 2;
         if (midX < 0.15 || midX > 0.85) {
           trackingFeedback = 'not_centered';
@@ -564,17 +589,23 @@ export class PoseDetectorManager {
       }
     }
 
-    // Baseline adaptation for jump/duck
-    if (leftShoulder && rightShoulder && leftHip && rightHip) {
+    // Baseline adaptation for jump/duck.
+    // V5.14: shoulder baseline works even when hips/legs are outside the phone FOV.
+    // Hip baseline is used as an extra signal whenever hips are available.
+    if (leftShoulder && rightShoulder) {
       const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-      const avgHipY = (leftHip.y + rightHip.y) / 2;
+      const hipsAvailable = Boolean(leftHip && rightHip);
+      const avgHipY = hipsAvailable
+        ? ((leftHip!.y + rightHip!.y) / 2)
+        : this.baselineHipY;
+
       if (!this.baselineInitialized) {
         this.baselineShoulderY = avgShoulderY;
-        this.baselineHipY = avgHipY;
+        if (hipsAvailable) this.baselineHipY = avgHipY;
         this.baselineInitialized = true;
-      } else {
-        if (this.currentSmoothedGesture === 'standing') {
-          this.baselineShoulderY += (avgShoulderY - this.baselineShoulderY) * 0.02;
+      } else if (this.currentSmoothedGesture === 'standing') {
+        this.baselineShoulderY += (avgShoulderY - this.baselineShoulderY) * 0.02;
+        if (hipsAvailable) {
           this.baselineHipY += (avgHipY - this.baselineHipY) * 0.02;
         }
       }
