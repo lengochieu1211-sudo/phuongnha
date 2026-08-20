@@ -10,6 +10,7 @@ import {
   CarConfig,
   CameraViewMode,
   CarCustomization,
+  CarModelId,
   RaceSettings,
 } from '../../types';
 import { RaceEngine } from '../../lib/racing/RaceEngine';
@@ -192,9 +193,18 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     );
     if (car.id === 'rescue_truck_hauler_3d') {
       contactShadow.scale.set(1.8, 4.8, 1);
+    } else if (car.id === 'dodge_wc51_3d') {
+      contactShadow.scale.set(1.25, 2.7, 1);
+    } else if (car.id === 'tank_racer_3d') {
+      contactShadow.scale.set(1.7, 3.2, 1);
+    } else if (car.id === 'helicopter_racer_3d') {
+      contactShadow.scale.set(1.6, 2.8, 1);
+      (contactShadow.material as THREE.MeshBasicMaterial).opacity = 0.14;
+    } else if (isCharacterRacerModel(car.id)) {
+      contactShadow.scale.set(0.48, 0.62, 1);
     } else if (car.id === 'xedap_city_3d') {
       contactShadow.scale.set(0.34, 0.92, 1);
-    } else if (car.id === 'vespa_studio_3d') {
+    } else if (car.id === 'vespa_studio_3d' || car.id === 'police_motorcycle_3d') {
       contactShadow.scale.set(0.5, 1.24, 1);
     } else {
       contactShadow.scale.set(car.category === 'motorcycle' ? 0.42 : 1.15, car.category === 'motorcycle' ? 1.12 : 2.25, 1);
@@ -205,9 +215,10 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
     // 6. Build AI 3D Cars
     const aiCars: { id: string; instance: Car3DInstance }[] = [];
+    const externalAiHandles: ExternalCarHandle[] = [];
     engine.physics.aiRacers.forEach((ai) => {
       const localP2Custom = ai.isLocalPlayer && secondCustomization ? secondCustomization : null;
-      const aiInstance = buildCar3D(ai.carModelId as any, localP2Custom || {
+      const aiCustomization: CarCustomization = localP2Custom || {
         paintColor: ai.color,
         paintFinish: 'metallic',
         wheelStyle: 'sport',
@@ -217,8 +228,26 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         neonUnderglow: ai.isLocalPlayer ? 'pink' : 'cyan',
         windowTint: 'smoke',
         decal: 'none',
-      }, ai.isLocalPlayer ? profile.carDetail : profile.aiCarDetail);
+      };
+      const aiInstance = buildCar3D(ai.carModelId as any, aiCustomization, ai.isLocalPlayer ? profile.carDetail : profile.aiCarDetail);
       scene.add(aiInstance.root);
+
+      // V5.40: P2 may also use a real FBX on desktop. Regular AI stays procedural
+      // so one race never parses a fleet of heavy external models.
+      if (
+        ai.isLocalPlayer &&
+        isExternalCar(ai.carModelId as CarModelId) &&
+        shouldUseExternalCar(ai.carModelId as CarModelId, actualDeviceClass) &&
+        actualDeviceClass === 'desktop'
+      ) {
+        void attachExternalCarModel(aiInstance, ai.carModelId as CarModelId, aiCustomization, profile.carDetail)
+          .then((handle) => {
+            if (!handle) return;
+            if (externalLoadCancelled) handle.dispose();
+            else externalAiHandles.push(handle);
+          })
+          .catch((err) => console.warn('P2 external FBX failed; keeping procedural fallback.', err));
+      }
       const aiSpawnPt = getInterpolatedTrackPoint(engine.waypoints, ai.progress % 1.0);
       const aiSpawnConfig = CAR_CATALOG.find((cfg) => cfg.id === ai.carModelId);
       const aiSpawnX = aiSpawnPt.pos.x + aiSpawnPt.normal.x * ai.lateralOffset;
@@ -688,6 +717,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       fbxSceneryCancelled = true;
       fbxSceneryHandle?.dispose();
       externalPlayerHandle?.dispose();
+      externalAiHandles.forEach((handle) => handle.dispose());
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
       resizeObserver.disconnect();
       scene.traverse((obj: any) => {
@@ -752,15 +782,28 @@ function getRoadSurfaceY(
   return baseY + Math.abs(lateral) * bank * 0.2;
 }
 
+function isCharacterRacerModel(modelId: string): boolean {
+  return [
+    'spider_racer_3d', 'robot19_racer_3d', 'robot4_racer_3d', 'prime1_racer_3d',
+    'ironman_mark3_racer_3d', 'zora_nao_racer_3d', 'mark6_racer_3d',
+    'hulk_racer_3d', 'captain_racer_3d', 'knut_racer_3d', 'us_soldier_racer_3d', 'human_racer_3d', 'drag_driver_racer_3d',
+  ].includes(modelId);
+}
+
 function getRaceVehicleGroundLift(modelId: string, category?: string): number {
   // Keep the vehicle slightly above the mathematical road ribbon. This prevents
   // imported FBX/procedural wheels from being depth-hidden by the road when a
   // scene/map changes elevation or when the source pivot sits a few cm low.
   if (modelId === 'rescue_truck_hauler_3d') return 0.16;
+  if (modelId === 'dodge_wc51_3d') return 0.15;
+  if (modelId === 'tank_racer_3d') return 0.14;
+  if (modelId === 'helicopter_racer_3d') return 0.04;
+  if (modelId === 'ambulance_3d' || modelId === 'police_car_3d') return 0.10;
   if (modelId === 'xedap_city_3d') return 0.09;
-  if (modelId === 'roadster_883_3d') return 0.10;
+  if (modelId === 'roadster_883_3d' || modelId === 'police_motorcycle_3d') return 0.10;
   if (modelId === 'vespa_studio_3d') return 0.12;
   if (modelId === 'capybara_parade_3d') return 0.12;
+  if (isCharacterRacerModel(modelId)) return 0.03;
   if (category === 'motorcycle') return 0.10;
   return 0.08;
 }
@@ -786,24 +829,73 @@ function updateCameraPosition(
     canis_mesa_3d: 5.15,
     roadster_883_3d: 2.75,
     vespa_studio_3d: 2.85,
+    police_motorcycle_3d: 2.8,
+    police_car_3d: 4.8,
+    ambulance_3d: 5.7,
+    tank_racer_3d: 7.1,
+    helicopter_racer_3d: 6.8,
+    dodge_wc51_3d: 6.4,
     s14_sport_3d: 5.05,
     rescue_truck_hauler_3d: 10.8,
     xedap_city_3d: 2.45,
+    spider_racer_3d: 3.8,
+    robot19_racer_3d: 3.8,
+    robot4_racer_3d: 4.0,
+    prime1_racer_3d: 4.2,
+    ironman_mark3_racer_3d: 3.9,
+    zora_nao_racer_3d: 3.6,
+    mark6_racer_3d: 3.9,
+    hulk_racer_3d: 4.1,
+    captain_racer_3d: 3.9,
+    knut_racer_3d: 3.5,
   };
   const chaseDistanceByModel: Record<string, number> = {
     v12_sv_3d: 6.65,
     canis_mesa_3d: 6.15,
     roadster_883_3d: 3.65,
     vespa_studio_3d: 3.7,
+    police_motorcycle_3d: 3.7,
+    police_car_3d: 5.8,
+    ambulance_3d: 6.8,
+    tank_racer_3d: 8.4,
+    helicopter_racer_3d: 8.2,
+    dodge_wc51_3d: 7.5,
     s14_sport_3d: 6.05,
     rescue_truck_hauler_3d: 12.6,
     xedap_city_3d: 3.25,
+    spider_racer_3d: 4.7,
+    robot19_racer_3d: 4.7,
+    robot4_racer_3d: 4.9,
+    prime1_racer_3d: 5.1,
+    ironman_mark3_racer_3d: 4.8,
+    zora_nao_racer_3d: 4.5,
+    mark6_racer_3d: 4.8,
+    hulk_racer_3d: 5.0,
+    captain_racer_3d: 4.8,
+    knut_racer_3d: 4.4,
   };
   const closeDistance = closeDistanceByModel[carId] ?? (isMotorcycle ? 2.75 : 4.15);
   const chaseDistance = chaseDistanceByModel[carId] ?? (isMotorcycle ? 3.65 : 5.35);
-  const cameraHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.15, xedap_city_3d: 1.20, vespa_studio_3d: 1.26 };
-  const chaseHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.85, xedap_city_3d: 1.62, vespa_studio_3d: 1.72 };
-  const lookHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 1.75, xedap_city_3d: 0.62, vespa_studio_3d: 0.84 };
+  const cameraHeightByModel: Record<string, number> = {
+    rescue_truck_hauler_3d: 3.15, dodge_wc51_3d: 2.15, tank_racer_3d: 2.35,
+    helicopter_racer_3d: 3.3, ambulance_3d: 2.0, police_car_3d: 1.7,
+    police_motorcycle_3d: 1.28, xedap_city_3d: 1.20, vespa_studio_3d: 1.26,
+  };
+  const chaseHeightByModel: Record<string, number> = {
+    rescue_truck_hauler_3d: 3.85, dodge_wc51_3d: 2.7, tank_racer_3d: 3.0,
+    helicopter_racer_3d: 4.15, ambulance_3d: 2.55, police_car_3d: 2.25,
+    police_motorcycle_3d: 1.76, xedap_city_3d: 1.62, vespa_studio_3d: 1.72,
+  };
+  const lookHeightByModel: Record<string, number> = {
+    rescue_truck_hauler_3d: 1.75, dodge_wc51_3d: 1.1, tank_racer_3d: 1.0,
+    helicopter_racer_3d: 2.3, ambulance_3d: 1.0, police_car_3d: 0.8,
+    police_motorcycle_3d: 0.75, xedap_city_3d: 0.62, vespa_studio_3d: 0.84,
+  };
+  if (isCharacterRacerModel(carId)) {
+    cameraHeightByModel[carId] = 1.65;
+    chaseHeightByModel[carId] = 2.05;
+    lookHeightByModel[carId] = 1.05;
+  }
   const cameraHeight = cameraHeightByModel[carId] ?? (isMotorcycle ? 1.32 : 1.72);
   const chaseHeight = chaseHeightByModel[carId] ?? (isMotorcycle ? 1.78 : 2.28);
   const lookHeight = lookHeightByModel[carId] ?? (isMotorcycle ? 0.72 : 0.92);
@@ -842,8 +934,18 @@ function updateCameraPosition(
     case 'hood': {
       // Imported FBXs do not share a reliable bonnet/interior origin. The old fixed
       // y=1.0 camera could sit inside an opaque shell and produce a completely black view.
-      const forward = carId === 'rescue_truck_hauler_3d' ? 2.4 : isMotorcycle ? 0.34 : 1.72;
-      const height = carId === 'rescue_truck_hauler_3d' ? 3.05 : isMotorcycle ? 1.28 : 1.52;
+      const hoodForwardByModel: Record<string, number> = {
+        rescue_truck_hauler_3d: 2.4, dodge_wc51_3d: 1.8, tank_racer_3d: 1.7,
+        helicopter_racer_3d: 1.4, ambulance_3d: 1.7, police_car_3d: 1.55,
+        police_motorcycle_3d: 0.34,
+      };
+      const hoodHeightByModel: Record<string, number> = {
+        rescue_truck_hauler_3d: 3.05, dodge_wc51_3d: 1.75, tank_racer_3d: 1.7,
+        helicopter_racer_3d: 2.65, ambulance_3d: 1.65, police_car_3d: 1.48,
+        police_motorcycle_3d: 1.28,
+      };
+      const forward = isCharacterRacerModel(carId) ? 0.85 : (hoodForwardByModel[carId] ?? (isMotorcycle ? 0.34 : 1.72));
+      const height = isCharacterRacerModel(carId) ? 1.62 : (hoodHeightByModel[carId] ?? (isMotorcycle ? 1.28 : 1.52));
       const camX = px + tangent.x * forward;
       const camY = py + height;
       const camZ = pz + tangent.z * forward;
@@ -853,8 +955,13 @@ function updateCameraPosition(
     }
     case 'cockpit': {
       // Use a safe driver/roof viewpoint rather than assuming the FBX contains a hollow cockpit.
-      const back = isMotorcycle ? 0.08 : 0.30;
-      const height = carId === 'rescue_truck_hauler_3d' ? 3.22 : isMotorcycle ? 1.34 : 1.58;
+      const cockpitHeightByModel: Record<string, number> = {
+        rescue_truck_hauler_3d: 3.22, dodge_wc51_3d: 1.92, tank_racer_3d: 1.86,
+        helicopter_racer_3d: 2.8, ambulance_3d: 1.8, police_car_3d: 1.58,
+        police_motorcycle_3d: 1.34,
+      };
+      const back = isCharacterRacerModel(carId) ? -0.7 : (isMotorcycle ? 0.08 : 0.30);
+      const height = isCharacterRacerModel(carId) ? 1.72 : (cockpitHeightByModel[carId] ?? (isMotorcycle ? 1.34 : 1.58));
       const camX = px - tangent.x * back;
       const camY = py + height;
       const camZ = pz - tangent.z * back;

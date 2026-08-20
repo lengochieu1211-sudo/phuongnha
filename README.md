@@ -113,3 +113,9 @@ Race scenery can now layer small real FBX props over the existing procedural wor
 
 ## V5.39 – Full regression + mobile Garage + Vespa restore
 - Restored high-precision Vespa FBX, fixed phone fallback camera, moved phone car selector outside the 3D viewport, and excluded heavy source-only scenery from the GitHub ZIP.
+
+
+## V5.40 – FBX Garage/Race expansion
+- Adds police car/motorcycle, ambulance, tank, helicopter, Dodge WC-51, Spider, robots and character FBXs as selectable Garage/Race entries.
+- Fixes Capybara race direction by 180° and adds robust height-based framing for character racers.
+- Device-aware loading keeps the heaviest FBXs desktop-only.

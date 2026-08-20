@@ -276,10 +276,38 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
       // Move only when the new model is committed, not while it is loading.
       // On phone/TV some heavy FBXs use a procedural CAR fallback. Never apply a tiny
       // motorcycle/FBX camera preset to that fallback or the camera can end up inside it.
-      const usingRealExternal = isExternalCar(currentCar.id) && shouldUseExternalCar(currentCar.id, actualDeviceClass);
+      const usingRealExternal = !!stagedExternalHandle;
+      const characterRacer = [
+        'spider_racer_3d', 'robot19_racer_3d', 'robot4_racer_3d', 'prime1_racer_3d',
+        'ironman_mark3_racer_3d', 'zora_nao_racer_3d', 'mark6_racer_3d',
+        'hulk_racer_3d', 'captain_racer_3d', 'knut_racer_3d', 'us_soldier_racer_3d', 'human_racer_3d', 'drag_driver_racer_3d',
+      ].includes(currentCar.id);
+
       if (isExternalCar(currentCar.id) && !usingRealExternal) {
+        // Real FBX was skipped/failed: frame the procedural fallback as a normal car.
         camera.position.set(0, 1.85, 5.7);
         camera.lookAt(0, 0.52, 0);
+      } else if (characterRacer) {
+        camera.position.set(0.45, 1.55, 4.15);
+        camera.lookAt(0, 0.95, 0);
+      } else if (currentCar.id === 'helicopter_racer_3d') {
+        camera.position.set(0.75, 2.9, 7.8);
+        camera.lookAt(0, 1.75, 0);
+      } else if (currentCar.id === 'tank_racer_3d') {
+        camera.position.set(0.6, 2.45, 8.4);
+        camera.lookAt(0, 1.0, 0);
+      } else if (currentCar.id === 'dodge_wc51_3d') {
+        camera.position.set(0.5, 2.5, 7.4);
+        camera.lookAt(0, 0.9, 0);
+      } else if (currentCar.id === 'ambulance_3d') {
+        camera.position.set(0.35, 2.15, 6.4);
+        camera.lookAt(0, 0.8, 0);
+      } else if (currentCar.id === 'police_car_3d') {
+        camera.position.set(0.35, 1.9, 5.6);
+        camera.lookAt(0, 0.62, 0);
+      } else if (currentCar.id === 'police_motorcycle_3d') {
+        camera.position.set(0.35, 1.28, 3.05);
+        camera.lookAt(0, 0.76, 0);
       } else if (currentCar.id === 'rescue_truck_hauler_3d') {
         camera.position.set(0, 3.55, 13.2);
         camera.lookAt(0, 1.45, 0);
@@ -287,7 +315,6 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
         camera.position.set(0, 1.18, 3.0);
         camera.lookAt(0, 0.72, 0);
       } else if (currentCar.id === 'vespa_studio_3d') {
-        // Dedicated 3/4 showroom framing so the front apron, handlebar and seat read clearly.
         camera.position.set(0.52, 1.24, 2.82);
         camera.lookAt(0.06, 0.86, 0);
       } else if (currentCar.id === 'roadster_883_3d') {
@@ -722,7 +749,15 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
             {CAR_CATALOG.map((carItem, idx) => {
               const selected = idx === selectedCarIndex;
               const unlocked = profile.unlockedCars.includes(carItem.id);
-              const vehicleIcon = carItem.id === 'xedap_city_3d' ? '🚲' : carItem.category === 'motorcycle' ? '🛵' : carItem.id === 'rescue_truck_hauler_3d' ? '🚛' : '🏎️';
+              const vehicleIcon =
+                carItem.id === 'xedap_city_3d' ? '🚲' :
+                carItem.id === 'helicopter_racer_3d' ? '🚁' :
+                carItem.id === 'tank_racer_3d' ? '🪖' :
+                carItem.id === 'ambulance_3d' ? '🚑' :
+                carItem.id === 'police_car_3d' ? '🚓' :
+                carItem.id === 'dodge_wc51_3d' || carItem.id === 'rescue_truck_hauler_3d' ? '🚛' :
+                ['spider_racer_3d','robot19_racer_3d','robot4_racer_3d','prime1_racer_3d','ironman_mark3_racer_3d','zora_nao_racer_3d','mark6_racer_3d','hulk_racer_3d','captain_racer_3d','knut_racer_3d'].includes(carItem.id) ? '🤖' :
+                carItem.category === 'motorcycle' ? '🛵' : '🏎️';
               return (
                 <button key={`mobile-${carItem.id}`} type="button" onClick={() => setSelectedCarIndex(idx)} className={`snap-center flex-shrink-0 w-[124px] rounded-xl border px-2 py-2 text-left ${selected ? 'border-amber-300 bg-gradient-to-br from-amber-500/90 to-rose-500/90 text-slate-950' : 'border-slate-800 bg-slate-900 text-slate-200'}`}>
                   <div className="mb-1 flex items-center justify-between">

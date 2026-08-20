@@ -1,0 +1,182 @@
+{
+  "version": "5.40.0",
+  "purpose": "runtime FBX integration for Garage/Race",
+  "records": [
+    {
+      "id": "police_car_3d",
+      "name": "Police Patrol 3D",
+      "file": "assets/scenery/police-car-static.fbx",
+      "bytes": 144781,
+      "policy": "all_devices",
+      "kind": "vehicle",
+      "sha256": "bb97d41b30902749fff24de66de5c984e6d10ae1401de3fc5945f5941d50183f"
+    },
+    {
+      "id": "police_motorcycle_3d",
+      "name": "Police Motorcycle 3D",
+      "file": "assets/vehicles-extra/police-motorcycle-racer.fbx",
+      "bytes": 303130,
+      "policy": "all_devices",
+      "kind": "vehicle",
+      "sha256": "ca2e277cf38082134ec42258913417038ff890222ff43cab9d504553c717e356"
+    },
+    {
+      "id": "ambulance_3d",
+      "name": "Ambulance Rescue 3D",
+      "file": "assets/scenery/ambulance-static.fbx",
+      "bytes": 172739,
+      "policy": "all_devices",
+      "kind": "vehicle",
+      "sha256": "090931962abee6950b11a28cc053ca5a3f813bca87e6474c901f903546561082"
+    },
+    {
+      "id": "tank_racer_3d",
+      "name": "Battle Tank 3D",
+      "file": "assets/scenery/tank-static-low.fbx",
+      "bytes": 6865727,
+      "policy": "tv_up",
+      "kind": "vehicle",
+      "sha256": "04a1fb4777ee5019fec57f40088931492ceb9ed0cafbe44db9d71e349ffb2e94"
+    },
+    {
+      "id": "helicopter_racer_3d",
+      "name": "Helicopter Racer 3D",
+      "file": "assets/scenery/helicopter-static.fbx",
+      "bytes": 192303,
+      "policy": "all_devices",
+      "kind": "vehicle",
+      "sha256": "8603e8455f5f6eb089ecafe14bcf95bfb98cd281cca7601d28f234c686ab9935"
+    },
+    {
+      "id": "dodge_wc51_3d",
+      "name": "Dodge WC-51 3D",
+      "file": "assets/vehicles-extra/dodge-wc51-racer.fbx",
+      "bytes": 20566268,
+      "policy": "desktop_only",
+      "kind": "vehicle",
+      "sha256": "495847b5056207955e82c4ca8f7c9ef7839f4e04efbb02cc7d881704cbab326e"
+    },
+    {
+      "id": "spider_racer_3d",
+      "name": "Spider Hero Racer",
+      "file": "assets/racers-extra/spider-racer.fbx",
+      "bytes": 826248,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "72c24a42e725c4227a2efa7b7f687a584c991001f961e3853a1747a5a516d89d"
+    },
+    {
+      "id": "robot19_racer_3d",
+      "name": "Robot 19 Racer",
+      "file": "assets/racers-extra/robot19-racer.fbx",
+      "bytes": 4599167,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "7ed4bc6cb1db63d390594d6eb37177c0809c5a0119a1ccded3c7ca1ec58cc098"
+    },
+    {
+      "id": "robot4_racer_3d",
+      "name": "Robot 4 Racer",
+      "file": "assets/racers-extra/robot4-racer.fbx",
+      "bytes": 8600673,
+      "policy": "tv_up",
+      "kind": "character",
+      "sha256": "fd58247a4bbda04ba529ba8291eb7f630c78272f88e9d52a6aef059e379dd9e5"
+    },
+    {
+      "id": "prime1_racer_3d",
+      "name": "Prime 1 Racer",
+      "file": "assets/racers-extra/prime1-racer.fbx",
+      "bytes": 12658169,
+      "policy": "desktop_only",
+      "kind": "character",
+      "sha256": "f30c4e4968cada4f3b548f3adfd3ef63d759088e71f60acef54ad07ab386745e"
+    },
+    {
+      "id": "ironman_mark3_racer_3d",
+      "name": "Iron Man Mark III Racer",
+      "file": "assets/racers-extra/ironman-mark3-racer.fbx",
+      "bytes": 22918540,
+      "policy": "desktop_only",
+      "kind": "character",
+      "sha256": "fdecc526700dded51c859351bd7917eb592811369f7468f03bf7d1d5529ff4a6"
+    },
+    {
+      "id": "zora_nao_racer_3d",
+      "name": "Zora Nao Robot Racer",
+      "file": "assets/racers-extra/zora-nao-racer.fbx",
+      "bytes": 23731404,
+      "policy": "desktop_only",
+      "kind": "character",
+      "sha256": "872c356017d4544f0d89504a4141bde45aaa916b16594487cda56caf42ec48b5"
+    },
+    {
+      "id": "mark6_racer_3d",
+      "name": "Armor Mark Racer",
+      "file": "assets/racers-extra/mark6-racer.fbx",
+      "bytes": 6403050,
+      "policy": "tv_up",
+      "kind": "character",
+      "sha256": "2f0f6aef35b220cf1488118ab5ba2567471319a3c00091812c67df11141ae942"
+    },
+    {
+      "id": "hulk_racer_3d",
+      "name": "Hulk Racer 3D",
+      "file": "assets/racers-extra/hulk-racer.fbx",
+      "bytes": 3271278,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "00fd69dc3f6f91c8a9aa3b273b9cada340d158f3d92ecf4bbe740867c2e0b57f"
+    },
+    {
+      "id": "captain_racer_3d",
+      "name": "Captain Hero Racer",
+      "file": "assets/racers-extra/captain-racer.fbx",
+      "bytes": 1842892,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "d5495882e4d343ecf98ad815d9008f6da179d46123fdcbf24b010c87613dd13f"
+    },
+    {
+      "id": "knut_racer_3d",
+      "name": "Knut Racer 3D",
+      "file": "assets/racers-extra/knut-racer.fbx",
+      "bytes": 1928334,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "b342c9b95f95ac719033b431a9417889266fceb6a0a12a3e3e448f96088f7be9"
+    },
+    {
+      "id": "us_soldier_racer_3d",
+      "name": "US Soldier Racer",
+      "file": "assets/racers-extra/us-soldier-racer.fbx",
+      "bytes": 949074,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "1a83db1ddb195458369982995e31df297fa82069a3677e2aafb71feb1d7c0627"
+    },
+    {
+      "id": "human_racer_3d",
+      "name": "Human Racer 3D",
+      "file": "assets/racers-extra/human-racer.fbx",
+      "bytes": 370281,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "9f2a81a7ed4d1682fdc1015d194ddbb60196278a03a9b652334b29ea7515cde2"
+    },
+    {
+      "id": "drag_driver_racer_3d",
+      "name": "Drag Driver Racer",
+      "file": "assets/racers-extra/drag-driver-racer.fbx",
+      "bytes": 2382246,
+      "policy": "all_devices",
+      "kind": "character",
+      "sha256": "23a2fcb4a665464f50b972200edb3832b013760a192a6eeac75ae996dd1c7736"
+    }
+  ],
+  "notes": [
+    "Capybara race model receives a 180 degree visual yaw correction based on user screenshot.",
+    "Character racers use robust height-based bounds and whole-model motion because uploaded FBXs do not have confirmed skeleton/skin rigs.",
+    "P2 can use real external FBX on desktop; normal AI remains procedural to avoid parsing many heavy models."
+  ]
+}

@@ -33,6 +33,12 @@ interface ExternalVehicleConfig {
   paintMaterialPattern?: RegExp;
   /** Material tuning preset for models that need a more specific shading recipe. */
   materialProfile?: 'default' | 'scooter_gloss';
+  /** Character/robot racers scale against height instead of horizontal vehicle length. */
+  scaleBasis?: 'horizontal' | 'height';
+  /** Preserve source colors for character/robot/special models that should not be repainted. */
+  allowPaint?: boolean;
+  /** Hide exporter helper/collision groups that are not part of the visible model. */
+  hideNodePattern?: RegExp;
 }
 
 interface WheelRigNode {
@@ -56,6 +62,7 @@ function shouldPaintMaterial(
   sourceMaterial: any,
   cfg: ExternalVehicleConfig,
 ): boolean {
+  if (cfg.allowPaint === false) return false;
   const n = name.toLowerCase();
   const opacity = Number.isFinite(sourceMaterial?.opacity) ? Number(sourceMaterial.opacity) : 1;
 
@@ -174,14 +181,221 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   capybara_parade_3d: {
     file: 'assets/cars/capybara-lowpoly-racer.fbx',
     targetLength: 3.35,
-    // Humorous capybara parade model; set the nose/head direction toward the track tangent.
+    // V5.40: user screenshot confirmed the capybara head faced backward in race.
     forwardAxis: '+z',
+    visualYawOffset: Math.PI,
     kind: 'car',
-    // This lowpoly FBX is only ~0.5 MB, so it is safe on phone / TV / PC.
     policy: 'all_devices',
     rideHeight: 0.11,
     wheelMode: 'none',
-    paintMaterialPattern: /body|fur|capy|mesh/i,
+    allowPaint: false,
+  },
+
+  police_car_3d: {
+    file: 'assets/scenery/police-car-static.fbx',
+    targetLength: 4.35,
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.11,
+    wheelMode: 'named',
+    paintMaterialPattern: /white|mediumblue|frontcolor/i,
+  },
+  police_motorcycle_3d: {
+    file: 'assets/vehicles-extra/police-motorcycle-racer.fbx',
+    targetLength: 2.25,
+    forwardAxis: '+z',
+    kind: 'motorcycle',
+    policy: 'all_devices',
+    rideHeight: 0.09,
+    wheelMode: 'none',
+    maxLeanRad: 0.16,
+  },
+  ambulance_3d: {
+    file: 'assets/scenery/ambulance-static.fbx',
+    targetLength: 5.25,
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.13,
+    wheelMode: 'named',
+    paintMaterialPattern: /white|ghostwhite|frontcolor/i,
+  },
+  tank_racer_3d: {
+    file: 'assets/scenery/tank-static-low.fbx',
+    targetLength: 6.2,
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'tv_up',
+    rideHeight: 0.16,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  helicopter_racer_3d: {
+    file: 'assets/scenery/helicopter-static.fbx',
+    targetLength: 5.7,
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    // Hover above the road while the race root follows the track.
+    rideHeight: 1.55,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  dodge_wc51_3d: {
+    file: 'assets/vehicles-extra/dodge-wc51-racer.fbx',
+    targetLength: 5.1,
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'desktop_only',
+    rideHeight: 0.16,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+
+  spider_racer_3d: {
+    file: 'assets/racers-extra/spider-racer.fbx',
+    targetLength: 1.82,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  robot19_racer_3d: {
+    file: 'assets/racers-extra/robot19-racer.fbx',
+    targetLength: 1.88,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  robot4_racer_3d: {
+    file: 'assets/racers-extra/robot4-racer.fbx',
+    targetLength: 1.95,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'tv_up',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+    hideNodePattern: /convexhull/i,
+  },
+  prime1_racer_3d: {
+    file: 'assets/racers-extra/prime1-racer.fbx',
+    targetLength: 2.05,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'desktop_only',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  ironman_mark3_racer_3d: {
+    file: 'assets/racers-extra/ironman-mark3-racer.fbx',
+    targetLength: 1.92,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'desktop_only',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  zora_nao_racer_3d: {
+    file: 'assets/racers-extra/zora-nao-racer.fbx',
+    targetLength: 1.55,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'desktop_only',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  mark6_racer_3d: {
+    file: 'assets/racers-extra/mark6-racer.fbx',
+    targetLength: 1.92,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'tv_up',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  hulk_racer_3d: {
+    file: 'assets/racers-extra/hulk-racer.fbx',
+    targetLength: 2.15,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  captain_racer_3d: {
+    file: 'assets/racers-extra/captain-racer.fbx',
+    targetLength: 1.9,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  knut_racer_3d: {
+    file: 'assets/racers-extra/knut-racer.fbx',
+    targetLength: 1.45,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  us_soldier_racer_3d: {
+    file: 'assets/racers-extra/us-soldier-racer.fbx',
+    targetLength: 1.82,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  human_racer_3d: {
+    file: 'assets/racers-extra/human-racer.fbx',
+    targetLength: 1.78,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
+  },
+  drag_driver_racer_3d: {
+    file: 'assets/racers-extra/drag-driver-racer.fbx',
+    targetLength: 1.8,
+    scaleBasis: 'height',
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'all_devices',
+    rideHeight: 0.03,
+    wheelMode: 'none',
+    allowPaint: false,
   },
 
 };
@@ -306,6 +520,46 @@ function sanitizeFbxScene(root: THREE.Object3D) {
       obj.userData.apHiddenAsNonVehicle = true;
     }
   });
+}
+
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) * 0.5;
+}
+
+function robustObjectBounds(root: THREE.Object3D): THREE.Box3 {
+  root.updateWorldMatrix(true, true);
+  const boxes: THREE.Box3[] = [];
+  root.traverse((obj: any) => {
+    if (!obj.isMesh || obj.visible === false) return;
+    const b = new THREE.Box3().setFromObject(obj);
+    if (!b.isEmpty()) boxes.push(b);
+  });
+  if (boxes.length <= 2) return new THREE.Box3().setFromObject(root);
+
+  const centers = boxes.map((b) => b.getCenter(new THREE.Vector3()));
+  const med = new THREE.Vector3(
+    median(centers.map((c) => c.x)),
+    median(centers.map((c) => c.y)),
+    median(centers.map((c) => c.z)),
+  );
+  const distances = centers.map((c) => c.distanceTo(med));
+  const sorted = [...distances].sort((a, b) => a - b);
+  const p88 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.88))] || 0;
+  const threshold = Math.max(p88 * 1.9, 1e-4);
+  const robust = new THREE.Box3();
+  let kept = 0;
+  boxes.forEach((b, i) => {
+    if (distances[i] <= threshold) {
+      robust.union(b);
+      kept += 1;
+    }
+  });
+  return kept >= Math.max(2, Math.floor(boxes.length * 0.55)) && !robust.isEmpty()
+    ? robust
+    : new THREE.Box3().setFromObject(root);
 }
 
 function forwardYaw(axis: ForwardAxis): number {
@@ -587,6 +841,14 @@ export async function attachExternalCarModel(
   holder.add(fbx);
 
   sanitizeFbxScene(fbx);
+  if (cfg.hideNodePattern) {
+    fbx.traverse((obj: any) => {
+      if (cfg.hideNodePattern?.test(obj.name || '')) {
+        obj.visible = false;
+        obj.userData.apHiddenAsExporterHelper = true;
+      }
+    });
+  }
 
   // Build wheel pivots while the FBX is still in its native coordinate system.
   // This lets us classify the real spin axis and repair SketchUp pivots safely.
@@ -599,14 +861,16 @@ export async function attachExternalCarModel(
   // different forward signs. V5.15 stores the verified source forward axis per model.
   holder.rotation.y = forwardYaw(cfg.forwardAxis) + (cfg.visualYawOffset ?? 0);
 
-  let box = new THREE.Box3().setFromObject(holder);
+  let box = cfg.scaleBasis === 'height' ? robustObjectBounds(holder) : new THREE.Box3().setFromObject(holder);
   let size = box.getSize(new THREE.Vector3());
 
-  const horizontalLength = Math.max(size.x, size.z, 0.001);
-  const scale = cfg.targetLength / horizontalLength;
+  const scaleBasis = cfg.scaleBasis === 'height'
+    ? Math.max(size.y, 0.001)
+    : Math.max(size.x, size.z, 0.001);
+  const scale = cfg.targetLength / scaleBasis;
   holder.scale.setScalar(scale);
 
-  box = new THREE.Box3().setFromObject(holder);
+  box = cfg.scaleBasis === 'height' ? robustObjectBounds(holder) : new THREE.Box3().setFromObject(holder);
   const center = box.getCenter(new THREE.Vector3());
   holder.position.set(-center.x, cfg.rideHeight - box.min.y, -center.z);
 
