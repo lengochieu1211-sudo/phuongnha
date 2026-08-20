@@ -46,6 +46,11 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
   const itemMeshesRef = useRef<{ id: number; mesh: THREE.Mesh }[]>([]);
   const particlesRef = useRef<THREE.Points | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
+  const cameraViewRef = useRef<CameraViewMode>(cameraView);
+
+  useEffect(() => {
+    cameraViewRef.current = cameraView;
+  }, [cameraView]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -67,7 +72,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     const envSize = profile.quality === 'high' ? 256 : profile.quality === 'balanced' ? 128 : 64;
     scene.environment = createProceduralRaceEnvironment(track.environmentType, envSize);
 
-    const camera = new THREE.PerspectiveCamera(54, width / height, 0.5, 1400);
+    const camera = new THREE.PerspectiveCamera(54, width / height, 0.12, 1400);
     cameraRef.current = camera;
 
     // 2. WebGL Renderer
@@ -114,6 +119,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     // Phones / Low mode keep the procedural fallback so initial loading and FPS stay safe.
     let externalPlayerHandle: ExternalCarHandle | null = null;
     let externalLoadCancelled = false;
+    let acceptLateExternalModel = true;
     let externalReadyPromise: Promise<void> = Promise.resolve();
 
     if (
@@ -123,7 +129,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       externalReadyPromise = attachExternalCarModel(playerCar, car.id, customization, profile.carDetail)
         .then((handle) => {
           if (!handle) return;
-          if (externalLoadCancelled) {
+          if (externalLoadCancelled || !acceptLateExternalModel) {
             handle.dispose();
             return;
           }
@@ -230,13 +236,22 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       false,
       car.id,
       car.category,
+      true,
     );
 
     // V5.17 warm-up: wait for the selected FBX (normally already preloaded), render a
     // hidden frame and compile materials/shaders before starting the countdown.
     let readyCancelled = false;
     void (async () => {
-      await externalReadyPromise;
+      // Never hold the race behind a huge ASCII FBX forever. If a selected model is
+      // not ready quickly enough, start with the already-built procedural fallback.
+      // A late FBX is discarded instead of being attached mid-race and causing a freeze.
+      const maxExternalWaitMs = actualDeviceClass === 'desktop' ? 7000 : 3800;
+      const externalLoadedInTime = await Promise.race([
+        externalReadyPromise.then(() => true),
+        new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), maxExternalWaitMs)),
+      ]);
+      if (!externalLoadedInTime) acceptLateExternalModel = false;
       if (readyCancelled || externalLoadCancelled) return;
 
       try {
@@ -338,7 +353,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
       // Update Camera Tracking View
       updateCameraPosition(
-        camera, px, py, pz, pt.tangent, cameraView, engine.physics.player.isNitroActive,
+        camera, px, py, pz, pt.tangent, cameraViewRef.current, engine.physics.player.isNitroActive,
         car.id, car.category
       );
 
@@ -394,6 +409,8 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         mats.forEach((m: any) => { m.map?.dispose?.(); m.dispose?.(); });
       });
       renderer.dispose();
+      renderer.forceContextLoss?.();
+      if (renderer.domElement.parentElement === container) container.removeChild(renderer.domElement);
     };
   }, [track.id, car.id, qualitySetting]);
 
@@ -446,7 +463,8 @@ function updateCameraPosition(
   viewMode: CameraViewMode,
   isNitro: boolean,
   carId: string,
-  carCategory: string
+  carCategory: string,
+  snap = false,
 ) {
   // V5.19: chase camera is vehicle-size aware. A fixed 3.25 m offset placed the
   // camera inside the long V12 SV while making Vespa/883 motorcycles look tiny.
@@ -479,6 +497,22 @@ function updateCameraPosition(
   const chaseHeight = chaseHeightByModel[carId] ?? (isMotorcycle ? 1.78 : 2.28);
   const lookHeight = lookHeightByModel[carId] ?? (isMotorcycle ? 0.72 : 0.92);
 
+  // Camera safety: a malformed waypoint/tangent must never turn the view matrix into NaN
+  // (which produces a fully black WebGL frame).
+  if (![px, py, pz, tangent.x, tangent.y, tangent.z].every(Number.isFinite)) {
+    px = Number.isFinite(px) ? px : 0;
+    py = Number.isFinite(py) ? py : 0;
+    pz = Number.isFinite(pz) ? pz : 0;
+    tangent = { x: 0, y: 0, z: 1 };
+  }
+  const setOrLerp = (x: number, y: number, z: number, alpha: number) => {
+    if (snap || !Number.isFinite(camera.position.x + camera.position.y + camera.position.z)) {
+      camera.position.set(x, y, z);
+    } else {
+      camera.position.lerp(new THREE.Vector3(x, y, z), alpha);
+    }
+  };
+
   // Slightly narrower FOV for motorcycles so they remain readable without moving the
   // camera dangerously close to the model.
   const fovTarget = isNitro ? (isMotorcycle ? 53 : 56) : (isMotorcycle ? 46 : 49);
@@ -490,24 +524,31 @@ function updateCameraPosition(
       const camX = px - tangent.x * closeDistance;
       const camY = py + cameraHeight;
       const camZ = pz - tangent.z * closeDistance;
-      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.2);
+      setOrLerp(camX, camY, camZ, 0.2);
       camera.lookAt(px + tangent.x * 5.0, py + lookHeight, pz + tangent.z * 5.0);
       break;
     }
     case 'hood': {
-      const camX = px + tangent.x * 0.8;
-      const camY = py + 1.0;
-      const camZ = pz + tangent.z * 0.8;
+      // Imported FBXs do not share a reliable bonnet/interior origin. The old fixed
+      // y=1.0 camera could sit inside an opaque shell and produce a completely black view.
+      const forward = carId === 'rescue_truck_hauler_3d' ? 2.4 : isMotorcycle ? 0.34 : 1.72;
+      const height = carId === 'rescue_truck_hauler_3d' ? 3.05 : isMotorcycle ? 1.28 : 1.52;
+      const camX = px + tangent.x * forward;
+      const camY = py + height;
+      const camZ = pz + tangent.z * forward;
       camera.position.set(camX, camY, camZ);
-      camera.lookAt(px + tangent.x * 20, py + 0.8, pz + tangent.z * 20);
+      camera.lookAt(px + tangent.x * 22, py + height - 0.18, pz + tangent.z * 22);
       break;
     }
     case 'cockpit': {
-      const camX = px - tangent.x * 0.2;
-      const camY = py + 0.95;
-      const camZ = pz - tangent.z * 0.2;
+      // Use a safe driver/roof viewpoint rather than assuming the FBX contains a hollow cockpit.
+      const back = isMotorcycle ? 0.08 : 0.30;
+      const height = carId === 'rescue_truck_hauler_3d' ? 3.22 : isMotorcycle ? 1.34 : 1.58;
+      const camX = px - tangent.x * back;
+      const camY = py + height;
+      const camZ = pz - tangent.z * back;
       camera.position.set(camX, camY, camZ);
-      camera.lookAt(px + tangent.x * 25, py + 0.9, pz + tangent.z * 25);
+      camera.lookAt(px + tangent.x * 25, py + height - 0.12, pz + tangent.z * 25);
       break;
     }
     case 'cinematic': {
@@ -515,7 +556,7 @@ function updateCameraPosition(
       const camX = px + Math.sin(angle) * 12;
       const camY = py + 3.5;
       const camZ = pz + Math.cos(angle) * 12;
-      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.1);
+      setOrLerp(camX, camY, camZ, 0.1);
       camera.lookAt(px, py + 1.0, pz);
       break;
     }
@@ -524,7 +565,7 @@ function updateCameraPosition(
       const camX = px - tangent.x * chaseDistance;
       const camY = py + chaseHeight;
       const camZ = pz - tangent.z * chaseDistance;
-      camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.16);
+      setOrLerp(camX, camY, camZ, 0.16);
       camera.lookAt(px + tangent.x * 4.8, py + lookHeight + 0.12, pz + tangent.z * 4.8);
       break;
     }

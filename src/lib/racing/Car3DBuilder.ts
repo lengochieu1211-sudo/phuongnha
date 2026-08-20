@@ -619,8 +619,13 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
   root.add(carBodyGroup);
 
   // 5. Spoiler Group
+  // V5.25: motorcycle/bicycle procedural fallbacks must never inherit an automotive
+  // rear wing. On XEDAP this looked exactly like a detached table in front of the bike.
+  const supportsAutomotiveSpoiler = !['roadster_883_3d', 'vespa_studio_3d', 'xedap_city_3d'].includes(modelId);
   const spoilerGroup = new THREE.Group();
-  rebuildSpoiler(spoilerGroup, initialCustom.spoilerStyle, carbonMaterial, chromeMaterial);
+  if (supportsAutomotiveSpoiler) {
+    rebuildSpoiler(spoilerGroup, initialCustom.spoilerStyle, carbonMaterial, chromeMaterial);
+  }
   spoilerGroup.position.set(0, 0.68, -bodyProfile.length * 0.40);
   root.add(spoilerGroup);
 
@@ -810,7 +815,9 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
     underglowLight.color.set(neonCol);
     underglowLight.intensity = custom.neonUnderglow === 'none' ? 0 : 1.5;
 
-    rebuildSpoiler(spoilerGroup, custom.spoilerStyle, carbonMaterial, chromeMaterial);
+    if (supportsAutomotiveSpoiler) {
+      rebuildSpoiler(spoilerGroup, custom.spoilerStyle, carbonMaterial, chromeMaterial);
+    }
   };
 
   return {

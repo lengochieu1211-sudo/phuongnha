@@ -113,7 +113,10 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const carInstanceRef = useRef<Car3DInstance | null>(null);
+  const externalGarageHandleRef = useRef<ExternalCarHandle | null>(null);
+  const carSwapTokenRef = useRef(0);
   const graphicsProfile = useRef(resolveRacingGraphicsProfile(qualitySetting)).current;
   const actualDeviceClass = useRef(detectDeviceClass()).current;
   const isDraggingRef = useRef(false);
@@ -127,8 +130,11 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const selectorMovedRef = useRef(false);
   const selectorStartXRef = useRef(0);
   const selectorStartScrollLeftRef = useRef(0);
+  const selectorPointerCarIndexRef = useRef<number | null>(null);
 
-  // Setup 3D Turntable Scene
+  // Setup one persistent 3D showroom. V5.25: do NOT recreate a WebGLRenderer
+  // every time a car is selected; doing so caused visible flicker and could exhaust
+  // the browser WebGL-context limit before entering a race.
   useEffect(() => {
     if (!containerRef.current) return;
     const container = containerRef.current;
@@ -142,25 +148,19 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     }
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    // V5.21: the newly imported truck/bicycle need their own framing. A fixed
-    // camera that fits a normal 4–5 m car can clip into the 9 m hauler or make
-    // a bicycle look tiny. Keep the turntable camera independent from model transforms.
-    if (currentCar.id === 'rescue_truck_hauler_3d') {
-      camera.position.set(0, 3.55, 13.2);
-      camera.lookAt(0, 1.45, 0);
-    } else if (currentCar.id === 'xedap_city_3d') {
-      camera.position.set(0, 1.18, 3.0);
-      camera.lookAt(0, 0.72, 0);
-    } else if (currentCar.category === 'motorcycle') {
-      camera.position.set(0, 1.28, 3.25);
-      camera.lookAt(0, 0.72, 0);
-    } else {
-      camera.position.set(0, 1.85, 5.7);
-      camera.lookAt(0, 0.4, 0);
-    }
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 120);
+    camera.position.set(0, 1.85, 5.7);
+    camera.lookAt(0, 0.55, 0);
+    cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+    // preserveDrawingBuffer=false is materially lighter while rotating large FBXs.
+    // Photo capture explicitly renders immediately before toDataURL().
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      preserveDrawingBuffer: false,
+      powerPreference: 'high-performance',
+    });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, graphicsProfile.pixelRatioCap));
     renderer.shadowMap.enabled = graphicsProfile.shadows;
@@ -173,7 +173,6 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
-    // Studio Lighting
     const ambientLight = new THREE.HemisphereLight(0xdbeafe, 0x111827, 1.35);
     scene.add(ambientLight);
 
@@ -192,19 +191,13 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     topWhiteLight.position.set(0, 10, 0);
     scene.add(topWhiteLight);
 
-    // Studio Floor Grid & Reflection Disc
     const floorGeo = new THREE.CylinderGeometry(4.5, 4.5, 0.2, graphicsProfile.quality === 'high' ? 64 : 32);
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x111827,
-      roughness: 0.1,
-      metalness: 0.85,
-    });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.85 });
     const floorDisc = new THREE.Mesh(floorGeo, floorMat);
     floorDisc.position.y = -0.1;
     floorDisc.receiveShadow = true;
     scene.add(floorDisc);
 
-    // Neon Rim on Disc
     const rimGeo = new THREE.TorusGeometry(4.5, 0.06, graphicsProfile.quality === 'high' ? 20 : 12, graphicsProfile.quality === 'high' ? 96 : 48);
     rimGeo.rotateX(Math.PI * 0.5);
     const rimMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
@@ -212,63 +205,125 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     rimMesh.position.y = 0.01;
     scene.add(rimMesh);
 
-    // Build 3D Car Instance
-    const carInst = buildCar3D(currentCar.id, currentCustomization, graphicsProfile.carDetail);
-    scene.add(carInst.root);
-    carInstanceRef.current = carInst;
-
-    let externalGarageHandle: ExternalCarHandle | null = null;
-    let externalGarageCancelled = false;
-    if (
-      isExternalCar(currentCar.id) &&
-      shouldUseExternalCar(currentCar.id, actualDeviceClass)
-    ) {
-      attachExternalCarModel(carInst, currentCar.id, currentCustomization, graphicsProfile.carDetail)
-        .then((handle) => {
-          if (!handle) return;
-          if (externalGarageCancelled) {
-            handle.dispose();
-            return;
-          }
-          externalGarageHandle = handle;
-        })
-        .catch((err) => {
-          console.warn('Garage FBX preview failed; keeping procedural fallback.', err);
-        });
-    }
-
-    let animId: number;
+    let animId = 0;
     const animate = () => {
-      if (!isDraggingRef.current) {
-        turntableAngleRef.current += 0.005; // Gentle slow rotation
-      }
-      if (carInstanceRef.current) {
-        carInstanceRef.current.root.rotation.y = turntableAngleRef.current;
-      }
+      if (!isDraggingRef.current) turntableAngleRef.current += 0.005;
+      if (carInstanceRef.current) carInstanceRef.current.root.rotation.y = turntableAngleRef.current;
       renderer.render(scene, camera);
       animId = requestAnimationFrame(animate);
     };
     animId = requestAnimationFrame(animate);
 
     const handleResize = () => {
-      if (!containerRef.current || !rendererRef.current) return;
-      const w = containerRef.current.clientWidth;
-      const h = containerRef.current.clientHeight;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      rendererRef.current.setSize(w, h);
+      if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
+      const w = Math.max(1, containerRef.current.clientWidth);
+      const h = Math.max(1, containerRef.current.clientHeight);
+      cameraRef.current.aspect = w / h;
+      cameraRef.current.updateProjectionMatrix();
+      rendererRef.current.setSize(w, h, false);
     };
 
     const ro = new ResizeObserver(handleResize);
     ro.observe(container);
 
     return () => {
-      externalGarageCancelled = true;
-      externalGarageHandle?.dispose();
+      carSwapTokenRef.current += 1;
+      externalGarageHandleRef.current?.dispose();
+      externalGarageHandleRef.current = null;
       cancelAnimationFrame(animId);
       ro.disconnect();
+      scene.traverse((obj: any) => {
+        obj.geometry?.dispose?.();
+        const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+        mats.forEach((m: any) => m.dispose?.());
+      });
+      scene.environment?.dispose?.();
       renderer.dispose();
+      renderer.forceContextLoss?.();
+      if (renderer.domElement.parentElement === container) container.removeChild(renderer.domElement);
+      rendererRef.current = null;
+      cameraRef.current = null;
+      sceneRef.current = null;
     };
+  }, []);
+
+  // Swap only the vehicle inside the persistent showroom. A short settle delay
+  // prevents parsing a 20–50 MB FBX for every card the user merely swipes past.
+  useEffect(() => {
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!scene || !camera) return;
+
+    const token = ++carSwapTokenRef.current;
+    let cancelled = false;
+    let attachTimer: number | null = null;
+    let localExternalHandle: ExternalCarHandle | null = null;
+
+    const previous = carInstanceRef.current;
+    if (previous) {
+      externalGarageHandleRef.current?.dispose();
+      externalGarageHandleRef.current = null;
+      scene.remove(previous.root);
+      previous.root.traverse((obj: any) => {
+        obj.geometry?.dispose?.();
+        const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+        mats.forEach((m: any) => m.dispose?.());
+      });
+    }
+
+    if (currentCar.id === 'rescue_truck_hauler_3d') {
+      camera.position.set(0, 3.55, 13.2);
+      camera.lookAt(0, 1.45, 0);
+    } else if (currentCar.id === 'xedap_city_3d') {
+      camera.position.set(0, 1.18, 3.0);
+      camera.lookAt(0, 0.72, 0);
+    } else if (currentCar.category === 'motorcycle') {
+      camera.position.set(0, 1.28, 3.25);
+      camera.lookAt(0, 0.72, 0);
+    } else {
+      camera.position.set(0, 1.85, 5.7);
+      camera.lookAt(0, 0.4, 0);
+    }
+
+    const carInst = buildCar3D(currentCar.id, currentCustomization, graphicsProfile.carDetail);
+    carInst.root.rotation.y = turntableAngleRef.current;
+    scene.add(carInst.root);
+    carInstanceRef.current = carInst;
+
+    if (isExternalCar(currentCar.id) && shouldUseExternalCar(currentCar.id, actualDeviceClass)) {
+      attachTimer = window.setTimeout(() => {
+        if (cancelled || token !== carSwapTokenRef.current) return;
+        attachExternalCarModel(carInst, currentCar.id, currentCustomization, graphicsProfile.carDetail)
+          .then((handle) => {
+            if (!handle) return;
+            if (cancelled || token !== carSwapTokenRef.current) {
+              handle.dispose();
+              return;
+            }
+            localExternalHandle = handle;
+            externalGarageHandleRef.current = handle;
+          })
+          .catch((err) => console.warn('Garage FBX preview failed; keeping procedural fallback.', err));
+      }, 180);
+    }
+
+    return () => {
+      cancelled = true;
+      if (attachTimer !== null) window.clearTimeout(attachTimer);
+      if (localExternalHandle && externalGarageHandleRef.current === localExternalHandle) {
+        localExternalHandle.dispose();
+        externalGarageHandleRef.current = null;
+      }
+      if (carInstanceRef.current === carInst) carInstanceRef.current = null;
+      if (sceneRef.current === scene) scene.remove(carInst.root);
+      carInst.root.traverse((obj: any) => {
+        obj.geometry?.dispose?.();
+        const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+        mats.forEach((m: any) => m.dispose?.());
+      });
+    };
+    // currentCustomization intentionally does not trigger FBX reload; paint/parts use applyCustomization().
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCar.id]);
 
   // Pointer drag listeners for 360 degree turntable rotation
@@ -304,6 +359,8 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     selectorMovedRef.current = false;
     selectorStartXRef.current = e.clientX;
     selectorStartScrollLeftRef.current = strip.scrollLeft;
+    const card = (e.target as HTMLElement).closest<HTMLElement>('[data-car-index]');
+    selectorPointerCarIndexRef.current = card ? Number(card.dataset.carIndex) : null;
     strip.setPointerCapture?.(e.pointerId);
   };
 
@@ -318,9 +375,16 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
 
   const handleSelectorPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     const strip = carSelectorRef.current;
+    const wasMoved = selectorMovedRef.current;
+    const pressedIndex = selectorPointerCarIndexRef.current;
     selectorDraggingRef.current = false;
+    selectorPointerCarIndexRef.current = null;
     if (strip?.hasPointerCapture?.(e.pointerId)) strip.releasePointerCapture(e.pointerId);
-    // Delay clearing moved so the synthetic click after a drag can be ignored.
+    // Pointer capture used for dragging can suppress the button's native click.
+    // Select explicitly on pointer-up when this was a tap/click, never after a drag.
+    if (!wasMoved && pressedIndex !== null && Number.isFinite(pressedIndex)) {
+      setSelectedCarIndex(pressedIndex);
+    }
     window.setTimeout(() => { selectorMovedRef.current = false; }, 0);
   };
 
@@ -431,7 +495,8 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
 
   // Photo Mode Snapshot Export
   const handleCapturePhoto = () => {
-    if (!rendererRef.current) return;
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+    rendererRef.current.render(sceneRef.current, cameraRef.current);
     const dataUrl = rendererRef.current.domElement.toDataURL('image/png');
     const link = document.createElement('a');
     link.download = `bara_racing_${currentCar.id}.png`;
@@ -566,10 +631,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                       key={carItem.id}
                       type="button"
                       data-car-index={idx}
-                      onClick={() => {
-                        if (selectorMovedRef.current) return;
-                        setSelectedCarIndex(idx);
-                      }}
+                      onClick={() => setSelectedCarIndex(idx)}
                       className={`snap-center flex-shrink-0 w-[158px] px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-2 border transition-all ${
                         isSelected
                           ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 border-white shadow-md scale-[1.03]'
@@ -732,23 +794,31 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
           {/* TAB 3: PARTS & ACCESSORIES */}
           {activeTab === 'parts' && (
             <div className="flex flex-col gap-3 overflow-y-auto max-h-[220px] pr-1">
-              {/* Spoilers */}
-              <span className="text-xs font-bold text-slate-300">Cánh Gió Đua (Spoiler):</span>
-              <div className="grid grid-cols-2 gap-2 text-xs font-bold">
-                {SPOILER_STYLES.map((sp) => (
-                  <button
-                    key={sp.id}
-                    onClick={() => updateCustomization({ spoilerStyle: sp.id })}
-                    className={`py-2 px-3 rounded-xl border text-left transition-all ${
-                      currentCustomization.spoilerStyle === sp.id
-                        ? 'bg-purple-500/20 border-purple-400 text-purple-300'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {sp.name}
-                  </button>
-                ))}
-              </div>
+              {/* Spoilers: automotive-only. Two-wheel FBX/fallbacks must not render a floating car wing. */}
+              {currentCar.category === 'motorcycle' ? (
+                <div className="rounded-xl border border-cyan-500/25 bg-cyan-950/25 px-3 py-2 text-[11px] font-bold text-cyan-200">
+                  🛵 Xe hai bánh không dùng cánh gió ô tô. Phần này được tắt để tránh vật thể lạ phía trước/sau model.
+                </div>
+              ) : (
+                <>
+                  <span className="text-xs font-bold text-slate-300">Cánh Gió Đua (Spoiler):</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                    {SPOILER_STYLES.map((sp) => (
+                      <button
+                        key={sp.id}
+                        onClick={() => updateCustomization({ spoilerStyle: sp.id })}
+                        className={`py-2 px-3 rounded-xl border text-left transition-all ${
+                          currentCustomization.spoilerStyle === sp.id
+                            ? 'bg-purple-500/20 border-purple-400 text-purple-300'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {sp.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {/* Neon Underglow */}
               <span className="text-xs font-bold text-slate-300 mt-2">Đèn Gầm Neon (Underglow):</span>
