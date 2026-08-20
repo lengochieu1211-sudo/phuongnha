@@ -1,7 +1,7 @@
 {
   "name": "react-example",
   "private": true,
-  "version": "5.27.0",
+  "version": "5.29.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "check:voice": "tsx src/scripts/checkVoiceFiles.ts",
     "check:assets": "tsx src/scripts/checkAssets.ts",
-    "check": "npm run lint && npm run check:assets && npm run check:voice"
+    "check": "npm run lint && npm run check:assets && npm run check:voice",
+    "optimize:fbx": "node src/scripts/optimizeAsciiFbx.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

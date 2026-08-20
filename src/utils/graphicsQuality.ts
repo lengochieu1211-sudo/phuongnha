@@ -32,7 +32,8 @@ function getGlCaps() {
 export function detectDeviceClass(): DeviceClass {
   const ua = navigator.userAgent.toLowerCase();
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  const tv = /android tv|google ?tv|smart-?tv|smarttv|mibox|mi box|aft[a-z0-9]*|fire tv|bravia|viera|netcast|web0s|webos|hbbtv|crkey|shield android tv/.test(ua);
+  const forcedTv = typeof location !== 'undefined' && new URLSearchParams(location.search).get('tv') === '1';
+  const tv = forcedTv || /android tv|google ?tv|smart-?tv|smarttv|mibox|mi box|aft[a-z0-9]*|fire tv|bravia|viera|netcast|web0s|webos|hbbtv|crkey|shield android tv/.test(ua);
   if (tv) return 'tv';
 
   const mobileUa = /android|iphone|ipod|mobile/.test(ua);

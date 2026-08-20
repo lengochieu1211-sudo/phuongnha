@@ -9,9 +9,8 @@ import {
   RaceMode,
   RaceSettings,
   RaceItemPickup,
-  PlayerRaceProfile,
 } from '../../types';
-import { CAR_CATALOG, calculateUpgradedStats, loadRaceProfile, saveRaceProfile } from './CarData';
+import { CAR_CATALOG, calculateUpgradedStats, loadRaceProfile } from './CarData';
 import { TRACK_CATALOG, generateTrackWaypoints, Waypoint3D, getInterpolatedTrackPoint } from './TrackData';
 import { VehiclePhysicsEngine } from './VehiclePhysics';
 import { raceAudio } from './RaceAudio';
@@ -25,9 +24,15 @@ export interface RaceResult {
   diamondsEarned: number;
   isNewRecord: boolean;
   racersFinished: { name: string; timeMs: number; rank: number; isPlayer: boolean }[];
+  localWinner?: 1 | 2;
 }
 
 export type RaceStatePhase = 'countdown' | 'racing' | 'finished' | 'paused';
+
+export interface LocalRaceOptions {
+  playerCount?: 1 | 2;
+  secondCarModelId?: CarModelId;
+}
 
 export class RaceEngine {
   private countdownTimer: ReturnType<typeof setInterval> | null = null;
@@ -53,6 +58,8 @@ export class RaceEngine {
   public lastCheckpointPassed: number = -1;
   public raceResult: RaceResult | null = null;
   public isFinished: boolean = false;
+  public localPlayerCount: 1 | 2 = 1;
+  public secondCarModelId: CarModelId | null = null;
 
   private voiceCallback?: (lineKey: string, text?: string) => void;
 
@@ -61,13 +68,16 @@ export class RaceEngine {
     carModelId: CarModelId,
     mode: RaceMode,
     settings: RaceSettings,
-    onVoice?: (lineKey: string, text?: string) => void
+    onVoice?: (lineKey: string, text?: string) => void,
+    localOptions: LocalRaceOptions = {},
   ) {
     this.trackId = trackId;
     this.carModelId = carModelId;
     this.mode = mode;
     this.settings = settings;
     this.voiceCallback = onVoice;
+    this.localPlayerCount = localOptions.playerCount === 2 ? 2 : 1;
+    this.secondCarModelId = this.localPlayerCount === 2 ? (localOptions.secondCarModelId || carModelId) : null;
 
     const trackConfig = TRACK_CATALOG.find((t) => t.id === trackId) || TRACK_CATALOG[0];
     this.totalLaps = trackConfig.lapsCount;
@@ -81,8 +91,13 @@ export class RaceEngine {
     this.waypoints = generateTrackWaypoints(trackId);
 
     // Initialize AI Opponents
-    const aiCount = mode === 'time_attack' ? 0 : 3;
+    const aiCount = mode === 'time_attack' ? 0 : (this.localPlayerCount === 2 ? 2 : 3);
     this.physics.initAIRacers(aiCount, trackConfig.difficulty);
+    if (this.localPlayerCount === 2 && this.secondCarModelId) {
+      const secondCar = CAR_CATALOG.find((c) => c.id === this.secondCarModelId) || carConfig;
+      const secondStats = calculateUpgradedStats(secondCar, profile.carUpgrades[this.secondCarModelId]);
+      this.physics.initLocalSecondPlayer(this.secondCarModelId, secondStats);
+    }
 
     // Initialize Track Items (Nitro canisters, Magic Shields, Rainbow boosters)
     this.initItems();
@@ -143,6 +158,10 @@ export class RaceEngine {
   public inputSteer: number = 0;
   public inputHandbrake: boolean = false;
   public inputNitro: boolean = false;
+  public secondInputThrottle: boolean = true;
+  public secondInputBrake: boolean = false;
+  public secondInputSteer: number = 0;
+  public secondInputNitro: boolean = false;
 
   public setSteeringInput(steer: number) {
     this.inputSteer = steer;
@@ -160,6 +179,26 @@ export class RaceEngine {
     this.inputNitro = true;
   }
 
+  public activatePlayerShield(durationSec: number = 5) {
+    this.physics.activateShield(durationSec);
+  }
+
+  public setSecondPlayerSteeringInput(steer: number) {
+    this.secondInputSteer = Math.max(-1, Math.min(1, steer));
+  }
+
+  public setSecondPlayerBrakeInput(brake: boolean) {
+    this.secondInputBrake = brake;
+  }
+
+  public triggerSecondPlayerNitro() {
+    this.secondInputNitro = true;
+  }
+
+  public activateSecondPlayerShield(durationSec: number = 5) {
+    this.physics.activateSecondShield(durationSec);
+  }
+
   public step(delta: number) {
     this.update(
       delta,
@@ -169,7 +208,19 @@ export class RaceEngine {
       this.inputHandbrake,
       this.inputNitro
     );
+    if (this.phase === 'racing' && this.localPlayerCount === 2) {
+      this.physics.updateLocalSecondPlayer(
+        delta,
+        this.settings.autoThrottle ? true : this.secondInputThrottle,
+        this.secondInputBrake,
+        this.secondInputSteer,
+        this.secondInputNitro,
+        this.trackLengthMeters,
+        this.totalLaps,
+      );
+    }
     this.inputNitro = false;
+    this.secondInputNitro = false;
   }
 
   public update(
@@ -211,6 +262,10 @@ export class RaceEngine {
 
     // Lap progress & Checkpoint check
     this.checkLapCompletion(now);
+    const p2 = this.physics.getLocalSecondPlayer();
+    if (this.localPlayerCount === 2 && !this.isFinished && p2 && p2.progress >= this.totalLaps) {
+      this.finishRace(now, 2);
+    }
   }
 
   private updateItems(delta: number) {
@@ -218,6 +273,14 @@ export class RaceEngine {
     const playerPt = getInterpolatedTrackPoint(this.waypoints, playerProg);
     const playerX = playerPt.pos.x + playerPt.normal.x * this.physics.player.lateralOffset;
     const playerZ = playerPt.pos.z + playerPt.normal.z * this.physics.player.lateralOffset;
+    const p2 = this.physics.getLocalSecondPlayer();
+    let p2X = Number.POSITIVE_INFINITY;
+    let p2Z = Number.POSITIVE_INFINITY;
+    if (p2) {
+      const p2Pt = getInterpolatedTrackPoint(this.waypoints, p2.progress % 1.0);
+      p2X = p2Pt.pos.x + p2Pt.normal.x * p2.lateralOffset;
+      p2Z = p2Pt.pos.z + p2Pt.normal.z * p2.lateralOffset;
+    }
 
     this.items.forEach((item) => {
       if (!item.active) {
@@ -228,21 +291,23 @@ export class RaceEngine {
         return;
       }
 
-      const dist = Math.hypot(playerX - item.x, playerZ - item.z);
-      if (dist < 4.2) {
+      const distP1 = Math.hypot(playerX - item.x, playerZ - item.z);
+      const distP2 = Math.hypot(p2X - item.x, p2Z - item.z);
+      const collector: 1 | 2 | 0 = distP1 < 4.2 ? 1 : (p2 && distP2 < 4.2 ? 2 : 0);
+      if (collector) {
         item.active = false;
-        item.respawnTimer = 6.0; // 6s respawn
+        item.respawnTimer = 6.0;
         raceAudio.playItemCollected();
 
         if (item.type === 'nitro') {
-          this.physics.addNitro(40);
-          this.voiceCallback?.('nitroReady', 'Nitro hồi phục!');
+          collector === 1 ? this.physics.addNitro(40) : this.physics.addSecondNitro(40);
+          this.voiceCallback?.('nitroReady', `P${collector} hồi Nitro!`);
         } else if (item.type === 'shield') {
-          this.physics.activateShield(8);
-          this.voiceCallback?.('itemShield', 'Khiên phép thuật bảo vệ!');
+          collector === 1 ? this.physics.activateShield(8) : this.physics.activateSecondShield(8);
+          this.voiceCallback?.('itemShield', `Khiên bảo vệ P${collector}!`);
         } else if (item.type === 'rainbow' || item.type === 'star') {
-          this.physics.addNitro(60);
-          this.voiceCallback?.('itemStar', 'Ngôi sao tăng tốc thần kỳ!');
+          collector === 1 ? this.physics.addNitro(60) : this.physics.addSecondNitro(60);
+          this.voiceCallback?.('itemStar', `P${collector} nhận tăng tốc thần kỳ!`);
         }
       }
     });
@@ -271,17 +336,18 @@ export class RaceEngine {
       }
 
       if (this.lapTimes.length >= this.totalLaps) {
-        this.finishRace(now);
+        this.finishRace(now, 1);
       }
     }
   }
 
-  private finishRace(now: number) {
+  private finishRace(now: number, localWinner: 1 | 2 = 1) {
     this.phase = 'finished';
     this.isFinished = true;
     raceAudio.stopEngine();
 
-    const rank = this.physics.player.rank;
+    const p2 = this.physics.getLocalSecondPlayer();
+    const rank = localWinner === 2 && p2 ? p2.rank : this.physics.player.rank;
     const isFirst = rank === 1;
 
     let starsEarned = isFirst ? 20 : rank === 2 ? 14 : rank === 3 ? 10 : 6;
@@ -292,33 +358,34 @@ export class RaceEngine {
       starsEarned += 5;
     }
 
-    // Save record to profile
+    // RaceEngine only calculates the result. Persistence is owned by the React screen so
+    // one finish event cannot write the racing profile twice.
     const profile = loadRaceProfile();
     const oldBest = profile.bestLapTimes[this.trackId] || 0;
-    const isNewRecord = oldBest === 0 || this.bestLapTimeMs < oldBest;
+    const isNewRecord = this.bestLapTimeMs > 0 && (oldBest === 0 || this.bestLapTimeMs < oldBest);
 
-    if (isNewRecord) {
-      profile.bestLapTimes[this.trackId] = this.bestLapTimeMs;
-    }
-    if (isFirst) {
-      profile.racesWon = (profile.racesWon || 0) + 1;
-    }
-    profile.totalDriftScore = (profile.totalDriftScore || 0) + this.physics.player.driftScore;
-    saveRaceProfile(profile);
-
-    // AI finishers
+    // Build an accurate ranking table. In local 2P, P1 and P2 are separate human entries
+    // instead of incorrectly duplicating the winner's rank under the generic "Bạn" row.
+    const winnerRank = rank;
+    const estimateTime = (racerRank: number, isLocalWinner: boolean) => {
+      if (isLocalWinner) return this.totalElapsedTimeMs;
+      const rankGap = racerRank - winnerRank;
+      if (rankGap === 0) return this.totalElapsedTimeMs + 900;
+      const offset = Math.abs(rankGap) * (1800 + Math.random() * 800);
+      return Math.max(0, this.totalElapsedTimeMs + Math.sign(rankGap) * offset);
+    };
     const racers = [
       {
-        name: 'Bạn',
-        timeMs: this.totalElapsedTimeMs,
-        rank: rank,
+        name: this.localPlayerCount === 2 ? 'P1' : 'Bạn',
+        timeMs: estimateTime(this.physics.player.rank, this.localPlayerCount === 1 || localWinner === 1),
+        rank: this.physics.player.rank,
         isPlayer: true,
       },
       ...this.physics.aiRacers.map((ai) => ({
-        name: ai.name,
-        timeMs: this.totalElapsedTimeMs + (ai.rank - rank) * (1800 + Math.random() * 800),
+        name: ai.isLocalPlayer ? 'P2' : ai.name,
+        timeMs: estimateTime(ai.rank, !!ai.isLocalPlayer && localWinner === 2),
         rank: ai.rank,
-        isPlayer: false,
+        isPlayer: !!ai.isLocalPlayer,
       })),
     ].sort((a, b) => a.rank - b.rank);
 
@@ -331,10 +398,11 @@ export class RaceEngine {
       diamondsEarned,
       isNewRecord,
       racersFinished: racers,
+      localWinner: this.localPlayerCount === 2 ? localWinner : undefined,
     };
 
     if (isFirst) {
-      this.voiceCallback?.('firstPlace', 'Tuyệt vời! Bạn đã xuất sắc về nhất cuộc đua!');
+      this.voiceCallback?.('firstPlace', this.localPlayerCount === 2 ? `Tuyệt vời! P${localWinner} về đích đầu tiên!` : 'Tuyệt vời! Bạn đã xuất sắc về nhất cuộc đua!');
     } else {
       this.voiceCallback?.('finishGood', 'Bạn lái xe rất cừ! Hãy thử thêm lần nữa nhé!');
     }

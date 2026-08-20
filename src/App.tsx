@@ -145,14 +145,13 @@ export default function App() {
       'magicacademy',
       'dance',
       'parentplay',
-      'ludo',
     ].includes(screen)) {
       return 'upper_body';
     }
 
-    if (['racing'].includes(screen)) {
-      return 'racing_two_hands';
-    }
+    // Racing chooses 1P/2P only after opening its own hub, so do not force a
+    // single-player calibration before the user can choose the race mode.
+    if (screen === 'racing' || screen === 'ludo') return 'none';
 
     if (['fruitslash', 'chickenblaster', 'sweetzombie', 'starcatcher'].includes(screen)) {
       return 'wrist';
@@ -237,12 +236,12 @@ export default function App() {
   }, [setSimulatedGesture, trackingMode, isStreaming]);
 
   // Manage camera lifecycle only for screens that actually consume pose/camera data.
-  // This prevents webcam/MediaPipe from burning battery/GPU in board-game, pet and menu-only screens.
+  // This prevents webcam/MediaPipe from burning battery/GPU in screens that do not consume camera data.
   useEffect(() => {
     const cameraScreens: GameScreen[] = [
       'adventure', 'racing', 'starcatcher', 'mimic', 'dance', 'fruitslash',
       'chickenblaster', 'sweetzombie', 'workout_session', 'parentplay',
-      'dressing', 'ninja', 'goalkeeper', 'magicacademy', 'ludo', 'cameratest', 'calibration'
+      'dressing', 'ninja', 'goalkeeper', 'magicacademy', 'ludo', 'petcare', 'cameratest', 'calibration'
     ];
     const needsCamera = showCalibration || cameraScreens.includes(currentScreen);
     if (trackingMode === 'keyboard_only' || !needsCamera) {

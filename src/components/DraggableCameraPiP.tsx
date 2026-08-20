@@ -18,6 +18,7 @@ import {
 import { GameGesture } from '../types';
 import { useCameraPose } from '../providers/CameraPoseContext';
 import { drawImageContain } from '../utils/cameraFrame';
+import { poseDetector } from '../utils/poseDetector';
 
 interface DraggableCameraPiPProps {
   visible: boolean;
@@ -42,6 +43,7 @@ export default function DraggableCameraPiP({
     isSkeletonVisible,
     setIsSkeletonVisible,
     canvasElement,
+    videoElement,
   } = useCameraPose();
 
   const pipCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -50,12 +52,23 @@ export default function DraggableCameraPiP({
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 16, y: 75 });
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [poseProcessingEnabled, setPoseProcessingEnabled] = useState<boolean>(() => poseDetector.getProcessingEnabled());
   const dragStartRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({
     startX: 0,
     startY: 0,
     posX: 16,
     posY: 75,
   });
+
+
+  useEffect(() => {
+    const sync = (event: Event) => {
+      const detail = (event as CustomEvent<{ enabled?: boolean }>).detail;
+      setPoseProcessingEnabled(detail?.enabled ?? poseDetector.getProcessingEnabled());
+    };
+    window.addEventListener('phuongnha:pose-processing', sync);
+    return () => window.removeEventListener('phuongnha:pose-processing', sync);
+  }, []);
 
   // RAF loop to mirror the master canvas to this local PIP canvas
   useEffect(() => {
@@ -64,14 +77,16 @@ export default function DraggableCameraPiP({
     const renderLoop = () => {
       if (visible && isStreaming && !isMinimized && pipCanvasRef.current && canvasElement) {
         const destCtx = pipCanvasRef.current.getContext('2d');
-        if (destCtx && canvasElement.width > 0 && canvasElement.height > 0) {
-          drawImageContain(
-            destCtx,
-            canvasElement,
-            pipCanvasRef.current.width,
-            pipCanvasRef.current.height,
-            false,
-          );
+        if (destCtx) {
+          // During 2P racing the normal single-pose loop is intentionally suspended.
+          // Draw the live raw video directly so PiP never freezes; otherwise retain
+          // the normal mirrored pose canvas (with skeleton overlays) for 1P games.
+          const useLiveVideo = !poseProcessingEnabled && videoElement && videoElement.readyState >= 2;
+          if (useLiveVideo) {
+            drawImageContain(destCtx, videoElement, pipCanvasRef.current.width, pipCanvasRef.current.height, true);
+          } else if (canvasElement.width > 0 && canvasElement.height > 0) {
+            drawImageContain(destCtx, canvasElement, pipCanvasRef.current.width, pipCanvasRef.current.height, false);
+          }
         }
       }
       animId = requestAnimationFrame(renderLoop);
@@ -79,11 +94,14 @@ export default function DraggableCameraPiP({
 
     animId = requestAnimationFrame(renderLoop);
     return () => cancelAnimationFrame(animId);
-  }, [visible, isStreaming, isMinimized, canvasElement]);
+  }, [visible, isStreaming, isMinimized, canvasElement, videoElement, poseProcessingEnabled]);
 
   // Gesture translation for child
   const upperBodyReady = bodyDetected && leftWrist.visible && rightWrist.visible;
-  const framingLabel = fullBodyDetected
+  const dualCameraMode = !poseProcessingEnabled;
+  const framingLabel = dualCameraMode
+    ? 'CAMERA 2 NGƯỜI'
+    : fullBodyDetected
     ? 'TOÀN THÂN'
     : upperBodyReady
     ? 'NỬA NGƯỜI + 2 TAY'
@@ -231,9 +249,9 @@ export default function DraggableCameraPiP({
         {/* Header Bar */}
         <div className="bg-slate-950/90 px-2.5 py-1.5 flex items-center justify-between cursor-move border-b border-slate-800 text-white">
           <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${bodyDetected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className={`w-2 h-2 rounded-full ${dualCameraMode || bodyDetected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             <span className="text-[11px] font-black tracking-wider text-emerald-300">AI CAMERA</span>
-            {poseFps > 0 && <span className="text-[9px] text-slate-400 font-mono">{poseFps}fps</span>}
+            {!dualCameraMode && poseFps > 0 && <span className="text-[9px] text-slate-400 font-mono">{poseFps}fps</span>}
           </div>
 
           <div className="flex items-center gap-1">
@@ -280,7 +298,7 @@ export default function DraggableCameraPiP({
 
             {/* Gesture Badge */}
             <div className="absolute top-1.5 left-1.5 bg-slate-900/90 backdrop-blur-xs text-emerald-400 border border-emerald-500/50 text-[10px] font-black px-2 py-0.5 rounded-lg shadow-sm">
-              {gestureLabel[gesture] || gesture.toUpperCase()}
+              {dualCameraMode ? '👥 P1 TRÁI · P2 PHẢI' : (gestureLabel[gesture] || gesture.toUpperCase())}
             </div>
 
             {/* Real Accurate Status Badge */}
@@ -289,7 +307,7 @@ export default function DraggableCameraPiP({
             </div>
 
             {/* Distance / Placement Feedback */}
-            {trackingFeedback !== 'ok' && (
+            {!dualCameraMode && trackingFeedback !== 'ok' && (
               <div className="absolute bottom-1.5 inset-x-1.5 bg-amber-500/95 text-slate-950 font-black text-[9px] text-center py-1 rounded-md shadow-sm animate-bounce">
                 {trackingFeedback === 'too_far' && '🟡 TIẾN LẠI GẦN HƠN'}
                 {trackingFeedback === 'too_near' && '🟡 LÙI RA XA MỘT CHÚT'}
@@ -305,7 +323,7 @@ export default function DraggableCameraPiP({
         {isMinimized && (
           <div className="p-2 flex items-center justify-between bg-slate-900 text-xs">
             <span className="text-emerald-400 font-black text-[10px] truncate max-w-[100px]">
-              {gestureLabel[gesture] || gesture}
+              {dualCameraMode ? '👥 2 NGƯỜI' : (gestureLabel[gesture] || gesture)}
             </span>
             <button
               onClick={() => setIsMinimized(false)}

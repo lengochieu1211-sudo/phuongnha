@@ -42,7 +42,7 @@ export const CAR_CATALOG: CarConfig[] = [
     subTitle: 'Italian Retro Scooter',
     category: 'motorcycle',
     description:
-      'Scooter cổ điển 3D với nhiều chi tiết vật liệu. Bản TV/PC dùng FBX thật; điện thoại dùng fallback để giữ khung hình ổn định.',
+      'Scooter cổ điển 3D với nhiều chi tiết vật liệu. FBX đã được tối ưu dung lượng; PC dùng model thật, còn TV/Mi Box và điện thoại dùng fallback nhẹ để tránh khựng khi parse 238 mesh.',
     baseStats: {
       topSpeed: 68,
       acceleration: 79,
@@ -84,7 +84,7 @@ export const CAR_CATALOG: CarConfig[] = [
     subTitle: 'V12 Performance Supercar',
     category: 'supercar',
     description:
-      'Siêu xe V12 3D chi tiết do người dùng cung cấp. Chạy model thật trên PC/TV đủ mạnh và dùng fallback nhẹ khi thiết bị yếu.',
+      'Siêu xe V12 3D chi tiết do người dùng cung cấp. FBX đã được tối ưu mạnh; PC dùng model thật, còn TV/Mi Box và thiết bị di động dùng fallback nhẹ để tránh parse model lớn trên main thread.',
     baseStats: {
       topSpeed: 97,
       acceleration: 95,

@@ -16,6 +16,7 @@ import {
   PlayerProgress,
   GameGesture,
   CameraViewMode,
+  LocalRacePlayerCount,
 } from '../../types';
 import {
   CAR_CATALOG,
@@ -33,6 +34,8 @@ import { poseDetector, WristPosition, PoseLandmark } from '../../utils/poseDetec
 import { voiceGuide } from '../../lib/VoiceGuideService';
 import { isExternalCar, prefetchExternalCarAsset, shouldUseExternalCar } from '../../lib/racing/ExternalCarModelLoader';
 import { detectDeviceClass } from '../../utils/graphicsQuality';
+import { useCameraPose } from '../../providers/CameraPoseContext';
+import { dualRacePoseController, DualRacePoseFrame } from '../../lib/racing/DualRacePoseController';
 
 import { GarageScreen } from './GarageScreen';
 import { Race3DCanvas } from './Race3DCanvas';
@@ -40,6 +43,9 @@ import { RaceHUD } from './RaceHUD';
 import { RacePodium } from './RacePodium';
 import { MotionSteeringCalibration } from './MotionSteeringCalibration';
 import { PassAndPlayMultiplayer, LocalPlayerEntry } from './PassAndPlayMultiplayer';
+import { DuoRaceSetup } from './DuoRaceSetup';
+import { DuoRaceHUD } from './DuoRaceHUD';
+import { RaceGestureGuide } from './RaceGestureGuide';
 
 import {
   Trophy,
@@ -72,7 +78,8 @@ type RacingSubScreen =
   | 'in_race'
   | 'podium'
   | 'calibration'
-  | 'pass_and_play';
+  | 'pass_and_play'
+  | 'duo_setup';
 
 
 const RACE_SETTINGS_STORAGE_KEY = 'phuong_nha_race_settings_v54';
@@ -88,6 +95,7 @@ const DEFAULT_RACE_SETTINGS: RaceSettings = {
   quality: 'auto',
   soundVolume: 1.0,
   engineVolume: 0.8,
+  localPlayerCount: 1,
 };
 
 const QUALITY_PRESETS: { id: RaceSettings['quality']; label: string; hint: string }[] = [
@@ -103,6 +111,7 @@ export default function BaraSpeedRacingGame({
   gesture = 'standing',
   onBack,
 }: BaraSpeedRacingGameProps) {
+  const { videoElement, isCameraReady } = useCameraPose();
   // 1. Profile State
   const [profile, setProfile] = useState<PlayerRaceProfile>(() => loadRaceProfile());
   const [currentSubScreen, setCurrentSubScreen] = useState<RacingSubScreen>('mode_select');
@@ -112,6 +121,25 @@ export default function BaraSpeedRacingGame({
   const [selectedCarId, setSelectedCarId] = useState<CarModelId>(profile.selectedCarId || 'bara_gt');
   const [raceMode, setRaceMode] = useState<RaceMode>('quick_race');
   const [cameraView, setCameraView] = useState<CameraViewMode>('close_chase');
+  const [secondPlayerCarId, setSecondPlayerCarId] = useState<CarModelId>(() => {
+    const unlocked = profile.unlockedCars || [];
+    return unlocked.find((id) => id !== (profile.selectedCarId || 'bara_gt')) || profile.selectedCarId || 'bara_gt';
+  });
+  const [dualPoseFrame, setDualPoseFrame] = useState<DualRacePoseFrame | null>(null);
+  const [showGestureGuide, setShowGestureGuide] = useState(false);
+  const shieldCooldownRef = useRef<[number, number]>([0, 0]);
+  const lastDualPoseAtRef = useRef<number>(0);
+
+  // 4. Engine & HUD State
+  const [engine, setEngine] = useState<RaceEngine | null>(null);
+  const [raceResult, setRaceResult] = useState<RaceResult | null>(null);
+  const [isSoundMuted, setIsSoundMuted] = useState(false);
+  const [activeVoiceText, setActiveVoiceText] = useState<string>('');
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [raceSceneReady, setRaceSceneReady] = useState(false);
+  const [raceLoadingText, setRaceLoadingText] = useState('Đang chuẩn bị đường đua...');
+  const countdownStartedRef = useRef(false);
+  const savedPhaseRef = useRef<RaceStatePhase>('racing');
 
   // 3. Settings State — persisted so the chosen Phone / TV / PC profile survives refreshes.
   const [raceSettings, setRaceSettings] = useState<RaceSettings>(() => {
@@ -124,6 +152,8 @@ export default function BaraSpeedRacingGame({
     }
   });
 
+  const localPlayerCount: LocalRacePlayerCount = raceSettings.localPlayerCount === 2 ? 2 : 1;
+
   useEffect(() => {
     try {
       localStorage.setItem(RACE_SETTINGS_STORAGE_KEY, JSON.stringify(raceSettings));
@@ -131,6 +161,50 @@ export default function BaraSpeedRacingGame({
       // Storage may be unavailable in private/locked-down browser modes.
     }
   }, [raceSettings]);
+
+  // V5.29: two racers share ONE camera. Pause the original single-pose inference loop
+  // while dual left/right crops are active so we never run three pose models at once.
+  // Multi-pose is intentionally OFF in Garage / Track Select to avoid competing with FBX parsing.
+  useEffect(() => {
+    let cancelled = false;
+    if (localPlayerCount !== 2) {
+      dualRacePoseController.stop();
+      poseDetector.setProcessingEnabled(true);
+      setDualPoseFrame(null);
+      return;
+    }
+
+    poseDetector.setProcessingEnabled(false);
+    const needsDualPose = currentSubScreen === 'duo_setup' || (currentSubScreen === 'in_race' && raceSceneReady);
+    if (!needsDualPose) {
+      // Keep the already-loaded light pose models warm only across Track Select and the
+      // race loading screen; inference is fully paused so FBX/scenery get the main thread.
+      // Garage/menu/podium release them completely to free memory on Android TV.
+      if (currentSubScreen === 'track_select' || currentSubScreen === 'in_race') dualRacePoseController.pause();
+      else dualRacePoseController.stop();
+      setDualPoseFrame(null);
+      return;
+    }
+
+    const unsub = dualRacePoseController.addListener((frame) => {
+      if (!cancelled) setDualPoseFrame(frame);
+    });
+    if (videoElement && isCameraReady) {
+      void dualRacePoseController.start(videoElement);
+    }
+    return () => {
+      cancelled = true;
+      unsub();
+      dualRacePoseController.pause();
+    };
+  }, [localPlayerCount, currentSubScreen, raceSceneReady, videoElement, isCameraReady]);
+
+  // If the racing component itself unmounts while 2P was selected, restore normal pose
+  // processing so the next camera game never inherits a suspended detector.
+  useEffect(() => () => {
+    dualRacePoseController.stop();
+    poseDetector.setProcessingEnabled(true);
+  }, []);
 
   // V5.16: warm NETWORK cache only while choosing a track. Do not parse a 20–40 MB
   // ASCII FBX in the background because FBXLoader parsing itself runs on the main thread.
@@ -156,17 +230,6 @@ export default function BaraSpeedRacingGame({
     img.decoding = 'async';
     img.src = `${((import.meta as any).env?.BASE_URL || '/')}assets/pc-hd/asphalt-hd.webp`;
   }, []);
-
-  // 4. Engine & HUD State
-  const [engine, setEngine] = useState<RaceEngine | null>(null);
-  const [raceResult, setRaceResult] = useState<RaceResult | null>(null);
-  const [isSoundMuted, setIsSoundMuted] = useState(false);
-  const [activeVoiceText, setActiveVoiceText] = useState<string>('');
-  const [showExitModal, setShowExitModal] = useState(false);
-  const [raceSceneReady, setRaceSceneReady] = useState(false);
-  const [raceLoadingText, setRaceLoadingText] = useState('Đang chuẩn bị đường đua...');
-  const countdownStartedRef = useRef(false);
-  const savedPhaseRef = useRef<RaceStatePhase>('racing');
 
   // Pause and Exit Handlers
   const handlePauseAndShowExitModal = useCallback(() => {
@@ -245,6 +308,9 @@ export default function BaraSpeedRacingGame({
       ...DEFAULT_CUSTOMIZATION,
       paintColor: currentCar.defaultColor,
     };
+  const currentSecondCar = CAR_CATALOG.find((c) => c.id === secondPlayerCarId) || CAR_CATALOG[0];
+  const currentSecondCustomization: CarCustomization =
+    profile.carCustomizations[secondPlayerCarId] || { ...DEFAULT_CUSTOMIZATION, paintColor: currentSecondCar.defaultColor };
 
   // Voice synthesis speaker
   const speakVoice = useCallback((text: string) => {
@@ -269,7 +335,7 @@ export default function BaraSpeedRacingGame({
         landmarks: result.landmarks,
       });
 
-      if (!engine || engine.phase !== 'racing' || raceSettings.controlMode !== 'camera_motion') return;
+      if (localPlayerCount === 2 || !engine || engine.phase !== 'racing' || raceSettings.controlMode !== 'camera_motion') return;
 
       // Process wrist/landmark angles via steering engine
       const steerRes = steeringEngineRef.current.processPose(
@@ -322,7 +388,61 @@ export default function BaraSpeedRacingGame({
     return () => {
       unsubscribe();
     };
-  }, [engine, gesture]);
+  }, [engine, gesture, localPlayerCount, raceSettings.controlMode]);
+
+  // Dual camera controls. P1 stays on screen-left, P2 on screen-right.
+  // If one player disappears, only that player's steering returns to neutral; IDs never swap.
+  useEffect(() => {
+    if (localPlayerCount !== 2 || !engine || engine.phase !== 'racing' || raceSettings.controlMode !== 'camera_motion') return;
+    const frame = dualPoseFrame;
+    if (!frame) return;
+    lastDualPoseAtRef.current = frame.timestamp || performance.now();
+    const [p1, p2] = frame.players;
+    const now = performance.now();
+    const applyPlayer = (player: typeof p1, index: 0 | 1) => {
+      // If one person leaves the camera for longer than the short ID grace period,
+      // slow only that player's car instead of letting auto-throttle drive unattended.
+      if (!player.bodyDetected) {
+        return { steer: 0, nitro: false, brake: true, shield: false };
+      }
+      let steer = player.steeringNormalized;
+      if (player.gesture === 'tilt_left') steer = Math.min(steer, -0.8);
+      if (player.gesture === 'tilt_right') steer = Math.max(steer, 0.8);
+      const nitro = player.gesture === 'both_arms_up';
+      const brake = player.gesture === 'duck';
+      const shield = player.gesture === 'hands_spread' && now >= shieldCooldownRef.current[index];
+      if (shield) shieldCooldownRef.current[index] = now + 9000;
+      return { steer, nitro, brake, shield };
+    };
+    const a = applyPlayer(p1, 0);
+    const b = applyPlayer(p2, 1);
+    engine.setSteeringInput(a.steer);
+    engine.setBrakeInput(a.brake);
+    if (a.nitro) engine.triggerNitro();
+    if (a.shield) engine.activatePlayerShield(4.5);
+    engine.setSecondPlayerSteeringInput(b.steer);
+    engine.setSecondPlayerBrakeInput(b.brake);
+    if (b.nitro) engine.triggerSecondPlayerNitro();
+    if (b.shield) engine.activateSecondPlayerShield(4.5);
+    setSteeringState((prev) => ({ ...prev, steerValue: a.steer, steeringAngleDeg: p1.steeringAngleDeg, isHoldingWheel: p1.bodyDetected, nitroTriggered: a.nitro, brakeTriggered: a.brake, handsConfidence: p1.confidence }));
+  }, [dualPoseFrame, engine, localPlayerCount, raceSettings.controlMode]);
+
+  // Safety watchdog: if the dual detector stops producing frames (camera unplugged,
+  // browser permission revoked, WASM hiccup), do not let auto-throttle drive either
+  // local car unattended. A fresh pose frame immediately resumes normal control.
+  useEffect(() => {
+    if (localPlayerCount !== 2 || !engine || currentSubScreen !== 'in_race') return;
+    lastDualPoseAtRef.current = performance.now();
+    const timer = window.setInterval(() => {
+      if (engine.phase !== 'racing') return;
+      if (performance.now() - lastDualPoseAtRef.current <= 900) return;
+      engine.setSteeringInput(0);
+      engine.setBrakeInput(true);
+      engine.setSecondPlayerSteeringInput(0);
+      engine.setSecondPlayerBrakeInput(true);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [engine, currentSubScreen, localPlayerCount]);
 
   // Keyboard controls listener for in-race
   useEffect(() => {
@@ -332,11 +452,8 @@ export default function BaraSpeedRacingGame({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape' || e.code === 'KeyP') {
-        if (showExitModal) {
-          handleResumeRace();
-        } else {
-          handlePauseAndShowExitModal();
-        }
+        if (engine.phase === 'paused') handleResumeRace();
+        else handlePauseAndShowExitModal();
         return;
       }
       keysDown.add(e.code);
@@ -353,7 +470,11 @@ export default function BaraSpeedRacingGame({
 
       // Camera view toggle (always allowed)
       if (keysDown.has('KeyC')) {
-        handleCycleCameraView();
+        setCameraView((prev) => {
+          const views: CameraViewMode[] = ['chase', 'close_chase', 'hood', 'cockpit', 'cinematic'];
+          return views[(views.indexOf(prev) + 1) % views.length];
+        });
+        raceAudio.playMenuClick();
         keysDown.delete('KeyC');
       }
 
@@ -396,7 +517,7 @@ export default function BaraSpeedRacingGame({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [engine, currentSubScreen, raceSettings.autoThrottle]);
+  }, [engine, currentSubScreen, raceSettings.autoThrottle, raceSettings.controlMode, handlePauseAndShowExitModal, handleResumeRace]);
 
   // Start race runner
   const handleStartRace = (trackId: RacingTrackId, carId: CarModelId, mode: RaceMode) => {
@@ -407,13 +528,14 @@ export default function BaraSpeedRacingGame({
 
     raceAudio.init();
 
-    const newEngine = new RaceEngine(trackId, carId, mode, raceSettings, (lineKey, text) => {
+    const effectivePlayerCount: LocalRacePlayerCount = mode === 'quick_race' ? localPlayerCount : 1;
+    const newEngine = new RaceEngine(trackId, carId, mode, { ...raceSettings, localPlayerCount: effectivePlayerCount }, (lineKey, text) => {
       if (text) speakVoice(text);
       else if (VOICE_LINES.racing[lineKey as keyof typeof VOICE_LINES.racing]) {
         const val = VOICE_LINES.racing[lineKey as keyof typeof VOICE_LINES.racing];
         if (typeof val === 'string') speakVoice(val);
       }
-    });
+    }, { playerCount: effectivePlayerCount, secondCarModelId: effectivePlayerCount === 2 ? secondPlayerCarId : undefined });
 
     countdownStartedRef.current = false;
     setRaceSceneReady(false);
@@ -448,6 +570,7 @@ export default function BaraSpeedRacingGame({
     if (!engine || currentSubScreen !== 'in_race') return;
 
     let animId: number;
+    let podiumTimer: number | null = null;
 
     const checkFinish = () => {
       if (engine.isFinished && engine.raceResult && !raceResult) {
@@ -492,13 +615,15 @@ export default function BaraSpeedRacingGame({
           ...profile,
           totalDriftScore: profile.totalDriftScore + res.totalDriftScore,
           racesWon: res.rank === 1 ? profile.racesWon + 1 : profile.racesWon,
-          bestLapTimes: {
-            ...profile.bestLapTimes,
-            [selectedTrackId]: Math.min(
-              profile.bestLapTimes[selectedTrackId] || 999999,
-              res.bestLapTimeMs
-            ),
-          },
+          bestLapTimes: res.bestLapTimeMs > 0
+            ? {
+                ...profile.bestLapTimes,
+                [selectedTrackId]: Math.min(
+                  profile.bestLapTimes[selectedTrackId] || Number.POSITIVE_INFINITY,
+                  res.bestLapTimeMs
+                ),
+              }
+            : profile.bestLapTimes,
         });
 
         // If in Pass and Play tournament mode
@@ -518,7 +643,7 @@ export default function BaraSpeedRacingGame({
           speakVoice(VOICE_LINES.racing.finishGood);
         }
 
-        setTimeout(() => {
+        podiumTimer = window.setTimeout(() => {
           setCurrentSubScreen('podium');
         }, 1200);
       } else {
@@ -527,7 +652,10 @@ export default function BaraSpeedRacingGame({
     };
 
     animId = requestAnimationFrame(checkFinish);
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      cancelAnimationFrame(animId);
+      if (podiumTimer !== null) window.clearTimeout(podiumTimer);
+    };
   }, [engine, currentSubScreen, raceResult, selectedTrackId, raceMode, tournamentPlayers, currentTournamentIndex, profile]);
 
   // Cycle camera views
@@ -608,9 +736,9 @@ export default function BaraSpeedRacingGame({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black bg-cyan-400 text-slate-950 px-2 py-0.5 rounded-full uppercase">
-                      Camera AI Đang Bật
+                      {localPlayerCount === 2 ? 'Camera 2 Người' : 'Camera AI Đang Bật'}
                     </span>
-                    <span className="text-xs text-cyan-300 font-bold">Vô-lăng ảo 2 tay</span>
+                    <span className="text-xs text-cyan-300 font-bold">{localPlayerCount === 2 ? '1 camera · P1 trái · P2 phải' : 'Vô-lăng ảo 2 tay'}</span>
                   </div>
                   <p className="text-xs text-slate-200 mt-0.5 leading-snug">
                     <strong className="text-cyan-300">2 tay giơ trước ngực</strong> bẻ lái như cầm vô lăng • <strong className="text-amber-300">Giơ 2 tay lên cao</strong> bật NITRO 🚀!
@@ -620,12 +748,28 @@ export default function BaraSpeedRacingGame({
 
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => setCurrentSubScreen('calibration')}
+                  onClick={() => setCurrentSubScreen(localPlayerCount === 2 ? 'duo_setup' : 'calibration')}
                   className="px-3.5 py-2 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs shadow-md transition active:scale-95"
                 >
                   Cân Chỉnh 📷
                 </button>
+                <button onClick={() => setShowGestureGuide(true)} className="px-3.5 py-2 rounded-2xl bg-violet-500 hover:bg-violet-400 text-white font-black text-xs shadow-md transition active:scale-95">Cử Chỉ ✋</button>
               </div>
+            </div>
+
+            <div className="mt-5 grid w-full max-w-2xl grid-cols-2 gap-3">
+              <button
+                onClick={() => setRaceSettings((prev) => ({ ...prev, localPlayerCount: 1 }))}
+                className={`rounded-3xl border-2 p-4 text-left transition ${localPlayerCount === 1 ? 'border-cyan-300 bg-cyan-500/20 shadow-lg shadow-cyan-950/50' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+              >
+                <div className="text-3xl">👤</div><div className="mt-1 text-base font-black">1 NGƯỜI</div><div className="text-[10px] font-bold text-slate-400">Nhẹ nhất · giữ chế độ hiện tại</div>
+              </button>
+              <button
+                onClick={() => { setRaceSettings((prev) => ({ ...prev, localPlayerCount: 2, controlMode: 'camera_motion', autoThrottle: true })); setRaceMode('quick_race'); }}
+                className={`rounded-3xl border-2 p-4 text-left transition ${localPlayerCount === 2 ? 'border-pink-300 bg-pink-500/20 shadow-lg shadow-pink-950/50' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+              >
+                <div className="text-3xl">👥</div><div className="mt-1 text-base font-black">2 NGƯỜI · 1 CAMERA</div><div className="text-[10px] font-bold text-slate-400">Split-screen · P1 trái / P2 phải</div>
+              </button>
             </div>
 
             {/* Quick Game Modes Grid */}
@@ -635,7 +779,7 @@ export default function BaraSpeedRacingGame({
                 id="mode-quick-race-card"
                 onClick={() => {
                   setRaceMode('quick_race');
-                  setCurrentSubScreen('track_select');
+                  setCurrentSubScreen(localPlayerCount === 2 ? 'duo_setup' : 'track_select');
                   raceAudio.playMenuClick();
                 }}
                 className="group relative bg-gradient-to-br from-cyan-950/60 to-slate-900/80 border-2 border-cyan-500/40 hover:border-cyan-400 rounded-3xl p-5 text-left cursor-pointer transition-all hover:scale-102 hover:shadow-2xl hover:shadow-cyan-950/60 flex flex-col justify-between"
@@ -651,11 +795,11 @@ export default function BaraSpeedRacingGame({
                     Đua Nhanh (Quick Race)
                   </h3>
                   <p className="text-xs text-slate-400 mt-1">
-                    Đua cùng 3 đối thủ AI thông minh trên các cung đường neon lung linh.
+                    {localPlayerCount === 2 ? 'P1 và P2 đối đầu trực tiếp cùng 2 xe AI trên một đường đua.' : 'Đua cùng 3 đối thủ AI thông minh trên các cung đường neon lung linh.'}
                   </p>
                 </div>
                 <div className="mt-4 flex items-center justify-between pt-3 border-t border-slate-800 text-xs font-black text-cyan-400">
-                  <span>3 Vòng đua</span>
+                  <span>{localPlayerCount === 2 ? '2 Người · 3 Vòng' : '3 Vòng đua'}</span>
                   <Play className="w-4 h-4 fill-cyan-400" />
                 </div>
               </div>
@@ -694,6 +838,7 @@ export default function BaraSpeedRacingGame({
               <div
                 id="mode-multiplayer-card"
                 onClick={() => {
+                  setRaceSettings((prev) => ({ ...prev, localPlayerCount: 1 }));
                   setCurrentSubScreen('pass_and_play');
                   raceAudio.playMenuClick();
                 }}
@@ -723,6 +868,7 @@ export default function BaraSpeedRacingGame({
               <div
                 id="mode-time-attack-card"
                 onClick={() => {
+                  setRaceSettings((prev) => ({ ...prev, localPlayerCount: 1 }));
                   setRaceMode('time_attack');
                   setCurrentSubScreen('track_select');
                   raceAudio.playMenuClick();
@@ -753,6 +899,7 @@ export default function BaraSpeedRacingGame({
               <div
                 id="mode-drift-card"
                 onClick={() => {
+                  setRaceSettings((prev) => ({ ...prev, localPlayerCount: 1 }));
                   setRaceMode('drift_challenge');
                   setCurrentSubScreen('track_select');
                   raceAudio.playMenuClick();
@@ -860,6 +1007,26 @@ export default function BaraSpeedRacingGame({
       )}
 
       {/* 2. Track Selection Screen */}
+      {currentSubScreen === 'duo_setup' && (
+        <DuoRaceSetup
+          profile={profile}
+          p1CarId={selectedCarId}
+          p2CarId={secondPlayerCarId}
+          onP1Car={(id) => { setSelectedCarId(id); handleUpdateProfile({ ...profile, selectedCarId: id }); }}
+          onP2Car={setSecondPlayerCarId}
+          p1Detected={!!dualPoseFrame?.players[0]?.bodyDetected}
+          p2Detected={!!dualPoseFrame?.players[1]?.bodyDetected}
+          poseFps={dualPoseFrame?.fps || 0}
+          deviceClass={detectDeviceClass()}
+          onBack={() => setCurrentSubScreen('mode_select')}
+          onContinue={() => setCurrentSubScreen('track_select')}
+          onSwitchToSolo={() => {
+            setRaceSettings((prev) => ({ ...prev, localPlayerCount: 1 }));
+            setCurrentSubScreen('mode_select');
+          }}
+        />
+      )}
+
       {currentSubScreen === 'track_select' && (
         <div
           id="racing-track-select-screen"
@@ -868,7 +1035,7 @@ export default function BaraSpeedRacingGame({
           {/* Header */}
           <div className="flex items-center justify-between">
             <button
-              onClick={() => setCurrentSubScreen('mode_select')}
+              onClick={() => setCurrentSubScreen(localPlayerCount === 2 && raceMode === 'quick_race' ? 'duo_setup' : 'mode_select')}
               className="px-4 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center gap-2"
             >
               <ChevronLeft className="w-5 h-5 text-cyan-400" />
@@ -1033,6 +1200,8 @@ export default function BaraSpeedRacingGame({
             customization={currentCustomization}
             cameraView={cameraView}
             qualitySetting={raceSettings.quality}
+            secondCar={localPlayerCount === 2 ? currentSecondCar : undefined}
+            secondCustomization={localPlayerCount === 2 ? currentSecondCustomization : undefined}
             onReady={handleRaceSceneReady}
           />
 
@@ -1053,6 +1222,19 @@ export default function BaraSpeedRacingGame({
           )}
 
           {/* In-Game HUD Overlay */}
+          {localPlayerCount === 2 ? (
+            <DuoRaceHUD
+              engine={engine}
+              track={currentTrack}
+              poseStatus={[!!dualPoseFrame?.players[0]?.bodyDetected, !!dualPoseFrame?.players[1]?.bodyDetected]}
+              poseFps={dualPoseFrame?.fps || 0}
+              isSoundMuted={isSoundMuted}
+              onToggleSound={handleToggleSound}
+              onExit={handlePauseAndShowExitModal}
+              onGuide={() => setShowGestureGuide(true)}
+              onSwitchCamera={handleCycleCameraView}
+            />
+          ) : (
           <RaceHUD
             player={engine.physics.player}
             aiRacers={engine.physics.aiRacers}
@@ -1079,6 +1261,8 @@ export default function BaraSpeedRacingGame({
             isSoundMuted={isSoundMuted}
             activeVoiceText={activeVoiceText}
           />
+          )}
+
 
           {/* Exit Confirmation Modal Overlay */}
           {showExitModal && (
@@ -1161,6 +1345,8 @@ export default function BaraSpeedRacingGame({
           }}
         />
       )}
+
+      {showGestureGuide && <RaceGestureGuide onClose={() => setShowGestureGuide(false)} compact={localPlayerCount === 2} />}
     </div>
   );
 }

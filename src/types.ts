@@ -393,6 +393,7 @@ export type RaceMode =
   | 'pass_and_play';
 
 export type CameraViewMode = 'chase' | 'close_chase' | 'hood' | 'cockpit' | 'cinematic';
+export type LocalRacePlayerCount = 1 | 2;
 
 export interface RaceSettings {
   controlMode: 'camera_motion' | 'touch_wheel' | 'touch_pedals' | 'tilt_device' | 'keyboard';
@@ -406,6 +407,8 @@ export interface RaceSettings {
   quality: 'auto' | 'low' | 'medium' | 'high';
   soundVolume: number;
   engineVolume: number;
+  /** 1P keeps the original lightweight pipeline; 2P enables one-camera split-screen racing. */
+  localPlayerCount?: LocalRacePlayerCount;
 }
 
 export interface RaceItemPickup {

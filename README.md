@@ -64,3 +64,11 @@ Lưu ý: source vẫn là WebGL/Three.js procedural, không nhúng model xe thư
 - Mobile/lite mode keeps the existing lightweight geometry to protect frame rate.
 - Fixed duplicate requestAnimationFrame scheduling in the race renderer and disabled race shadows when the detected graphics profile says shadows are off.
 - High-quality race/garage scenes use local procedural cube reflections; no external HDR/model download is required.
+
+## V5.29 — 1 camera / 2-player racing + full logic audit
+
+V5.29 adds an explicit **1 Player / 2 Players · 1 Camera** choice for racing. Two-player mode uses one shared camera with P1 on the left and P2 on the right, upper-body-only pose control, visible gesture instructions, stable side-based identity, split-screen rendering with one shared Three.js scene, separate HUDs, adaptive device performance and safety braking when a player disappears.
+
+The same pass also fixes brake priority with Auto-gas, duplicate race-profile persistence, invalid `0` best-lap saves, P1/P2 collision double-processing, Pet Care camera routing, racing/Ludo calibration routing, Pose Mimic double-advance/final bonus, Fashion Show stale final score, several timer cleanup issues, and TV `?tv=1` graphics detection.
+
+See `AUDIT-V5.29-ONE-CAMERA-2P-FULL-LOGIC.md` and `VALIDATION-V5.29.md` for validation and recommended PC/phone/Android TV hardware.

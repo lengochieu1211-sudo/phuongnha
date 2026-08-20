@@ -52,10 +52,15 @@ export default function PoseMimicGame({ progress, onUpdateProgress, gesture, onB
   const timeLeftRef = useRef<number>(10);
   const scoreRef = useRef<number>(0);
   const holdIntervalRef = useRef<any>(null);
+  const advancingRef = useRef(false);
+  const cheerTimerRef = useRef<number | null>(null);
   const activePose = POSES[currentPoseIndex];
 
   // Start game
   const startGame = () => {
+    advancingRef.current = false;
+    if (cheerTimerRef.current !== null) window.clearTimeout(cheerTimerRef.current);
+    cheerTimerRef.current = null;
     audio.playRoundStartJingle();
     voiceGuide.speak('Hãy làm theo các tư thế mẫu siêu dễ thương nào!', 'high');
     setScore(0);
@@ -74,6 +79,10 @@ export default function PoseMimicGame({ progress, onUpdateProgress, gesture, onB
 
   // Turn to next pose
   const nextPose = (success: boolean) => {
+    // Countdown expiry and pose-hold completion can happen in the same frame.
+    // Guard the transition so one pose can never advance twice / score and fail together.
+    if (advancingRef.current) return;
+    advancingRef.current = true;
     if (success) {
       setTotalCompleted((prev) => prev + 1);
       setStreak((prev) => prev + 1);
@@ -82,13 +91,15 @@ export default function PoseMimicGame({ progress, onUpdateProgress, gesture, onB
       // Show cute cheer text
       const randomCheer = CHEERS[Math.floor(Math.random() * CHEERS.length)];
       setCheerMsg(randomCheer);
-      setTimeout(() => setCheerMsg(''), 1800);
+      if (cheerTimerRef.current !== null) window.clearTimeout(cheerTimerRef.current);
+      cheerTimerRef.current = window.setTimeout(() => { cheerTimerRef.current = null; setCheerMsg(''); }, 1800);
     } else {
       setStreak(0);
       audio.playFail();
       voiceGuide.speak(VOICE_LINES.mimic.hold, 'low');
       setCheerMsg('Thử lại nhé! 💪');
-      setTimeout(() => setCheerMsg(''), 1800);
+      if (cheerTimerRef.current !== null) window.clearTimeout(cheerTimerRef.current);
+      cheerTimerRef.current = window.setTimeout(() => { cheerTimerRef.current = null; setCheerMsg(''); }, 1800);
     }
 
     if (currentPoseIndex < POSES.length - 1) {
@@ -96,18 +107,21 @@ export default function PoseMimicGame({ progress, onUpdateProgress, gesture, onB
       resetPoseTimer();
     } else {
       // Completed all poses
-      endGame();
+      endGame(success);
     }
   };
 
   // End game summary
-  const endGame = () => {
+  const endGame = (lastPoseSucceeded: boolean = false) => {
     setGameState('game_over');
     audio.playSuccess();
     voiceGuide.speak('Xuất sắc! Bạn đã vượt qua tất cả thử thách tư thế!', 'high');
 
     const finalScore = scoreRef.current;
-    const starsEarned = Math.floor(finalScore / 12) + (totalCompleted === POSES.length ? 15 : 0);
+    // React state from setTotalCompleted() is not committed yet when the LAST pose
+    // succeeds, so include that final success explicitly for the completion bonus.
+    const completedCount = totalCompleted + (lastPoseSucceeded ? 1 : 0);
+    const starsEarned = Math.floor(finalScore / 12) + (completedCount === POSES.length ? 15 : 0);
     const diamondsEarned = Math.floor(finalScore / 35);
 
     onUpdateProgress((prev) => {
@@ -123,6 +137,15 @@ export default function PoseMimicGame({ progress, onUpdateProgress, gesture, onB
       };
     });
   };
+
+  useEffect(() => {
+    if (gameState === 'playing') advancingRef.current = false;
+  }, [currentPoseIndex, gameState]);
+
+  useEffect(() => () => {
+    if (cheerTimerRef.current !== null) window.clearTimeout(cheerTimerRef.current);
+    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+  }, []);
 
   // 10 second countdown per pose
   useEffect(() => {

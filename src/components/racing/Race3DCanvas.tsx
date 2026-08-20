@@ -26,6 +26,8 @@ interface Race3DCanvasProps {
   customization: CarCustomization;
   cameraView: CameraViewMode;
   qualitySetting: RaceSettings['quality'];
+  secondCar?: CarConfig;
+  secondCustomization?: CarCustomization;
   onReady?: () => void;
 }
 
@@ -36,12 +38,15 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
   customization,
   cameraView,
   qualitySetting,
+  secondCar,
+  secondCustomization,
   onReady,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const secondCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const playerCarRef = useRef<Car3DInstance | null>(null);
   const aiCarsRef = useRef<{ id: string; instance: Car3DInstance }[]>([]);
   const itemMeshesRef = useRef<{ id: number; mesh: THREE.Mesh }[]>([]);
@@ -61,6 +66,14 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
     const profile = resolveRacingGraphicsProfile(qualitySetting);
     const actualDeviceClass = detectDeviceClass();
+    const twoPlayer = engine.localPlayerCount === 2 && !!engine.physics.getLocalSecondPlayer();
+    if (twoPlayer) {
+      // Split-screen renders the same scene twice. Reduce scene cost before FPS drops,
+      // especially on Android TV / phones where GPU bandwidth is the main bottleneck.
+      profile.sceneryDensity *= actualDeviceClass === 'desktop' ? 0.82 : 0.52;
+      profile.aiCarDetail = 'lite';
+      profile.targetFps = actualDeviceClass === 'desktop' ? Math.min(profile.targetFps, 55) : 36;
+    }
 
     // 1. Three.js Scene & Camera
     const scene = new THREE.Scene();
@@ -75,12 +88,15 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
     const camera = new THREE.PerspectiveCamera(54, width / height, 0.12, 1400);
     cameraRef.current = camera;
+    const secondCamera = twoPlayer ? new THREE.PerspectiveCamera(54, width / height, 0.12, 1400) : null;
+    secondCameraRef.current = secondCamera;
 
     // 2. WebGL Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, profile.pixelRatioCap));
-    renderer.shadowMap.enabled = profile.shadows;
+    const splitRatioScale = twoPlayer ? (actualDeviceClass === 'desktop' ? 0.88 : 0.74) : 1;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, profile.pixelRatioCap * splitRatioScale));
+    renderer.shadowMap.enabled = profile.shadows && (!twoPlayer || actualDeviceClass === 'desktop');
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -125,7 +141,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
     if (
       isExternalCar(car.id) &&
-      shouldUseExternalCar(car.id, actualDeviceClass)
+      shouldUseExternalCar(car.id, actualDeviceClass) && (!twoPlayer || actualDeviceClass === 'desktop')
     ) {
       externalReadyPromise = attachExternalCarModel(playerCar, car.id, customization, profile.carDetail)
         .then((handle) => {
@@ -161,18 +177,18 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     // 6. Build AI 3D Cars
     const aiCars: { id: string; instance: Car3DInstance }[] = [];
     engine.physics.aiRacers.forEach((ai) => {
-      const aiInstance = buildCar3D(ai.carModelId as any, {
+      const localP2Custom = ai.isLocalPlayer && secondCustomization ? secondCustomization : null;
+      const aiInstance = buildCar3D(ai.carModelId as any, localP2Custom || {
         paintColor: ai.color,
         paintFinish: 'metallic',
         wheelStyle: 'sport',
         wheelColor: '#1e293b',
-        // V5.22: a tall sport wing on the first AI car sits directly in front of the chase camera
-        // at the start grid and looks like a detached table/platform. Keep AI spoilers compact.
+        // Keep AI spoilers compact; tall wings can look like a detached table from a chase camera.
         spoilerStyle: 'stock',
-        neonUnderglow: 'cyan',
+        neonUnderglow: ai.isLocalPlayer ? 'pink' : 'cyan',
         windowTint: 'smoke',
         decal: 'none',
-      }, profile.aiCarDetail);
+      }, ai.isLocalPlayer ? profile.carDetail : profile.aiCarDetail);
       scene.add(aiInstance.root);
       aiCars.push({ id: ai.id, instance: aiInstance });
     });
@@ -204,7 +220,8 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     itemMeshesRef.current = itemMeshes;
 
     // 8. Speed Lines Particle System
-    const particleCount = profile.quality === 'high' ? 220 : profile.quality === 'balanced' ? 140 : 80;
+    const particleBaseCount = profile.quality === 'high' ? 220 : profile.quality === 'balanced' ? 140 : 80;
+    const particleCount = Math.round(particleBaseCount * (twoPlayer ? 0.62 : 1));
     const particleGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount * 3; i += 3) {
@@ -309,8 +326,11 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     };
 
     let lastCollisionPulse = engine.physics.player.collisionPulse;
+    let lastSecondCollisionPulse = engine.physics.getLocalSecondPlayer()?.collisionPulse || 0;
     let cameraShakeSec = 0;
     let cameraShakeStrength = 0;
+    let secondCameraShakeSec = 0;
+    let secondCameraShakeStrength = 0;
     let damageFxAccumulator = 0;
 
     // Put camera at the start grid before shader compilation so the first visible
@@ -328,6 +348,15 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       car.category,
       true,
     );
+    if (secondCamera) {
+      const p2 = engine.physics.getLocalSecondPlayer();
+      const p2CarId = (p2?.carModelId || secondCar?.id || car.id) as string;
+      const p2Category = secondCar?.category || 'sports';
+      updateCameraPosition(
+        secondCamera, startPt.pos.x, startPt.pos.y, startPt.pos.z, startPt.tangent, cameraView, false,
+        p2CarId, p2Category, true,
+      );
+    }
 
     // V5.17 warm-up: wait for the selected FBX (normally already preloaded), render a
     // hidden frame and compile materials/shaders before starting the countdown.
@@ -463,6 +492,21 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         raceAudio.playSoftBump();
       }
 
+      const localP2 = engine.physics.getLocalSecondPlayer();
+      if (localP2 && (localP2.collisionPulse || 0) !== lastSecondCollisionPulse) {
+        lastSecondCollisionPulse = localP2.collisionPulse || 0;
+        const p2Pt = getInterpolatedTrackPoint(engine.waypoints, localP2.progress % 1.0);
+        const p2x = p2Pt.pos.x + p2Pt.normal.x * localP2.lateralOffset;
+        const p2z = p2Pt.pos.z + p2Pt.normal.z * localP2.lateralOffset;
+        const severity = Math.max(0.15, localP2.lastCollisionSeverity || 0.25);
+        const side = localP2.lastCollisionSide || 1;
+        spawnFromPool(sparkPool, Math.max(3, Math.round((7 + severity * 16) * impactScale)), p2x + p2Pt.normal.x * side, p2Pt.pos.y + 0.7, p2z + p2Pt.normal.z * side, 1, 2.4, [0.25, 0.68]);
+        if (severity > 0.42) spawnFromPool(smokePool, Math.max(2, Math.round((2 + severity * 5) * impactScale)), p2x, p2Pt.pos.y + 0.75, p2z, 0.65, 0.6, [0.8, 1.6]);
+        if (severity > 0.74 && profile.quality !== 'lite') spawnFromPool(firePool, Math.max(1, Math.round((2 + severity * 3) * impactScale)), p2x, p2Pt.pos.y + 0.72, p2z, 0.5, 1.25, [0.18, 0.50]);
+        secondCameraShakeSec = 0.10 + severity * 0.14;
+        secondCameraShakeStrength = (profile.quality === 'lite' ? 0.05 : 0.09) + severity * 0.09;
+      }
+
       // Progressive visual damage without deforming imported FBX meshes.
       damageFxAccumulator += delta;
       const damage = engine.physics.player.damage;
@@ -475,6 +519,16 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         if (damage >= 78 && profile.quality !== 'lite') {
           spawnFromPool(firePool, 1, px - pt.tangent.x * 0.45, py + 0.78, pz - pt.tangent.z * 0.45, 0.20, 0.85, [0.18, 0.46]);
         }
+        const p2DamageState = engine.physics.getLocalSecondPlayer();
+        if (p2DamageState && (p2DamageState.damage || 0) >= 35) {
+          const p2PtFx = getInterpolatedTrackPoint(engine.waypoints, p2DamageState.progress % 1.0);
+          const p2xFx = p2PtFx.pos.x + p2PtFx.normal.x * p2DamageState.lateralOffset;
+          const p2zFx = p2PtFx.pos.z + p2PtFx.normal.z * p2DamageState.lateralOffset;
+          spawnFromPool(smokePool, (p2DamageState.damage || 0) >= 70 ? 2 : 1, p2xFx - p2PtFx.tangent.x * 0.5, p2PtFx.pos.y + 0.86, p2zFx - p2PtFx.tangent.z * 0.5, 0.34, 0.5, [1.0, 2.0]);
+          if ((p2DamageState.damage || 0) >= 78 && profile.quality !== 'lite') {
+            spawnFromPool(firePool, 1, p2xFx - p2PtFx.tangent.x * 0.4, p2PtFx.pos.y + 0.76, p2zFx - p2PtFx.tangent.z * 0.4, 0.18, 0.78, [0.18, 0.44]);
+          }
+        }
       }
       updateImpactPool(sparkPool, delta, 3.4, -7.8);
       updateImpactPool(smokePool, delta, 1.3, 0.28);
@@ -485,6 +539,25 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         camera, px, py, pz, pt.tangent, cameraViewRef.current, engine.physics.player.isNitroActive,
         car.id, car.category
       );
+      if (secondCamera) {
+        const p2 = engine.physics.getLocalSecondPlayer();
+        if (p2) {
+          const p2Pt = getInterpolatedTrackPoint(engine.waypoints, p2.progress % 1.0);
+          const p2x = p2Pt.pos.x + p2Pt.normal.x * p2.lateralOffset;
+          const p2y = p2Pt.pos.y;
+          const p2z = p2Pt.pos.z + p2Pt.normal.z * p2.lateralOffset;
+          updateCameraPosition(
+            secondCamera, p2x, p2y, p2z, p2Pt.tangent, cameraViewRef.current, p2.isNitroActive,
+            (p2.carModelId || secondCar?.id || car.id) as string, secondCar?.category || 'sports'
+          );
+        }
+      }
+      if (secondCamera && secondCameraShakeSec > 0) {
+        secondCameraShakeSec = Math.max(0, secondCameraShakeSec - delta);
+        const fade2 = Math.min(1, secondCameraShakeSec / 0.14);
+        secondCamera.position.x += (Math.random() - 0.5) * secondCameraShakeStrength * fade2;
+        secondCamera.position.y += (Math.random() - 0.5) * secondCameraShakeStrength * 0.6 * fade2;
+      }
       if (cameraShakeSec > 0) {
         cameraShakeSec = Math.max(0, cameraShakeSec - delta);
         const fade = Math.min(1, cameraShakeSec / 0.16);
@@ -513,7 +586,31 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         fpsWindowStart = time;
       }
 
-      renderer.render(scene, camera);
+      if (secondCamera && engine.physics.getLocalSecondPlayer()) {
+        const rw = container.clientWidth || window.innerWidth;
+        const rh = container.clientHeight || window.innerHeight;
+        const verticalSplit = rw >= rh;
+        renderer.setScissorTest(true);
+        if (verticalSplit) {
+          const half = Math.floor(rw / 2);
+          camera.aspect = half / rh;
+          secondCamera.aspect = (rw - half) / rh;
+          camera.updateProjectionMatrix(); secondCamera.updateProjectionMatrix();
+          renderer.setViewport(0, 0, half, rh); renderer.setScissor(0, 0, half, rh); renderer.render(scene, camera);
+          renderer.setViewport(half, 0, rw - half, rh); renderer.setScissor(half, 0, rw - half, rh); renderer.render(scene, secondCamera);
+        } else {
+          const half = Math.floor(rh / 2);
+          camera.aspect = rw / (rh - half);
+          secondCamera.aspect = rw / half;
+          camera.updateProjectionMatrix(); secondCamera.updateProjectionMatrix();
+          renderer.setViewport(0, half, rw, rh - half); renderer.setScissor(0, half, rw, rh - half); renderer.render(scene, camera);
+          renderer.setViewport(0, 0, rw, half); renderer.setScissor(0, 0, rw, half); renderer.render(scene, secondCamera);
+        }
+        renderer.setScissorTest(false);
+      } else {
+        renderer.setViewport(0, 0, container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
+        renderer.render(scene, camera);
+      }
       animFrameIdRef.current = requestAnimationFrame(animate);
     };
 
@@ -526,6 +623,10 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       const h = containerRef.current.clientHeight || window.innerHeight;
       cameraRef.current.aspect = w / h;
       cameraRef.current.updateProjectionMatrix();
+      if (secondCameraRef.current) {
+        secondCameraRef.current.aspect = w / h;
+        secondCameraRef.current.updateProjectionMatrix();
+      }
       rendererRef.current.setSize(w, h);
     };
 
@@ -547,7 +648,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       renderer.forceContextLoss?.();
       if (renderer.domElement.parentElement === container) container.removeChild(renderer.domElement);
     };
-  }, [track.id, car.id, qualitySetting]);
+  }, [track.id, car.id, secondCar?.id, qualitySetting, engine.localPlayerCount]);
 
   // Update Customization in real-time if changed
   useEffect(() => {

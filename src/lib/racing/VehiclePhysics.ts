@@ -28,7 +28,7 @@ export interface VehicleState {
   damage: number; // 0 pristine -> 100 heavily damaged
   collisionPulse: number; // increments once for each resolved impact
   lastCollisionSeverity: number; // 0..1, consumed by the renderer
-  lastCollisionKind: 'ai' | 'barrier' | 'none';
+  lastCollisionKind: 'ai' | 'barrier' | 'player' | 'none';
   lastCollisionSide: number; // -1 left, +1 right, 0 centered
 }
 
@@ -46,6 +46,17 @@ export interface AIRacerState {
   isNitroActive: boolean;
   rank: number;
   lap: number;
+  /** Local P2 uses the AI rendering lane/state container but is controlled by camera input. */
+  isLocalPlayer?: boolean;
+  accelerationRate?: number;
+  nitroMeter?: number;
+  isShieldActive?: boolean;
+  shieldDuration?: number;
+  damage?: number;
+  collisionPulse?: number;
+  lastCollisionSeverity?: number;
+  lastCollisionKind?: 'ai' | 'barrier' | 'player' | 'none';
+  lastCollisionSide?: number;
 }
 
 export class VehiclePhysicsEngine {
@@ -54,6 +65,8 @@ export class VehiclePhysicsEngine {
 
   private roadHalfWidth: number = 11.5;
   private collisionCooldownSec: number = 0;
+  private secondCollisionCooldownSec: number = 0;
+  private localSecondPlayerId = 'local_player_2';
 
   constructor(stats: CarStats) {
     const topKmh = 140 + stats.topSpeed * 1.2;
@@ -112,6 +125,105 @@ export class VehiclePhysicsEngine {
     }
   }
 
+  public initLocalSecondPlayer(carModelId: string, stats: CarStats) {
+    // Remove an old P2 entry when restarting a local race.
+    this.aiRacers = this.aiRacers.filter((r) => r.id !== this.localSecondPlayerId);
+    const maxSpeedKmh = 140 + stats.topSpeed * 1.2;
+    const p2: AIRacerState = {
+      id: this.localSecondPlayerId,
+      name: 'P2',
+      carModelId,
+      color: '#f472b6',
+      progress: 0,
+      lateralOffset: 3.2,
+      speedKmh: 0,
+      maxSpeedKmh,
+      targetLateralOffset: 3.2,
+      steerAngleRad: 0,
+      isNitroActive: false,
+      rank: 2,
+      lap: 1,
+      isLocalPlayer: true,
+      accelerationRate: 35 + stats.acceleration * 0.45,
+      nitroMeter: 100,
+      isShieldActive: false,
+      shieldDuration: 0,
+      damage: 0,
+      collisionPulse: 0,
+      lastCollisionSeverity: 0,
+      lastCollisionKind: 'none',
+      lastCollisionSide: 0,
+    };
+    this.aiRacers.unshift(p2);
+    // Put P1 on the left lane for an immediately readable 2P starting grid.
+    this.player.lateralOffset = -3.2;
+    return p2;
+  }
+
+  public getLocalSecondPlayer(): AIRacerState | null {
+    return this.aiRacers.find((r) => r.id === this.localSecondPlayerId && r.isLocalPlayer) || null;
+  }
+
+  public updateLocalSecondPlayer(
+    delta: number,
+    throttle: boolean,
+    brake: boolean,
+    steer: number,
+    nitroRequested: boolean,
+    trackLengthMeters: number,
+    totalLaps: number,
+  ) {
+    const p2 = this.getLocalSecondPlayer();
+    if (!p2) return;
+    const dt = Math.min(delta, 0.05);
+    this.secondCollisionCooldownSec = Math.max(0, this.secondCollisionCooldownSec - dt);
+
+    const nitroMeter = p2.nitroMeter ?? 0;
+    if (nitroRequested && nitroMeter > 5 && !p2.isNitroActive) p2.isNitroActive = true;
+    if (p2.isNitroActive) {
+      p2.nitroMeter = Math.max(0, nitroMeter - 28 * dt);
+      if ((p2.nitroMeter || 0) <= 0) p2.isNitroActive = false;
+    } else {
+      p2.nitroMeter = Math.min(100, nitroMeter + 6 * dt);
+    }
+
+    const nitroBoost = p2.isNitroActive ? 55 : 0;
+    const maxNow = p2.maxSpeedKmh + nitroBoost;
+    // Brake always overrides auto-throttle. This is essential for camera duck/brake
+    // and for safely slowing a player whose pose temporarily disappears.
+    if (brake) {
+      p2.speedKmh = Math.max(0, p2.speedKmh - 90 * dt);
+    } else if (throttle) {
+      p2.speedKmh = Math.min(maxNow, p2.speedKmh + (p2.accelerationRate || 55) * (p2.isNitroActive ? 1.9 : 1) * dt);
+    } else {
+      p2.speedKmh = Math.max(0, p2.speedKmh - 18 * dt);
+    }
+
+    const speedRatio = Math.min(1, p2.speedKmh / 50);
+    const targetWheel = Math.max(-1, Math.min(1, steer)) * 0.45;
+    p2.steerAngleRad += (targetWheel - p2.steerAngleRad) * 0.25;
+    p2.lateralOffset += steer * (p2.speedKmh * 0.08) * speedRatio * dt;
+
+    if (Math.abs(p2.lateralOffset) > this.roadHalfWidth) {
+      const side = Math.sign(p2.lateralOffset) || 1;
+      const severity = Math.max(0.22, Math.min(1, p2.speedKmh / Math.max(80, p2.maxSpeedKmh)) * 0.72);
+      p2.lateralOffset = side * this.roadHalfWidth;
+      this.registerSecondCollision('barrier', severity, side);
+    }
+
+    const mps = (p2.speedKmh * 1000) / 3600;
+    p2.progress += (mps * dt) / trackLengthMeters;
+    p2.lap = Math.min(totalLaps, Math.floor(p2.progress) + 1);
+
+    if (p2.isShieldActive) {
+      p2.shieldDuration = Math.max(0, (p2.shieldDuration || 0) - dt);
+      if ((p2.shieldDuration || 0) <= 0) p2.isShieldActive = false;
+    }
+
+    this.resolveSecondPlayerCollisions(trackLengthMeters);
+    this.calculateRankings();
+  }
+
   public update(
     delta: number,
     throttle: boolean,
@@ -146,15 +258,17 @@ export class VehiclePhysicsEngine {
     const nitroBoostSpeed = this.player.isNitroActive ? 55 : 0;
     const currentMaxSpeed = this.player.maxSpeedKmh + nitroBoostSpeed;
 
-    if (throttle) {
+    // Brake must win over throttle/auto-throttle; otherwise S/down/duck cannot slow
+    // the vehicle in the default kids auto-gas mode.
+    if (brake) {
+      this.player.speedKmh -= 90 * dt;
+      if (this.player.speedKmh < 0) this.player.speedKmh = 0;
+    } else if (throttle) {
       const accel = this.player.accelerationRate * (this.player.isNitroActive ? 1.9 : 1.0);
       this.player.speedKmh += accel * dt;
       if (this.player.speedKmh > currentMaxSpeed) {
         this.player.speedKmh = currentMaxSpeed;
       }
-    } else if (brake) {
-      this.player.speedKmh -= 90 * dt;
-      if (this.player.speedKmh < 0) this.player.speedKmh = 0;
     } else {
       // Natural rolling friction
       this.player.speedKmh -= 18 * dt;
@@ -231,6 +345,7 @@ export class VehiclePhysicsEngine {
     const playerProg = this.player.progress;
 
     this.aiRacers.forEach((ai) => {
+      if (ai.isLocalPlayer) return;
       // Dynamic rubber banding: Keep excitement high without making it frustrating
       const distToPlayer = ai.progress - playerProg;
       let targetSpeed = ai.maxSpeedKmh;
@@ -265,7 +380,7 @@ export class VehiclePhysicsEngine {
   }
 
 
-  private registerCollision(kind: 'ai' | 'barrier', severity: number, side: number) {
+  private registerCollision(kind: 'ai' | 'barrier' | 'player', severity: number, side: number) {
     if (this.collisionCooldownSec > 0) return;
 
     const clampedSeverity = Math.max(0.12, Math.min(1, severity));
@@ -285,6 +400,7 @@ export class VehiclePhysicsEngine {
     if (this.collisionCooldownSec > 0 || this.player.speedKmh < 6) return;
 
     for (const ai of this.aiRacers) {
+      if (ai.isLocalPlayer) continue;
       const longitudinalMeters = Math.abs(ai.progress - this.player.progress) * trackLengthMeters;
       const lateralMeters = Math.abs(ai.lateralOffset - this.player.lateralOffset);
 
@@ -307,7 +423,60 @@ export class VehiclePhysicsEngine {
     }
   }
 
-  private calculateRankings() {
+  private registerSecondCollision(kind: 'ai' | 'barrier' | 'player', severity: number, side: number) {
+    const p2 = this.getLocalSecondPlayer();
+    if (!p2 || this.secondCollisionCooldownSec > 0) return;
+    const clamped = Math.max(0.12, Math.min(1, severity));
+    const shieldFactor = p2.isShieldActive ? 0.18 : 1;
+    p2.speedKmh *= Math.max(0.68, 1 - (p2.isShieldActive ? 0.035 : 0.055 + clamped * 0.12));
+    p2.damage = Math.min(100, (p2.damage || 0) + clamped * 13 * shieldFactor);
+    p2.collisionPulse = (p2.collisionPulse || 0) + 1;
+    p2.lastCollisionSeverity = clamped;
+    p2.lastCollisionKind = kind;
+    p2.lastCollisionSide = Math.sign(side);
+    this.secondCollisionCooldownSec = kind === 'barrier' ? 0.34 : 0.48;
+  }
+
+  private resolveSecondPlayerCollisions(trackLengthMeters: number) {
+    const p2 = this.getLocalSecondPlayer();
+    if (!p2 || this.secondCollisionCooldownSec > 0 || p2.speedKmh < 6) return;
+
+    // P2 <-> P1 collision.
+    const longP1 = Math.abs(p2.progress - this.player.progress) * trackLengthMeters;
+    const latP1 = Math.abs(p2.lateralOffset - this.player.lateralOffset);
+    if (longP1 <= 4.4 && latP1 <= 2.7) {
+      const relative = Math.abs(p2.speedKmh - this.player.speedKmh);
+      const severity = Math.max(0.28, Math.min(1, (relative + p2.speedKmh * 0.18) / 120));
+      const side = this.player.lateralOffset >= p2.lateralOffset ? -1 : 1;
+      p2.lateralOffset += side * (0.45 + severity * 0.65);
+      this.player.lateralOffset -= side * (0.40 + severity * 0.55);
+      this.player.bounceOffset.x = -side * (0.35 + severity * 0.45);
+      // Resolve a local P1<->P2 hit exactly once and apply the same arcade damage
+      // rules to BOTH players. P1's generic AI collision loop skips P2 above so this
+      // cannot double-trigger in the same physics frame.
+      this.registerCollision('player', severity, -side);
+      this.registerSecondCollision('player', severity, side);
+      return;
+    }
+
+    // P2 <-> normal AI.
+    for (const ai of this.aiRacers) {
+      if (ai.isLocalPlayer) continue;
+      const longitudinal = Math.abs(ai.progress - p2.progress) * trackLengthMeters;
+      const lateral = Math.abs(ai.lateralOffset - p2.lateralOffset);
+      if (longitudinal > 4.4 || lateral > 2.7) continue;
+      const relative = Math.abs(p2.speedKmh - ai.speedKmh);
+      const severity = Math.max(0.26, Math.min(1, (relative + p2.speedKmh * 0.16) / 120));
+      const side = ai.lateralOffset >= p2.lateralOffset ? -1 : 1;
+      p2.lateralOffset += side * (0.40 + severity * 0.65);
+      ai.lateralOffset -= side * (0.32 + severity * 0.4);
+      ai.speedKmh *= 0.95;
+      this.registerSecondCollision('ai', severity, side);
+      break;
+    }
+  }
+
+  public calculateRankings() {
     const all = [
       { id: 'player', progress: this.player.progress },
       ...this.aiRacers.map((a) => ({ id: a.id, progress: a.progress })),
@@ -324,6 +493,19 @@ export class VehiclePhysicsEngine {
         if (found) found.rank = rank;
       }
     });
+  }
+
+  public activateSecondShield(durationSec: number = 8) {
+    const p2 = this.getLocalSecondPlayer();
+    if (!p2) return;
+    p2.isShieldActive = true;
+    p2.shieldDuration = durationSec;
+  }
+
+  public addSecondNitro(amount: number = 35) {
+    const p2 = this.getLocalSecondPlayer();
+    if (!p2) return;
+    p2.nitroMeter = Math.min(100, (p2.nitroMeter || 0) + amount);
   }
 
   public activateShield(durationSec: number = 8) {

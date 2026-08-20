@@ -109,7 +109,9 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
     // Verified: front wheel is near X=-4453; engine/rear wheel is near X=-3290.
     forwardAxis: '-x',
     kind: 'motorcycle',
-    policy: 'tv_up',
+    // V5.28: optimized to ~13.5 MB, but 238 meshes still make ASCII parsing expensive on Mi Box.
+    // PC uses the real FBX; TV/tablet/phone use the lightweight procedural fallback.
+    policy: 'desktop_only',
     rideHeight: 0.09,
     // Source wheel pivots are at world origin; keep static until a clean separated wheel rig is supplied.
     wheelMode: 'none',

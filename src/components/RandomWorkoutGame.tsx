@@ -129,12 +129,13 @@ export default function RandomWorkoutGame({
   // Safety reminder on session start
   useEffect(() => {
     voiceGuide.speak(VOICE_LINES.safety.warmup, 'high');
-    setTimeout(() => {
+    const introTimer = window.setTimeout(() => {
       voiceGuide.speak(
         mode === '5min' ? VOICE_LINES.workout.start5min : VOICE_LINES.workout.start10min,
         'high'
       );
     }, 2000);
+    return () => window.clearTimeout(introTimer);
   }, [mode]);
 
   const segmentTimeLeftRef = useRef<number>(segments[0]?.durationSeconds || 30);

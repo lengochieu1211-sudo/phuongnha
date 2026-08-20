@@ -129,6 +129,9 @@ export class PoseDetectorManager {
   private isMediaPipeLoading: boolean = false;
   private rafId: number | null = null;
   private isProcessingFrame: boolean = false;
+  // V5.29: 2-player racing can temporarily pause the single-pose inference loop
+  // while keeping the camera stream alive for the dual crop detector.
+  private processingEnabled: boolean = true;
 
   // Subscribers
   private listeners: Set<PoseListener> = new Set();
@@ -189,6 +192,28 @@ export class PoseDetectorManager {
 
   public setSkeletonVisible(visible: boolean) {
     this.isSkeletonVisible = visible;
+  }
+
+  public setProcessingEnabled(enabled: boolean) {
+    const changed = this.processingEnabled !== enabled;
+    this.processingEnabled = enabled;
+    if (!enabled) {
+      this.isProcessingFrame = false;
+      // 2P racing owns two lightweight pose loops. Stop the single-pose RAF/interval
+      // completely instead of leaving an idle callback running every display frame.
+      this.stopMediaPipe();
+      this.stopPixelMotion();
+    } else if (changed && this.isRunning) {
+      // Reuse the already-loaded model/scripts when returning to normal 1P mode.
+      this.restartTracking();
+    }
+    if (changed && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('phuongnha:pose-processing', { detail: { enabled } }));
+    }
+  }
+
+  public getProcessingEnabled(): boolean {
+    return this.processingEnabled;
   }
 
   public setSimulatedGesture(g: GameGesture) {
@@ -302,7 +327,7 @@ export class PoseDetectorManager {
 
         const video = this.videoElement;
         if (video && video.readyState >= 2 && video.videoWidth > 0 && !video.paused) {
-          if (!this.isProcessingFrame && this.mediaPipePose) {
+          if (this.processingEnabled && !this.isProcessingFrame && this.mediaPipePose) {
             this.isProcessingFrame = true;
             try {
               await this.mediaPipePose.send({ image: video });
@@ -381,7 +406,7 @@ export class PoseDetectorManager {
   // --- Landmark & Gesture Processing ---
 
   private handleMediaPipeResults(results: any) {
-    if (!this.isRunning || this.mode !== 'mediapipe') return;
+    if (!this.isRunning || this.mode !== 'mediapipe' || !this.processingEnabled) return;
 
     // Update FPS
     this.frameCount++;
@@ -897,7 +922,7 @@ export class PoseDetectorManager {
     if (!offCtx) return;
 
     this.pixelMotionInterval = setInterval(() => {
-      if (!this.isRunning || this.mode !== 'pixel_motion') return;
+      if (!this.isRunning || this.mode !== 'pixel_motion' || !this.processingEnabled) return;
       if (video.readyState < 2 || video.videoWidth === 0) return;
 
       offCtx.drawImage(video, 0, 0, sampleWidth, sampleHeight);

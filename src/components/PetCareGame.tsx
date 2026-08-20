@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Trophy, Sparkles, ShowerHead, Apple, HelpCircle, ArrowLeft } from 'lucide-react';
 import { PetState, PlayerProgress, GameGesture, CharacterId } from '../types';
 import { audio } from '../lib/AudioEngine';
@@ -21,6 +21,7 @@ export default function PetCareGame({ progress, onUpdateProgress, gesture, onBac
   const [actionFeedback, setActionFeedback] = useState<string>('');
   const [feedbackColor, setFeedbackColor] = useState<string>('text-pink-500');
   const [gestureCooldown, setGestureCooldown] = useState<boolean>(false);
+  const feedbackTimerRef = useRef<number | null>(null);
 
   const currentPetId = progress.pets[selectedPetId] ? selectedPetId : (Object.keys(progress.pets)[0] || 'bara');
   const pet = progress.pets[currentPetId] || { name: 'Thú Cưng', level: 1, hunger: 80, happiness: 80, cleanliness: 80, energy: 80, favoriteToy: 'Đồ chơi' };
@@ -104,8 +105,16 @@ export default function PetCareGame({ progress, onUpdateProgress, gesture, onBac
     });
 
     setActionFeedback(actionType);
-    setTimeout(() => setActionFeedback(''), 2500);
+    if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = window.setTimeout(() => {
+      feedbackTimerRef.current = null;
+      setActionFeedback('');
+    }, 2500);
   };
+
+  useEffect(() => () => {
+    if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+  }, []);
 
   // Connect Camera gestures to Actions
   useEffect(() => {

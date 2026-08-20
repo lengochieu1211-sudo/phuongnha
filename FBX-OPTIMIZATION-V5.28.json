@@ -1,0 +1,110 @@
+[
+  {
+    "file": "public/assets/avatars/child-girl-static.fbx",
+    "old_bytes": 14165808,
+    "new_bytes": 9422224,
+    "saved_bytes": 4743584,
+    "saved_pct": 33.5,
+    "mesh_geometries": 1,
+    "vertices": 66454,
+    "bbox_max_abs_error": 3.935550012101885e-06,
+    "old_sha256": "8487517c3ba0422384d24bd7931db08aa6b3ab494414b0122995d39f22f0ff6a",
+    "new_sha256": "11f14bcae02751f37d01393f66046e59484d6f9e7a9e26aea683d6fa8c5e639a"
+  },
+  {
+    "file": "public/assets/avatars/ng1-human-static.fbx",
+    "old_bytes": 1119921,
+    "new_bytes": 657024,
+    "saved_bytes": 462897,
+    "saved_pct": 41.3,
+    "mesh_geometries": 5,
+    "vertices": 5087,
+    "bbox_max_abs_error": 3.6642218099736112e-06,
+    "old_sha256": "99df7e4ed721a26bb7d61691d5d94e615388d4649b1eb9e44deb8ea650fc7d80",
+    "new_sha256": "05df4ffcc8a78c7cb36ec434ca37b29a0935d0610addf02909a20fb5c6925add"
+  },
+  {
+    "file": "public/assets/cars/canis-mesa-cronoz.fbx",
+    "old_bytes": 7073343,
+    "new_bytes": 3991186,
+    "saved_bytes": 3082157,
+    "saved_pct": 43.6,
+    "mesh_geometries": 49,
+    "vertices": 34895,
+    "bbox_max_abs_error": 3.822508638402777e-06,
+    "old_sha256": "4574e68a149da8e4e89dc0b9efea8c82ccf1f789208aa8a2554f9251093672cd",
+    "new_sha256": "c8def9216b1b7e45dbc4761a4b788fe605f0f814fccafd34b85eb2af84af3a65"
+  },
+  {
+    "file": "public/assets/cars/rescue-truck-hauler.fbx",
+    "old_bytes": 52899633,
+    "new_bytes": 29740306,
+    "saved_bytes": 23159327,
+    "saved_pct": 43.8,
+    "mesh_geometries": 260,
+    "vertices": 306636,
+    "bbox_max_abs_error": 3.577048499181501e-06,
+    "old_sha256": "b5d2c6eee80f3e502f04c6f40554c5cd2001723e0088f1b739a09504aa466809",
+    "new_sha256": "76e96031910ba4441307c1b4944e31f8f6eeb5a878fa1ffd80577f83236ec90d"
+  },
+  {
+    "file": "public/assets/cars/roadster-883-3d.fbx",
+    "old_bytes": 11919480,
+    "new_bytes": 6375849,
+    "saved_bytes": 5543631,
+    "saved_pct": 46.5,
+    "mesh_geometries": 119,
+    "vertices": 70472,
+    "bbox_max_abs_error": 3.3204318770074792e-06,
+    "old_sha256": "267059b293eeef0807939f7ae5cead60913b9ae9d259dd2aac249e60463ff5e8",
+    "new_sha256": "78fbfa54f14db1c73edad71e931519668efdb9cd05dbef66a33c197ae86d10f2"
+  },
+  {
+    "file": "public/assets/cars/s14-sport-coupe.fbx",
+    "old_bytes": 9277031,
+    "new_bytes": 5629877,
+    "saved_bytes": 3647154,
+    "saved_pct": 39.3,
+    "mesh_geometries": 74,
+    "vertices": 69123,
+    "bbox_max_abs_error": 3.999999997006398e-06,
+    "old_sha256": "660d184f94223aa9774c50f33b8b286d61ba51c45d019b9a8cc430ed01192517",
+    "new_sha256": "ffb03d6fc1568862e8ff67a56a644851b67d3581ab25af35e93cdd34e8c10ed4"
+  },
+  {
+    "file": "public/assets/cars/v12-sv-supercar.fbx",
+    "old_bytes": 39479796,
+    "new_bytes": 21775002,
+    "saved_bytes": 17704794,
+    "saved_pct": 44.8,
+    "mesh_geometries": 69,
+    "vertices": 181061,
+    "bbox_max_abs_error": 4.477611574071894e-06,
+    "old_sha256": "0d352dbf484475d892e13dfff7e3efd5d6e1f81d0681eb480e9c03fa0eeb76ac",
+    "new_sha256": "52e713e1f97e7254dc35e5555d7fa2401ee64bfd1f89d32fad392b2431a3adf2"
+  },
+  {
+    "file": "public/assets/cars/vespa-studio-3d.fbx",
+    "old_bytes": 23327246,
+    "new_bytes": 13531508,
+    "saved_bytes": 9795738,
+    "saved_pct": 42.0,
+    "mesh_geometries": 238,
+    "vertices": 92745,
+    "bbox_max_abs_error": 3.454880243225489e-06,
+    "old_sha256": "da41061c79f7eb29fbcb413693f7a56d2f7f2c3d50ca1a92daaacf4cb730f9d0",
+    "new_sha256": "bfd90ec3e6094285bd6e27e5d6b2f9b88e21410b4f157ec3125908267be10c8b"
+  },
+  {
+    "file": "public/assets/cars/xedap-city-bike.fbx",
+    "old_bytes": 29968721,
+    "new_bytes": 18142935,
+    "saved_bytes": 11825786,
+    "saved_pct": 39.5,
+    "mesh_geometries": 50,
+    "vertices": 154962,
+    "bbox_max_abs_error": 5.877451059177474e-07,
+    "old_sha256": "3eb348b949b1017b512ee7a323f43866db50555e76d9ddc2b15dc79795fbd597",
+    "new_sha256": "781c4315683c690363656969bcf02c8be83c1885c5edaf1b0ec5ffb2731f5507"
+  }
+]

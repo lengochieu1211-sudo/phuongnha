@@ -81,6 +81,8 @@ export default function FashionShowMode({
   const [poseStreak, setPoseStreak] = useState(0);
   const [score, setScore] = useState(0);
   const [gameState, setGameState] = useState<'playing' | 'completed'>('playing');
+  const scoreRef = useRef(0);
+  const poseStreakRef = useRef(0);
 
   // Imperative 60 FPS runway render loop
   useEffect(() => {
@@ -296,6 +298,9 @@ export default function FashionShowMode({
 
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const flashTimerRef = useRef<number | null>(null);
+  const confettiTimerRef = useRef<number | null>(null);
+  const transitionTimerRef = useRef<number | null>(null);
   const activePose = FASHION_POSES[currentPoseIndex] || FASHION_POSES[0];
 
   // Speak when a new pose starts
@@ -366,16 +371,23 @@ export default function FashionShowMode({
     // Snap photo flash!
     audio.playDiceRoll();
     setPhotoFlash(true);
-    setTimeout(() => setPhotoFlash(false), 150);
+    if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = window.setTimeout(() => { flashTimerRef.current = null; setPhotoFlash(false); }, 150);
 
     // Save virtual snapshot of their outfit
     setCapturedPhotos((prev) => [...prev, activePose.id]);
     setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 2000);
+    if (confettiTimerRef.current !== null) window.clearTimeout(confettiTimerRef.current);
+    confettiTimerRef.current = window.setTimeout(() => { confettiTimerRef.current = null; setShowConfetti(false); }, 2000);
 
-    // Increment scores
-    setScore((prev) => prev + activePose.points + (poseStreak * 15));
-    setPoseStreak((prev) => prev + 1);
+    // Increment scores using refs so the LAST pose completion cannot read stale
+    // React state from the previous render.
+    const nextScore = scoreRef.current + activePose.points + (poseStreakRef.current * 15);
+    const nextStreak = poseStreakRef.current + 1;
+    scoreRef.current = nextScore;
+    poseStreakRef.current = nextStreak;
+    setScore(nextScore);
+    setPoseStreak(nextStreak);
 
     // Sync stats
     onUpdateProgress((prev) => ({
@@ -386,31 +398,33 @@ export default function FashionShowMode({
       }
     }));
 
-    // Transition to next pose
-    setTimeout(() => {
+    // Transition to next pose. Capture the exact final score/streak now instead of
+    // relying on a delayed callback's stale render closure.
+    if (transitionTimerRef.current !== null) window.clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = window.setTimeout(() => {
+      transitionTimerRef.current = null;
       if (currentPoseIndex < FASHION_POSES.length - 1) {
         setCurrentPoseIndex((prev) => prev + 1);
         setMatchPercentage(0);
       } else {
-        // Complete game!
-        handleGameCompletion();
+        handleGameCompletion(nextScore, nextStreak);
       }
     }, 1200);
   };
 
-  const handleGameCompletion = () => {
+  const handleGameCompletion = (finalScore: number = scoreRef.current, finalStreak: number = poseStreakRef.current) => {
     setGameState('completed');
     audio.playRoundStartJingle();
     setShowConfetti(true);
 
-    const starsReward = 15 + poseStreak * 3;
-    const diamondsReward = 3 + Math.floor(poseStreak / 2);
+    const starsReward = 15 + finalStreak * 3;
+    const diamondsReward = 3 + Math.floor(finalStreak / 2);
 
     // Save final results to user progression
     onUpdateProgress((prev) => {
       // High score tracking
       const previousHigh = prev.highScores?.fashion_show || 0;
-      const nextHigh = Math.max(previousHigh, score + starsReward * 10);
+      const nextHigh = Math.max(previousHigh, finalScore + starsReward * 10);
       
       const updatedHighScores = {
         ...prev.highScores,
@@ -432,6 +446,14 @@ export default function FashionShowMode({
 
     voiceGuide.speak('Fashion Show hoàn thành! Bé trình diễn rất tuyệt vời!', 'high');
   };
+
+  useEffect(() => () => {
+    if (holdTimerRef.current) clearInterval(holdTimerRef.current);
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    if (flashTimerRef.current !== null) window.clearTimeout(flashTimerRef.current);
+    if (confettiTimerRef.current !== null) window.clearTimeout(confettiTimerRef.current);
+    if (transitionTimerRef.current !== null) window.clearTimeout(transitionTimerRef.current);
+  }, []);
 
   return (
     <div id="fashion-show-game" className="flex flex-col items-center gap-6 w-full max-w-5xl mx-auto p-4 md:p-6 bg-indigo-50/70 rounded-3xl border-4 border-indigo-200 shadow-xl relative select-none">

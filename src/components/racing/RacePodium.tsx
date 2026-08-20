@@ -59,12 +59,12 @@ export const RacePodium: React.FC<RacePodiumProps> = ({
         <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 px-6 py-2 rounded-full shadow-2xl mb-2">
           <Trophy className="w-6 h-6 text-amber-300 animate-bounce" />
           <span className="text-sm md:text-base font-black tracking-widest text-white uppercase">
-            {isFirst ? '🏆 VÔ ĐỊCH ĐƯỜNG ĐUA!' : '🎉 HOÀN THÀNH CUỘC ĐUA!'}
+            {result.localWinner ? `🏆 P${result.localWinner} VỀ ĐÍCH ĐẦU TIÊN!` : (isFirst ? '🏆 VÔ ĐỊCH ĐƯỜNG ĐUA!' : '🎉 HOÀN THÀNH CUỘC ĐUA!')}
           </span>
         </div>
 
         <h1 className="text-3xl md:text-5xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-cyan-400 drop-shadow-lg">
-          {isFirst ? 'CHIẾN THẮNG TUYỆT ĐỈNH' : `BẠN VỀ ĐÍCH HẠNG #${result.rank}`}
+          {result.localWinner ? `CHIẾN THẮNG ĐỐI KHÁNG · P${result.localWinner}` : (isFirst ? 'CHIẾN THẮNG TUYỆT ĐỈNH' : `BẠN VỀ ĐÍCH HẠNG #${result.rank}`)}
         </h1>
 
         <p className="text-xs md:text-sm text-slate-300 font-semibold mt-1">
