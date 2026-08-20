@@ -13,6 +13,8 @@ interface Props {
   file?: string;
   title?: string;
   description?: string;
+  targetHeight?: number;
+  cameraPreset?: 'human' | 'compact';
 }
 
 const WHITE_PIXEL =
@@ -47,6 +49,46 @@ function loadAvatarTemplate(url: string): Promise<THREE.Group> {
   return pending;
 }
 
+
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) * 0.5;
+}
+
+function getRobustAvatarBounds(root: THREE.Object3D): THREE.Box3 {
+  const meshBoxes: THREE.Box3[] = [];
+  root.updateWorldMatrix(true, true);
+  root.traverse((obj: any) => {
+    if (!obj.isMesh || obj.visible === false) return;
+    const box = new THREE.Box3().setFromObject(obj);
+    if (!box.isEmpty()) meshBoxes.push(box);
+  });
+  if (meshBoxes.length <= 2) return new THREE.Box3().setFromObject(root);
+
+  const centers = meshBoxes.map((b) => b.getCenter(new THREE.Vector3()));
+  const med = new THREE.Vector3(
+    median(centers.map((c) => c.x)),
+    median(centers.map((c) => c.y)),
+    median(centers.map((c) => c.z)),
+  );
+  const distances = centers.map((c) => c.distanceTo(med));
+  const sortedDistances = [...distances].sort((a, b) => a - b);
+  const p85 = sortedDistances[Math.min(sortedDistances.length - 1, Math.floor(sortedDistances.length * 0.85))] || 0;
+  const threshold = Math.max(p85 * 1.8, 1e-4);
+
+  const robust = new THREE.Box3();
+  let kept = 0;
+  meshBoxes.forEach((box, i) => {
+    if (distances[i] <= threshold) { robust.union(box); kept++; }
+  });
+  // If filtering was too aggressive, fall back to the complete model.
+  return kept >= Math.max(2, Math.floor(meshBoxes.length * 0.55)) && !robust.isEmpty()
+    ? robust
+    : new THREE.Box3().setFromObject(root);
+}
+
 function disposeAvatarMaterials(root: THREE.Object3D) {
   root.traverse((obj: any) => {
     const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
@@ -61,6 +103,8 @@ export default function StaticFbxAvatar({
   file = 'assets/avatars/ng1-human-static.fbx',
   title = 'NGƯỜI MẪU 3D THẬT',
   description = 'Model FBX • xoay/nghiêng theo thân người',
+  targetHeight = 2.05,
+  cameraPreset = 'human',
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rigRef = useRef<THREE.Group | null>(null);
@@ -85,8 +129,13 @@ export default function StaticFbxAvatar({
     scene.background = new THREE.Color(0x0b1020);
 
     const camera = new THREE.PerspectiveCamera(34, width / height, 0.01, 100);
-    camera.position.set(0, 1.18, 4.2);
-    camera.lookAt(0, 1.0, 0);
+    if (cameraPreset === 'compact') {
+      camera.position.set(0, 1.22, 4.95);
+      camera.lookAt(0, 0.92, 0);
+    } else {
+      camera.position.set(0, 1.18, 4.2);
+      camera.lookAt(0, 1.0, 0);
+    }
 
     const renderer = new THREE.WebGLRenderer({
       antialias: quality !== 'phone',
@@ -175,7 +224,7 @@ export default function StaticFbxAvatar({
       renderer.forceContextLoss?.();
       if (renderer.domElement.parentElement === host) host.removeChild(renderer.domElement);
     };
-  }, [quality]);
+  }, [quality, cameraPreset]);
 
   useEffect(() => {
     const rig = rigRef.current;
@@ -227,13 +276,16 @@ export default function StaticFbxAvatar({
             obj.material = Array.isArray(obj.material) ? next : next[0];
           });
 
-          const box = new THREE.Box3().setFromObject(fbx);
+          // V5.35: frame characters from the main mesh cluster instead of blindly
+          // trusting the total FBX bounds. A stray SketchUp mesh far from the body
+          // used to make the actual person tiny/offset like disconnected body parts.
+          const box = getRobustAvatarBounds(fbx);
           const size = box.getSize(new THREE.Vector3());
           const modelHeight = Math.max(size.y, 0.001);
-          fbx.scale.setScalar(2.05 / modelHeight);
+          fbx.scale.setScalar(targetHeight / modelHeight);
           fbx.updateWorldMatrix(true, true);
 
-          const scaledBox = new THREE.Box3().setFromObject(fbx);
+          const scaledBox = getRobustAvatarBounds(fbx);
           const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
           fbx.position.set(-scaledCenter.x, -scaledBox.min.y, -scaledCenter.z);
 
@@ -256,7 +308,7 @@ export default function StaticFbxAvatar({
       cancelled = true;
       if (timer !== null) window.clearTimeout(timer);
     };
-  }, [file, quality]);
+  }, [file, quality, targetHeight]);
 
   return (
     <div className="absolute inset-0 z-40 bg-slate-950">

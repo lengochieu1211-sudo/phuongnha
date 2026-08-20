@@ -39,7 +39,8 @@ const getToneClasses = (charId: string) => {
         title: 'text-sky-950',
         ability: 'border-sky-100 bg-sky-50/75 text-sky-900',
       };
-    case 'capybara':
+    case 'bara':
+    case 'capy_tie':
       return {
         accent: 'from-amber-500 to-orange-500',
         chip: 'border-amber-200 bg-amber-50 text-amber-700',

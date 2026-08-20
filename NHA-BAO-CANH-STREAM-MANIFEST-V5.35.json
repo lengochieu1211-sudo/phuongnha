@@ -1,0 +1,109 @@
+{
+  "version": "5.35",
+  "strategy": "scene split by top-level groups and stream chunks; strong scenery precision Vertices=1, Normals=2, UV=3; heavy source ignored by Git",
+  "chunks": [
+    {
+      "file": "scene-g01-chunk-01.fbx",
+      "bytes": 14534476,
+      "beforeReopt": 14534476
+    },
+    {
+      "file": "scene-g01-chunk-02.fbx",
+      "bytes": 16850080,
+      "beforeReopt": 16850080
+    },
+    {
+      "file": "scene-g01-chunk-03.fbx",
+      "bytes": 2078831,
+      "beforeReopt": 2078831
+    },
+    {
+      "file": "scene-g01-chunk-04.fbx",
+      "bytes": 1854302,
+      "beforeReopt": 1854302
+    },
+    {
+      "file": "scene-g01-chunk-05.fbx",
+      "bytes": 1828428,
+      "beforeReopt": 1828428
+    },
+    {
+      "file": "scene-g01-chunk-06.fbx",
+      "bytes": 2373256,
+      "beforeReopt": 2373256
+    },
+    {
+      "file": "scene-g01-chunk-07.fbx",
+      "bytes": 1245333,
+      "beforeReopt": 1245333
+    },
+    {
+      "file": "scene-g02-chunk-01.fbx",
+      "bytes": 8434450,
+      "beforeReopt": 8434450
+    },
+    {
+      "file": "scene-g02-chunk-02.fbx",
+      "bytes": 2040584,
+      "beforeReopt": 2040584
+    },
+    {
+      "file": "scene-g02-chunk-03.fbx",
+      "bytes": 2008434,
+      "beforeReopt": 2008434
+    },
+    {
+      "file": "scene-g02-chunk-04.fbx",
+      "bytes": 2092035,
+      "beforeReopt": 2092035
+    },
+    {
+      "file": "scene-g02-chunk-05.fbx",
+      "bytes": 1852270,
+      "beforeReopt": 1852270
+    },
+    {
+      "file": "scene-g02-chunk-06.fbx",
+      "bytes": 1833251,
+      "beforeReopt": 1833251
+    },
+    {
+      "file": "scene-g03-chunk-01.fbx",
+      "bytes": 13153735,
+      "beforeReopt": 14122801
+    },
+    {
+      "file": "scene-g03-chunk-02.fbx",
+      "bytes": 2403009,
+      "beforeReopt": 2501933
+    },
+    {
+      "file": "scene-g03-chunk-03.fbx",
+      "bytes": 2322238,
+      "beforeReopt": 2420760
+    },
+    {
+      "file": "scene-g03-chunk-04.fbx",
+      "bytes": 2215157,
+      "beforeReopt": 2295480
+    },
+    {
+      "file": "scene-g03-chunk-05.fbx",
+      "bytes": 2062035,
+      "beforeReopt": 2121397
+    },
+    {
+      "file": "scene-g03-chunk-06.fbx",
+      "bytes": 538096,
+      "beforeReopt": 538304
+    },
+    {
+      "file": "scene-g04-chunk-01.fbx",
+      "bytes": 532584,
+      "beforeReopt": 532720
+    }
+  ],
+  "totalBytes": 82252584,
+  "maxChunkBytes": 16850080,
+  "distributionNote": "The monolithic NHA BAO CANH master is intentionally omitted from the distributable ZIP; the scene is retained as 20 split streaming FBX chunks to avoid single-file parse stalls."
+}

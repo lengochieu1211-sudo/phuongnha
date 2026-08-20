@@ -22,7 +22,7 @@ interface ExternalVehicleConfig {
   targetLength: number;
   forwardAxis: ForwardAxis;
   kind: VehicleKind;
-  policy: 'tv_up' | 'desktop_only';
+  policy: 'tv_up' | 'desktop_only' | 'all_devices';
   rideHeight: number;
   wheelMode: WheelMode;
   /** Extra visual yaw applied after FBXLoader axis conversion. Keep raw forwardAxis metadata intact. */
@@ -31,6 +31,8 @@ interface ExternalVehicleConfig {
   maxLeanRad?: number;
   /** Optional verified material-name matcher for models exported with generic material names. */
   paintMaterialPattern?: RegExp;
+  /** Material tuning preset for models that need a more specific shading recipe. */
+  materialProfile?: 'default' | 'scooter_gloss';
 }
 
 interface WheelRigNode {
@@ -63,6 +65,9 @@ function shouldPaintMaterial(
     return false;
   }
 
+  if (cfg.materialProfile === 'scooter_gloss' && cfg.paintMaterialPattern) {
+    return cfg.paintMaterialPattern.test(n);
+  }
   return DEFAULT_PAINT_MATERIAL_RE.test(n) || (cfg.paintMaterialPattern?.test(n) ?? false);
 }
 
@@ -105,14 +110,15 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   },
   vespa_studio_3d: {
     file: 'assets/cars/vespa-studio-3d.fbx',
-    targetLength: 1.86,
+    targetLength: 1.9,
     // Verified: front wheel is near X=-4453; engine/rear wheel is near X=-3290.
     forwardAxis: '-x',
     kind: 'motorcycle',
     // V5.28: optimized to ~13.5 MB, but 238 meshes still make ASCII parsing expensive on Mi Box.
     // PC uses the real FBX; TV/tablet/phone use the lightweight procedural fallback.
     policy: 'desktop_only',
-    rideHeight: 0.09,
+    // Lift the scooter a touch more so the belly/floorboard never visually sinks into the turntable or road.
+    rideHeight: 0.11,
     // Source wheel pivots are at world origin; keep static until a clean separated wheel rig is supplied.
     wheelMode: 'none',
     // The two verified wheel centres show this SketchUp export is actually ~40.1° off the nominal -X axis.
@@ -121,6 +127,9 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
     // This particular FBX has a messy exported transform/pivot. Dynamic whole-model lean exaggerates the
     // crooked appearance, so keep it upright until the model is cleanly re-exported/rigged.
     maxLeanRad: 0,
+    // Vespa body paint looks better with a glossy enamel recipe than the generic metallic-car preset.
+    materialProfile: 'scooter_gloss',
+    paintMaterialPattern: /(frontcolor|biancospino|color(?:_| )a(?:01|06|11)|color(?:_| )00(?:2|3|6)|_color_00(?:7|8))/i,
   },
 
   s14_sport_3d: {
@@ -162,6 +171,18 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
     maxLeanRad: 0.16,
     paintMaterialPattern: /(color_a06|m_0047_khaki|_redwood_)/i,
   },
+  capybara_parade_3d: {
+    file: 'assets/cars/capybara-lowpoly-racer.fbx',
+    targetLength: 3.35,
+    // Humorous capybara parade model; set the nose/head direction toward the track tangent.
+    forwardAxis: '+z',
+    kind: 'car',
+    // This lowpoly FBX is only ~0.5 MB, so it is safe on phone / TV / PC.
+    policy: 'all_devices',
+    rideHeight: 0.11,
+    wheelMode: 'none',
+    paintMaterialPattern: /body|fur|capy|mesh/i,
+  },
 
 };
 
@@ -175,7 +196,9 @@ export function isMotorcycleExternal(modelId: CarModelId): boolean {
 
 export function shouldUseExternalCar(modelId: CarModelId, deviceClass: DeviceClass): boolean {
   const cfg = EXTERNAL_CARS[modelId];
-  if (!cfg || deviceClass === 'phone') return false;
+  if (!cfg) return false;
+  if (cfg.policy === 'all_devices') return true;
+  if (deviceClass === 'phone') return false;
   if (cfg.policy === 'desktop_only') return deviceClass === 'desktop';
   return deviceClass === 'desktop' || deviceClass === 'tv' || deviceClass === 'tablet';
 }
@@ -185,7 +208,7 @@ function sourceColorOf(material: any, fallback: THREE.Color): THREE.Color {
   return fallback.clone();
 }
 
-function classifyMaterial(name: string, paint: THREE.Color, sourceMaterial?: any, forcePaint = false): THREE.Material {
+function classifyMaterial(name: string, paint: THREE.Color, sourceMaterial?: any, forcePaint = false, cfg?: ExternalVehicleConfig): THREE.Material {
   const n = name.toLowerCase();
   const original = sourceColorOf(sourceMaterial, paint);
   const sourceOpacity = Number.isFinite(sourceMaterial?.opacity) ? Number(sourceMaterial.opacity) : 1;
@@ -220,7 +243,7 @@ function classifyMaterial(name: string, paint: THREE.Color, sourceMaterial?: any
     });
   }
 
-  if (/chrome|cromado|metal|aluminum|aluminium|ottone|brass|calota|rim|wheel|exhaust|scarico|grade|grille|fork/.test(n)) {
+  if (/chrome|cromado|metal|aluminum|aluminium|ottone|brass|calota|rim|wheel|exhaust|scarico|grade|grille|fork|specchio|mirror/.test(n)) {
     return new THREE.MeshStandardMaterial({
       color: original.getHex() === 0xffffff ? 0xb8bec8 : original,
       roughness: 0.2,
@@ -244,12 +267,20 @@ function classifyMaterial(name: string, paint: THREE.Color, sourceMaterial?: any
   // for unknown materials so scooters/motorcycles do not become one solid color.
   const looksPainted = forcePaint || DEFAULT_PAINT_MATERIAL_RE.test(n);
 
+  const scooterGloss = cfg?.materialProfile === 'scooter_gloss';
+  const paintColor = looksPainted
+    ? (scooterGloss ? paint.clone().lerp(new THREE.Color(0xffffff), 0.06) : paint.clone())
+    : original;
+
   return new THREE.MeshPhysicalMaterial({
-    color: looksPainted ? paint.clone() : original,
-    metalness: looksPainted ? 0.64 : 0.28,
-    roughness: looksPainted ? 0.18 : 0.4,
+    color: paintColor,
+    map: sourceMaterial?.map || null,
+    normalMap: sourceMaterial?.normalMap || null,
+    alphaMap: sourceMaterial?.alphaMap || null,
+    metalness: looksPainted ? (scooterGloss ? 0.38 : 0.64) : 0.28,
+    roughness: looksPainted ? (scooterGloss ? 0.10 : 0.18) : (scooterGloss ? 0.34 : 0.4),
     clearcoat: looksPainted ? 1 : 0.45,
-    clearcoatRoughness: looksPainted ? 0.055 : 0.18,
+    clearcoatRoughness: looksPainted ? (scooterGloss ? 0.028 : 0.055) : (scooterGloss ? 0.12 : 0.18),
   });
 }
 
@@ -590,7 +621,7 @@ export async function attachExternalCarModel(
     const nextMats = sourceMats.map((m: any) => {
       const sourceName = `${obj.name} ${m?.name || ''}`;
       const paintable = shouldPaintMaterial(sourceName, m, cfg);
-      const next = classifyMaterial(sourceName, paint, m, paintable);
+      const next = classifyMaterial(sourceName, paint, m, paintable, cfg);
       next.name = sourceName;
       next.userData.apPaintable = paintable;
       return next;

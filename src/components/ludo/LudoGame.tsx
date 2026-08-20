@@ -29,6 +29,7 @@ import {
   GameGesture,
   CharacterId,
 } from '../../types';
+import { getCharacterEmoji } from '../../utils/characterRenderer';
 import {
   LudoGameEngine,
   DEFAULT_RULES,
@@ -93,22 +94,7 @@ export default function LudoGame({
   const lastGestureRef = useRef<string>('');
 
   // Mascot emoji helper
-  const getMascotAvatar = (mascot: CharacterId) => {
-    switch (mascot) {
-      case 'bara':
-        return '🐻';
-      case 'may':
-        return '☁️';
-      case 'bong':
-        return '🐰';
-      case 'miu':
-        return '🐱';
-      case 'lumi':
-        return '🦄';
-      default:
-        return '🐴';
-    }
-  };
+  const getMascotAvatar = (mascot: CharacterId) => getCharacterEmoji(mascot);
 
   // Speak helper using the unified VoiceGuide service
   const speakVoice = (textOrKey: string, isKey: boolean = false) => {

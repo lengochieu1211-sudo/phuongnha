@@ -103,6 +103,27 @@ export const CHARACTERS_CONFIG = [
   },
 ];
 
+export const CHARACTER_EMOJI: Record<CharacterId, string> = {
+  bara: '🦫',
+  may: '🐶',
+  bong: '🐰',
+  miu: '🐱',
+  lumi: '🦄',
+  cinnamoroll: '🐶',
+  kuromi: '😈',
+  capy_tie: '🦫',
+  po: '🐼',
+};
+
+export function getCharacterEmoji(characterId: CharacterId): string {
+  return CHARACTER_EMOJI[characterId] || '🐾';
+}
+
+export function getCharacterDisplayLabel(characterId: CharacterId): string {
+  const config = CHARACTERS_CONFIG.find((character) => character.id === characterId);
+  return config ? `${config.name} - ${config.species}` : 'Bạn Đồng Hành';
+}
+
 export const WARDROBE_ITEMS = [
   // Bows
   { id: 'bow_red', name: 'Nơ Đỏ Thắm', category: 'bow' as CategoryType, costStars: 10, costDiamonds: 0, previewColor: '#FF2A6D', icon: '🎀' },

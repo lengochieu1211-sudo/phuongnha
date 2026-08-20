@@ -17,11 +17,11 @@ import {
 export const CAR_CATALOG: CarConfig[] = [
   {
     id: 'roadster_883_3d',
-    name: 'Roadster 883 Heritage',
-    subTitle: 'Classic Performance Motorcycle',
+    name: 'Harley-Davidson Sportster 883',
+    subTitle: 'Cruiser / Roadster Motorcycle',
     category: 'motorcycle',
     description:
-      'Mẫu xe máy 3D chi tiết do người dùng cung cấp. Kích thước và camera được chuẩn hóa riêng cho xe hai bánh; điện thoại yếu dùng fallback nhẹ.',
+      'Mẫu 883 có kiểu dáng thuộc dòng Harley-Davidson Sportster. FBX không chứa metadata hãng chính thức, nên tên hãng được nhận dạng theo tên 883 và kiểu dáng; camera được chuẩn hóa riêng cho xe hai bánh.',
     baseStats: {
       topSpeed: 86,
       acceleration: 91,
@@ -34,15 +34,15 @@ export const CAR_CATALOG: CarConfig[] = [
     unlockCostDiamonds: 0,
     isUnlockedByDefault: true,
     defaultColor: '#20242b',
-    specialAura: '🏍️ Roadster 883',
+    specialAura: '🏍️ Harley-Davidson Sportster–style 883',
   },
   {
     id: 'vespa_studio_3d',
-    name: 'Vespa Classic Studio',
-    subTitle: 'Italian Retro Scooter',
+    name: 'Piaggio Vespa 125',
+    subTitle: 'Classic Italian Scooter',
     category: 'motorcycle',
     description:
-      'Scooter cổ điển 3D với nhiều chi tiết vật liệu. FBX đã được tối ưu dung lượng; PC dùng model thật, còn TV/Mi Box và điện thoại dùng fallback nhẹ để tránh khựng khi parse 238 mesh.',
+      'Scooter cổ điển Piaggio Vespa 125; FBX có node logo_vespa125. Model đã được tối ưu dung lượng; PC dùng model thật, TV/Mi Box và điện thoại dùng fallback nhẹ để tránh khựng khi parse nhiều mesh.',
     baseStats: {
       topSpeed: 68,
       acceleration: 79,
@@ -55,15 +55,15 @@ export const CAR_CATALOG: CarConfig[] = [
     unlockCostDiamonds: 0,
     isUnlockedByDefault: true,
     defaultColor: '#d9e8e6',
-    specialAura: '🛵 Retro scooter',
+    specialAura: '🛵 Piaggio Vespa 125',
   },
   {
     id: 'canis_mesa_3d',
-    name: 'Canis Mesa Trail 4x4',
-    subTitle: 'Off-Road Utility 4×4',
+    name: 'Canis Mesa 4×4',
+    subTitle: 'Off-Road SUV · Jeep Wrangler–style',
     category: 'suv_perf',
     description:
-      'Mẫu 4x4 3D chi tiết do người dùng cung cấp. Bản PC/TV ưu tiên model FBX thật; điện thoại yếu tự chuyển sang mô hình nhẹ để giữ FPS.',
+      'FBX xác nhận tên Canis Mesa. Đây là mẫu SUV địa hình hư cấu kiểu Jeep Wrangler; không gắn nhãn Jeep chính thức vì file không có metadata Jeep. PC/TV ưu tiên FBX thật, điện thoại yếu dùng fallback.',
     baseStats: {
       topSpeed: 76,
       acceleration: 79,
@@ -76,15 +76,15 @@ export const CAR_CATALOG: CarConfig[] = [
     unlockCostDiamonds: 0,
     isUnlockedByDefault: true,
     defaultColor: '#6b7a4a',
-    specialAura: '🏜️ 4x4 địa hình thực tế',
+    specialAura: '🏜️ Canis Mesa · Wrangler-style 4×4',
   },
   {
     id: 'v12_sv_3d',
-    name: 'V12 SV Strada',
-    subTitle: 'V12 Performance Supercar',
+    name: 'Lamborghini Murciélago LP 670-4 SV',
+    subTitle: 'Italian V12 Supercar',
     category: 'supercar',
     description:
-      'Siêu xe V12 3D chi tiết do người dùng cung cấp. FBX đã được tối ưu mạnh; PC dùng model thật, còn TV/Mi Box và thiết bị di động dùng fallback nhẹ để tránh parse model lớn trên main thread.',
+      'FBX chứa đường dẫn vật liệu Lamborghini_Murcielago_LP670-4_SV, xác nhận mẫu Lamborghini Murciélago LP 670-4 SuperVeloce. PC dùng model thật; TV/Mi Box và mobile dùng fallback nhẹ.',
     baseStats: {
       topSpeed: 97,
       acceleration: 95,
@@ -97,50 +97,72 @@ export const CAR_CATALOG: CarConfig[] = [
     unlockCostDiamonds: 0,
     isUnlockedByDefault: true,
     defaultColor: '#f2c300',
-    specialAura: '⚡ V12 SV tốc độ cao',
+    specialAura: '⚡ Lamborghini V12 SuperVeloce',
   },
 
   {
     id: 's14_sport_3d',
-    name: 'S14 Street Spec',
-    subTitle: 'JDM Drift Coupe',
+    name: 'Nissan Silvia S14',
+    subTitle: 'JDM Sports / Drift Coupe',
     category: 'jdm',
     description:
-      'Mẫu coupe S14 do người dùng cung cấp. Đã xác minh hướng đầu +Z từ hình học thật; hierarchy SketchUp không có tên bánh an toàn nên bánh được giữ tĩnh thay vì quay sai.',
+      'Coupe S14 có hình dáng/tên model phù hợp Nissan Silvia S14. FBX không chứa metadata Nissan chính thức, nên nhận dạng hãng dựa trên tên S14 và kiểu dáng. Bánh giữ tĩnh khi hierarchy không đủ an toàn.',
     baseStats: { topSpeed: 88, acceleration: 86, handling: 84, drift: 91, nitro: 85, braking: 83 },
     unlockCostStars: 0,
     unlockCostDiamonds: 0,
     isUnlockedByDefault: true,
     defaultColor: '#8b1018',
-    specialAura: '🏁 S14 drift coupe',
+    specialAura: '🏁 Nissan Silvia S14 · JDM Drift',
   },
   {
     id: 'rescue_truck_hauler_3d',
-    name: 'Rescue Hauler XT',
-    subTitle: 'Heavy Rescue Truck & Trailer',
+    name: 'International 4400LP Expeditor',
+    subTitle: 'Fire Rescue Hauler · Heavy Truck & Trailer',
     category: 'suv_perf',
     description:
-      'File “Ban tai” thực tế là xe tải cứu hộ/hauler kèm trailer nhiều trục. Model rất nặng nên FBX thật chỉ parse trên desktop; thiết bị khác dùng fallback để tránh đứng giao diện.',
+      'FBX có node 2008 INTERNATIONAL 4400LP Expeditor và Fire Rescue Smart Truck Hauler, xác nhận đầu kéo International 4400LP Expeditor kèm moóc cứu hộ nhiều trục. Desktop dùng FBX thật; thiết bị khác dùng fallback.',
     baseStats: { topSpeed: 60, acceleration: 52, handling: 48, drift: 35, nitro: 58, braking: 74 },
     unlockCostStars: 0,
     unlockCostDiamonds: 0,
     isUnlockedByDefault: true,
     defaultColor: '#f3f4f6',
-    specialAura: '🚛 Heavy rescue hauler',
+    specialAura: '🚛 International 4400LP Fire Rescue',
   },
   {
     id: 'xedap_city_3d',
-    name: 'Urban City Bicycle',
-    subTitle: 'Classic Commuter Bicycle',
+    name: 'Mamachari City Bicycle',
+    subTitle: 'Japanese Step-Through City Bicycle',
     category: 'motorcycle',
     description:
-      'Xe đạp 3D thật, đầu xe được xác minh theo -X. File không có rig và tên wheel group không đủ tin cậy, vì vậy giữ bánh tĩnh an toàn; desktop dùng FBX thật.',
+      'FBX có node mamachari_dxf, xác nhận loại xe đạp thành phố Nhật kiểu Mamachari/step-through. Không tìm thấy metadata hãng sản xuất, nên không gắn thương hiệu giả. Desktop dùng FBX thật.',
     baseStats: { topSpeed: 42, acceleration: 66, handling: 95, drift: 45, nitro: 52, braking: 88 },
     unlockCostStars: 0,
     unlockCostDiamonds: 0,
     isUnlockedByDefault: true,
     defaultColor: '#d7924f',
-    specialAura: '🚲 City ride',
+    specialAura: '🚲 Mamachari · Japanese City Bike',
+  },
+  {
+    id: 'capybara_parade_3d',
+    name: 'Capybara Parade XL',
+    subTitle: 'Lowpoly Meme Racer · Capybara Caravan',
+    category: 'mascot_special',
+    description:
+      'Model capybara lowpoly vui nhộn được bổ sung cho Gara, Gương Ma Thuật và Đua Xe. Scale được tăng lớn để dễ nhìn; đầu xoay theo hướng đua để tạo cảm giác hài hước nhưng vẫn rõ ràng.',
+    baseStats: {
+      topSpeed: 74,
+      acceleration: 77,
+      handling: 81,
+      drift: 68,
+      nitro: 72,
+      braking: 80,
+    },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#b78652',
+    mascotOwner: 'bara',
+    specialAura: '🦫 Capybara Parade · meme racer khổng lồ',
   },
   {
     id: 'bara_gt',
@@ -523,13 +545,22 @@ const RACING_SAVE_KEY = 'bara_speed_racing_profile_v1';
 
 export function getInitialRaceProfile(): PlayerRaceProfile {
   return {
-    unlockedCars: ['bara_gt', 'ap_r1', 'canis_mesa_3d', 'v12_sv_3d', 'roadster_883_3d', 'vespa_studio_3d', 's14_sport_3d', 'rescue_truck_hauler_3d', 'xedap_city_3d'],
+    unlockedCars: ['bara_gt', 'capybara_parade_3d', 'ap_r1', 'canis_mesa_3d', 'v12_sv_3d', 'roadster_883_3d', 'vespa_studio_3d', 's14_sport_3d', 'rescue_truck_hauler_3d', 'xedap_city_3d'],
     selectedCarId: 'bara_gt',
     carCustomizations: {
       bara_gt: {
         ...DEFAULT_CUSTOMIZATION,
         paintColor: '#c2884a',
         neonUnderglow: 'gold',
+      },
+      capybara_parade_3d: {
+        ...DEFAULT_CUSTOMIZATION,
+        paintColor: '#b78652',
+        paintFinish: 'glossy',
+        wheelStyle: 'sport',
+        spoilerStyle: 'stock',
+        neonUnderglow: 'gold',
+        decal: 'none',
       },
       ap_r1: {
         ...DEFAULT_CUSTOMIZATION,
@@ -539,6 +570,7 @@ export function getInitialRaceProfile(): PlayerRaceProfile {
     },
     carUpgrades: {
       bara_gt: { ...DEFAULT_UPGRADES },
+      capybara_parade_3d: { ...DEFAULT_UPGRADES },
       ap_r1: { ...DEFAULT_UPGRADES },
     },
     unlockedTracks: ['neon_city', 'coastal_highway', 'mountain_pass'],
@@ -566,6 +598,7 @@ export function loadRaceProfile(): PlayerRaceProfile {
         's14_sport_3d',
         'rescue_truck_hauler_3d',
         'xedap_city_3d',
+        'capybara_parade_3d',
       ])) as CarModelId[];
       return {
         ...initial,

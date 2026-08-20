@@ -13,11 +13,13 @@ import {
   RaceSettings,
 } from '../../types';
 import { RaceEngine } from '../../lib/racing/RaceEngine';
+import { CAR_CATALOG } from '../../lib/racing/CarData';
 import { raceAudio } from '../../lib/racing/RaceAudio';
 import { buildCar3D, Car3DInstance } from '../../lib/racing/Car3DBuilder';
 import { attachExternalCarModel, isExternalCar, shouldUseExternalCar, ExternalCarHandle } from '../../lib/racing/ExternalCarModelLoader';
 import { getInterpolatedTrackPoint } from '../../lib/racing/TrackData';
 import { createAsphaltTexture, resolveRacingGraphicsProfile, GraphicsProfile, detectDeviceClass } from '../../utils/graphicsQuality';
+import { attachFbxScenery, FbxSceneryHandle } from '../../lib/racing/SceneryFbxLoader';
 
 interface Race3DCanvasProps {
   engine: RaceEngine;
@@ -127,10 +129,35 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     build3DTrackMesh(scene, engine, profile, track);
     buildScenery(scene, track, engine, profile);
 
+    // V5.34: layer a small, device-budgeted set of real FBX scenery over the
+    // procedural world. Gameplay never waits for these assets and keeps working
+    // if an FBX fails to parse or is skipped on a weak device.
+    let fbxSceneryHandle: FbxSceneryHandle | null = null;
+    let fbxSceneryCancelled = false;
+    void attachFbxScenery(scene, track, engine, profile).then((handle) => {
+      if (fbxSceneryCancelled) handle.dispose();
+      else fbxSceneryHandle = handle;
+    });
+
     // 5. Build Player 3D Car
     const playerCar = buildCar3D(car.id, customization, profile.carDetail);
     scene.add(playerCar.root);
     playerCarRef.current = playerCar;
+
+    // V5.35: spawn on the actual road height immediately. High-elevation maps
+    // (Sky/Space/Mountain) previously showed the car at world Y=0 for the first
+    // scene frames, which looked like it had fallen underneath the road.
+    const initialSpawnPt = getInterpolatedTrackPoint(engine.waypoints, engine.physics.player.progress % 1.0);
+    const initialSpawnX = initialSpawnPt.pos.x + initialSpawnPt.normal.x * engine.physics.player.lateralOffset;
+    const initialSpawnRoadY = getRoadSurfaceY(initialSpawnPt, engine.physics.player.lateralOffset);
+    const initialSpawnY = initialSpawnRoadY + getRaceVehicleGroundLift(car.id, car.category);
+    const initialSpawnZ = initialSpawnPt.pos.z + initialSpawnPt.normal.z * engine.physics.player.lateralOffset;
+    playerCar.root.position.set(initialSpawnX, initialSpawnY, initialSpawnZ);
+    playerCar.root.lookAt(
+      initialSpawnX + initialSpawnPt.tangent.x * 10,
+      initialSpawnY + initialSpawnPt.tangent.y * 10,
+      initialSpawnZ + initialSpawnPt.tangent.z * 10,
+    );
 
     // V5.7: lazy-load user-provided FBX cars only when selected.
     // Phones / Low mode keep the procedural fallback so initial loading and FPS stay safe.
@@ -167,6 +194,8 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       contactShadow.scale.set(1.8, 4.8, 1);
     } else if (car.id === 'xedap_city_3d') {
       contactShadow.scale.set(0.34, 0.92, 1);
+    } else if (car.id === 'vespa_studio_3d') {
+      contactShadow.scale.set(0.5, 1.24, 1);
     } else {
       contactShadow.scale.set(car.category === 'motorcycle' ? 0.42 : 1.15, car.category === 'motorcycle' ? 1.12 : 2.25, 1);
     }
@@ -190,6 +219,18 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         decal: 'none',
       }, ai.isLocalPlayer ? profile.carDetail : profile.aiCarDetail);
       scene.add(aiInstance.root);
+      const aiSpawnPt = getInterpolatedTrackPoint(engine.waypoints, ai.progress % 1.0);
+      const aiSpawnConfig = CAR_CATALOG.find((cfg) => cfg.id === ai.carModelId);
+      const aiSpawnX = aiSpawnPt.pos.x + aiSpawnPt.normal.x * ai.lateralOffset;
+      const aiSpawnRoadY = getRoadSurfaceY(aiSpawnPt, ai.lateralOffset);
+      const aiSpawnY = aiSpawnRoadY + getRaceVehicleGroundLift(ai.carModelId, aiSpawnConfig?.category);
+      const aiSpawnZ = aiSpawnPt.pos.z + aiSpawnPt.normal.z * ai.lateralOffset;
+      aiInstance.root.position.set(aiSpawnX, aiSpawnY, aiSpawnZ);
+      aiInstance.root.lookAt(
+        aiSpawnX + aiSpawnPt.tangent.x * 10,
+        aiSpawnY + aiSpawnPt.tangent.y * 10,
+        aiSpawnZ + aiSpawnPt.tangent.z * 10,
+      );
       aiCars.push({ id: ai.id, instance: aiInstance });
     });
     aiCarsRef.current = aiCars;
@@ -351,7 +392,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     if (secondCamera) {
       const p2 = engine.physics.getLocalSecondPlayer();
       const p2CarId = (p2?.carModelId || secondCar?.id || car.id) as string;
-      const p2Category = secondCar?.category || 'sports';
+      const p2Category = secondCar?.category || 'sport';
       updateCameraPosition(
         secondCamera, startPt.pos.x, startPt.pos.y, startPt.pos.z, startPt.tangent, cameraView, false,
         p2CarId, p2Category, true,
@@ -411,11 +452,14 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       const pt = getInterpolatedTrackPoint(engine.waypoints, playerProg);
 
       const px = pt.pos.x + pt.normal.x * engine.physics.player.lateralOffset;
-      const py = pt.pos.y + (pt.bankAngle ? Math.abs(engine.physics.player.lateralOffset) * pt.bankAngle * 0.2 : 0);
+      const roadY = getRoadSurfaceY(pt, engine.physics.player.lateralOffset);
+      const vehicleLift = getRaceVehicleGroundLift(car.id, car.category);
+      const py = roadY + vehicleLift;
       const pz = pt.pos.z + pt.normal.z * engine.physics.player.lateralOffset;
 
       playerCar.root.position.set(px, py, pz);
-      contactShadow.position.set(px, py + 0.025, pz);
+      // Shadow stays on the road plane; the vehicle itself gets a small clearance lift.
+      contactShadow.position.set(px, roadY + 0.025, pz);
 
       // Car orientation along track tangent
       const targetLook = new THREE.Vector3(
@@ -444,7 +488,9 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         if (!found) return;
         const aiPt = getInterpolatedTrackPoint(engine.waypoints, ai.progress % 1.0);
         const aix = aiPt.pos.x + aiPt.normal.x * ai.lateralOffset;
-        const aiy = aiPt.pos.y;
+        const aiConfig = CAR_CATALOG.find((cfg) => cfg.id === ai.carModelId);
+        const aiRoadY = getRoadSurfaceY(aiPt, ai.lateralOffset);
+        const aiy = aiRoadY + getRaceVehicleGroundLift(ai.carModelId, aiConfig?.category);
         const aiz = aiPt.pos.z + aiPt.normal.z * ai.lateralOffset;
 
         found.instance.root.position.set(aix, aiy, aiz);
@@ -544,11 +590,14 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         if (p2) {
           const p2Pt = getInterpolatedTrackPoint(engine.waypoints, p2.progress % 1.0);
           const p2x = p2Pt.pos.x + p2Pt.normal.x * p2.lateralOffset;
-          const p2y = p2Pt.pos.y;
+          const p2CarId = (p2.carModelId || secondCar?.id || car.id) as string;
+          const p2Category = secondCar?.category || CAR_CATALOG.find((cfg) => cfg.id === p2CarId)?.category || 'sport';
+          const p2RoadY = getRoadSurfaceY(p2Pt, p2.lateralOffset);
+          const p2y = p2RoadY + getRaceVehicleGroundLift(p2CarId, p2Category);
           const p2z = p2Pt.pos.z + p2Pt.normal.z * p2.lateralOffset;
           updateCameraPosition(
             secondCamera, p2x, p2y, p2z, p2Pt.tangent, cameraViewRef.current, p2.isNitroActive,
-            (p2.carModelId || secondCar?.id || car.id) as string, secondCar?.category || 'sports'
+            p2CarId, p2Category
           );
         }
       }
@@ -636,6 +685,8 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     return () => {
       readyCancelled = true;
       externalLoadCancelled = true;
+      fbxSceneryCancelled = true;
+      fbxSceneryHandle?.dispose();
       externalPlayerHandle?.dispose();
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
       resizeObserver.disconnect();
@@ -690,6 +741,30 @@ function createProceduralRaceEnvironment(environmentType: string, size = 128): T
   return tex;
 }
 
+
+function getRoadSurfaceY(
+  point: { pos: { y: number }; bankAngle?: number },
+  lateralOffset: number,
+): number {
+  const baseY = Number.isFinite(point.pos.y) ? point.pos.y : 0;
+  const bank = Number.isFinite(point.bankAngle) ? (point.bankAngle || 0) : 0;
+  const lateral = Number.isFinite(lateralOffset) ? lateralOffset : 0;
+  return baseY + Math.abs(lateral) * bank * 0.2;
+}
+
+function getRaceVehicleGroundLift(modelId: string, category?: string): number {
+  // Keep the vehicle slightly above the mathematical road ribbon. This prevents
+  // imported FBX/procedural wheels from being depth-hidden by the road when a
+  // scene/map changes elevation or when the source pivot sits a few cm low.
+  if (modelId === 'rescue_truck_hauler_3d') return 0.16;
+  if (modelId === 'xedap_city_3d') return 0.09;
+  if (modelId === 'roadster_883_3d') return 0.10;
+  if (modelId === 'vespa_studio_3d') return 0.12;
+  if (modelId === 'capybara_parade_3d') return 0.12;
+  if (category === 'motorcycle') return 0.10;
+  return 0.08;
+}
+
 function updateCameraPosition(
   camera: THREE.PerspectiveCamera,
   px: number,
@@ -710,7 +785,7 @@ function updateCameraPosition(
     v12_sv_3d: 5.65,
     canis_mesa_3d: 5.15,
     roadster_883_3d: 2.75,
-    vespa_studio_3d: 2.55,
+    vespa_studio_3d: 2.85,
     s14_sport_3d: 5.05,
     rescue_truck_hauler_3d: 10.8,
     xedap_city_3d: 2.45,
@@ -719,16 +794,16 @@ function updateCameraPosition(
     v12_sv_3d: 6.65,
     canis_mesa_3d: 6.15,
     roadster_883_3d: 3.65,
-    vespa_studio_3d: 3.35,
+    vespa_studio_3d: 3.7,
     s14_sport_3d: 6.05,
     rescue_truck_hauler_3d: 12.6,
     xedap_city_3d: 3.25,
   };
   const closeDistance = closeDistanceByModel[carId] ?? (isMotorcycle ? 2.75 : 4.15);
   const chaseDistance = chaseDistanceByModel[carId] ?? (isMotorcycle ? 3.65 : 5.35);
-  const cameraHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.15, xedap_city_3d: 1.20 };
-  const chaseHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.85, xedap_city_3d: 1.62 };
-  const lookHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 1.75, xedap_city_3d: 0.62 };
+  const cameraHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.15, xedap_city_3d: 1.20, vespa_studio_3d: 1.26 };
+  const chaseHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.85, xedap_city_3d: 1.62, vespa_studio_3d: 1.72 };
+  const lookHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 1.75, xedap_city_3d: 0.62, vespa_studio_3d: 0.84 };
   const cameraHeight = cameraHeightByModel[carId] ?? (isMotorcycle ? 1.32 : 1.72);
   const chaseHeight = chaseHeightByModel[carId] ?? (isMotorcycle ? 1.78 : 2.28);
   const lookHeight = lookHeightByModel[carId] ?? (isMotorcycle ? 0.72 : 0.92);
@@ -1107,7 +1182,14 @@ function build3DTrackMesh(scene: THREE.Scene, engine: RaceEngine, profile: Graph
       new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.96, metalness: 0.0 })
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.18;
+    // V5.36: never let the decorative terrain plane sit above a low section
+    // of the actual road ribbon. Several tracks intentionally dip below world Y=0.
+    // A fixed -0.18 plane could therefore cover both asphalt and vehicles.
+    const minTrackY = engine.waypoints.reduce(
+      (minY, waypoint) => Number.isFinite(waypoint.y) ? Math.min(minY, waypoint.y) : minY,
+      0,
+    );
+    ground.position.y = minTrackY - 0.45;
     ground.receiveShadow = profile.shadows;
     scene.add(ground);
   }

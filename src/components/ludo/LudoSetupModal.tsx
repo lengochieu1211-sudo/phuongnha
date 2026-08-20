@@ -97,8 +97,8 @@ export default function LudoSetupModal({
   };
 
   const mascotOptions: { id: CharacterId; name: string; avatar: string }[] = [
-    { id: 'bara', name: 'Gấu Bara', avatar: '🐻' },
-    { id: 'may', name: 'Mây Nhỏ', avatar: '☁️' },
+    { id: 'bara', name: 'Bara Capybara', avatar: '🦫' },
+    { id: 'may', name: 'Mây Nhỏ', avatar: '🐶' },
     { id: 'bong', name: 'Thỏ Bông', avatar: '🐰' },
     { id: 'miu', name: 'Mèo Miu', avatar: '🐱' },
     { id: 'lumi', name: 'Kỳ Lân Lumi', avatar: '🦄' },

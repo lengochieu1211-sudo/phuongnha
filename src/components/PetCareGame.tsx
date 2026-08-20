@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Trophy, Sparkles, ShowerHead, Apple, HelpCircle, ArrowLeft } from 'lucide-react';
 import { PetState, PlayerProgress, GameGesture, CharacterId } from '../types';
+import { getCharacterEmoji } from '../utils/characterRenderer';
 import { audio } from '../lib/AudioEngine';
 import CharacterAvatar from './CharacterAvatar';
 
@@ -147,13 +148,7 @@ export default function PetCareGame({ progress, onUpdateProgress, gesture, onBac
 
   const menuPets = Object.keys(progress.pets).map(id => {
     const p = progress.pets[id];
-    let icon = '🐾';
-    if (id === 'bara' || id === 'capy_tie') icon = '🦫';
-    if (id === 'may') icon = '🐶';
-    if (id === 'bong' || id === 'cinnamoroll' || id === 'kuromi') icon = '🐰';
-    if (id === 'miu') icon = '🐱';
-    if (id === 'lumi') icon = '🦄';
-    if (id === 'po') icon = '🐼';
+    const icon = getCharacterEmoji(id as CharacterId);
     return { id, icon, name: p.name };
   });
 

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Sparkles, Star, Lock, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { PlayerProgress, CategoryType, WardrobeItem } from '../types';
-import { WARDROBE_ITEMS } from '../utils/characterRenderer';
+import { WARDROBE_ITEMS, getCharacterDisplayLabel } from '../utils/characterRenderer';
 import CharacterAvatar from './CharacterAvatar';
 import { audio } from '../lib/AudioEngine';
 
@@ -172,15 +172,7 @@ export default function WardrobeScreen({
             </div>
 
             <h3 className="font-black text-lg text-slate-800 uppercase">
-              {progress.selectedCharacter === 'bara'
-                ? 'Bara - Capybara'
-                : progress.selectedCharacter === 'may'
-                ? 'Mây - Chó Mây'
-                : progress.selectedCharacter === 'bong'
-                ? 'Bông - Thỏ'
-                : progress.selectedCharacter === 'miu'
-                ? 'Miu - Mèo'
-                : 'Lumi - Kỳ Lân'}
+              {getCharacterDisplayLabel(progress.selectedCharacter)}
             </h3>
 
             <div className="w-full bg-pink-50 p-3 rounded-2xl border border-pink-200 text-xs text-pink-800 font-bold">

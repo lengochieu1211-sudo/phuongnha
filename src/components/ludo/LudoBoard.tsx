@@ -11,6 +11,7 @@ import {
   LudoColor,
   CharacterId,
 } from '../../types';
+import { getCharacterEmoji } from '../../utils/characterRenderer';
 import {
   TRACK_GRID_COORDS,
   HOME_STRETCH_COORDS,
@@ -42,22 +43,7 @@ export default function LudoBoard({
   const currentPlayer = players[currentTurnIndex];
 
   // Mascot Icon Helper
-  const getMascotAvatar = (mascot: CharacterId) => {
-    switch (mascot) {
-      case 'bara':
-        return '🐻';
-      case 'may':
-        return '☁️';
-      case 'bong':
-        return '🐰';
-      case 'miu':
-        return '🐱';
-      case 'lumi':
-        return '🦄';
-      default:
-        return '🐴';
-    }
-  };
+  const getMascotAvatar = (mascot: CharacterId) => getCharacterEmoji(mascot);
 
   // Color Map
   const colorMap: Record<LudoColor, { base: string; light: string; border: string; glow: string; text: string }> = {

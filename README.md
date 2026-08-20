@@ -72,3 +72,44 @@ V5.29 adds an explicit **1 Player / 2 Players · 1 Camera** choice for racing. T
 The same pass also fixes brake priority with Auto-gas, duplicate race-profile persistence, invalid `0` best-lap saves, P1/P2 collision double-processing, Pet Care camera routing, racing/Ludo calibration routing, Pose Mimic double-advance/final bonus, Fashion Show stale final score, several timer cleanup issues, and TV `?tv=1` graphics detection.
 
 See `AUDIT-V5.29-ONE-CAMERA-2P-FULL-LOGIC.md` and `VALIDATION-V5.29.md` for validation and recommended PC/phone/Android TV hardware.
+
+## V5.32 — Bulk FBX library import + optimization
+
+- Added a new import library for extra user FBX assets under `assets-source/model-library/` with 3 buckets: `characters`, `vehicles`, `props`.
+- Imported and optimized the new uploaded FBX files by trimming ASCII noise/comments and reducing numeric precision where safe, to lower parse size without deleting core mesh content.
+- Generated `FBX_LIBRARY_MANIFEST_V5.32.json` with per-file size before/after, material/texture counts and usage notes.
+- Generated `AUDIT-V5.32-BULK-FBX-LIBRARY-OPTIMIZATION.md` summarizing the new assets and which ones are still heavy enough that TV/mobile should use fallback logic or a future lowpoly/GLB version.
+- This pass prepares the extra models cleanly inside the source tree so they can be wired into Garage, Racing, Fashion Mirror or scene props in later passes without re-uploading them.
+
+
+## V5.34 — FBX scenery layer
+
+Race scenery can now layer small real FBX props over the existing procedural world without blocking gameplay. Mountain uses the optimized Pine Tree model and optionally a Tank on Desktop High; City Night uses lightweight police/ambulance props; Coast/Sky can show a lightweight helicopter. Huge house/canon masters stay out of runtime and are kept as source-only/heavy assets for later splitting or GLB decimation.
+
+## V5.35 — Vehicle ground fix + robust avatar framing + NBN scenery streaming split
+
+- Fixes race/map transitions where player/AI vehicles could briefly appear below a high-elevation road: cars now spawn immediately at track Y and keep a small model-specific ground clearance while shadows remain on the road plane.
+- `StaticFbxAvatar` now uses robust main-mesh bounds so stray/outlier meshes no longer shrink or offset the visible character.
+- The large NBN guard-house scene is split into 20 strongly-compressed FBX streaming chunks rather than one monolithic runtime asset. Heavy source chunks remain excluded from GitHub Pages by `.gitignore` until a dedicated streamed map is enabled.
+
+## V5.36 — Regression fix: companion display + road ground occlusion
+
+- Fixed blank companion bubble for Cinnamoroll, Kuromi, Capybara Cà Vạt and Po.
+- Centralized companion emoji/display labels across Main Menu, Wardrobe, Pet Care and Ludo.
+- Fixed the root cause of cars/roads disappearing under scenery terrain on tracks with negative elevation: terrain ground plane is now positioned below the minimum road height per track.
+- Player, AI and local P2 now share the same bank-aware road surface Y calculation.
+- Corrected P2 fallback car category from `sports` to `sport`.
+
+## v5.37.0
+- Mobile Garage layout fix: visible 3D car preview + car selector on phone screens.
+- Selective FBX size reduction for Rescue Truck, V12 and city bicycle.
+- Vespa deliberately left untouched to preserve visual quality.
+- Heavy scenery kept source-only/split instead of destructive recompression.
+
+
+## V5.38 – Vespa visual fix
+- Dedicated Vespa glossy material tuning, garage camera preset, and race framing/grounding tweaks.
+
+
+## V5.39 – Full regression + mobile Garage + Vespa restore
+- Restored high-precision Vespa FBX, fixed phone fallback camera, moved phone car selector outside the 3D viewport, and excluded heavy source-only scenery from the GitHub ZIP.

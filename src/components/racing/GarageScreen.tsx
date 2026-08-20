@@ -274,12 +274,25 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
 
     const applyCameraForCar = () => {
       // Move only when the new model is committed, not while it is loading.
-      if (currentCar.id === 'rescue_truck_hauler_3d') {
+      // On phone/TV some heavy FBXs use a procedural CAR fallback. Never apply a tiny
+      // motorcycle/FBX camera preset to that fallback or the camera can end up inside it.
+      const usingRealExternal = isExternalCar(currentCar.id) && shouldUseExternalCar(currentCar.id, actualDeviceClass);
+      if (isExternalCar(currentCar.id) && !usingRealExternal) {
+        camera.position.set(0, 1.85, 5.7);
+        camera.lookAt(0, 0.52, 0);
+      } else if (currentCar.id === 'rescue_truck_hauler_3d') {
         camera.position.set(0, 3.55, 13.2);
         camera.lookAt(0, 1.45, 0);
       } else if (currentCar.id === 'xedap_city_3d') {
         camera.position.set(0, 1.18, 3.0);
         camera.lookAt(0, 0.72, 0);
+      } else if (currentCar.id === 'vespa_studio_3d') {
+        // Dedicated 3/4 showroom framing so the front apron, handlebar and seat read clearly.
+        camera.position.set(0.52, 1.24, 2.82);
+        camera.lookAt(0.06, 0.86, 0);
+      } else if (currentCar.id === 'roadster_883_3d') {
+        camera.position.set(0.22, 1.26, 3.05);
+        camera.lookAt(0.04, 0.78, 0);
       } else if (currentCar.category === 'motorcycle') {
         camera.position.set(0, 1.28, 3.25);
         camera.lookAt(0, 0.72, 0);
@@ -524,10 +537,10 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   return (
     <div
       id="garage-showroom-screen"
-      className="relative w-full h-full min-h-screen bg-slate-950 text-white flex flex-col justify-between select-none overflow-x-hidden"
+      className="relative w-full min-h-[100svh] bg-slate-950 text-white flex flex-col select-none overflow-x-hidden overflow-y-auto"
     >
       {/* 1. TOP HEADER: Back, Currencies, Car Title */}
-      <header className="relative z-10 flex items-center justify-between p-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+      <header className="relative z-30 flex items-center justify-between gap-2 p-2.5 sm:p-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div className="flex items-center gap-3">
           <button
             id="garage-back-btn"
@@ -535,25 +548,25 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
             className="px-4 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold flex items-center gap-2 transition-all shadow-md active:scale-95"
           >
             <ChevronLeft className="w-5 h-5 text-cyan-400" />
-            <span>Quay lại</span>
+            <span className="hidden xs:inline sm:inline">Quay lại</span>
           </button>
 
           <div>
-            <h1 className="text-xl md:text-2xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-cyan-400">
+            <h1 className="text-sm sm:text-xl md:text-2xl font-black italic text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-cyan-400">
               GARA BARA SPEED RACING
             </h1>
-            <p className="text-xs text-slate-400">Tùy chỉnh, nâng cấp và chiêm ngưỡng siêu xe của bạn</p>
+            <p className="hidden sm:block text-xs text-slate-400">Tùy chỉnh, nâng cấp và chiêm ngưỡng siêu xe của bạn</p>
           </div>
         </div>
 
         {/* Currency balances */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 bg-slate-950/80 border border-amber-500/40 px-3.5 py-1.5 rounded-full shadow-lg">
+        <div className="flex items-center gap-1.5 sm:gap-3">
+          <div className="flex items-center gap-1 bg-slate-950/80 border border-amber-500/40 px-2 sm:px-3.5 py-1.5 rounded-full shadow-lg">
             <span className="text-amber-400 text-lg">⭐</span>
             <span className="font-black text-amber-400">{playerProgress.stars}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-950/80 border border-cyan-500/40 px-3.5 py-1.5 rounded-full shadow-lg">
+          <div className="flex items-center gap-1.5 bg-slate-950/80 border border-cyan-500/40 px-2 sm:px-3.5 py-1.5 rounded-full shadow-lg">
             <span className="text-cyan-400 text-lg">💎</span>
             <span className="font-black text-cyan-400">{playerProgress.diamonds}</span>
           </div>
@@ -561,9 +574,9 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
       </header>
 
       {/* 2. MAIN 3D SHOWROOM & CAR SELECTOR */}
-      <div className="relative flex-1 flex flex-col md:flex-row items-center justify-between p-4 gap-4 overflow-hidden">
+      <div className="relative flex-1 flex flex-col md:flex-row items-stretch md:items-center justify-start md:justify-between p-2.5 sm:p-4 gap-3 md:gap-4 overflow-visible md:overflow-hidden">
         {/* Left: 3D Turntable Viewport */}
-        <div className="relative flex-1 w-full h-[320px] md:h-[500px] rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-gradient-to-b from-slate-900 to-slate-950">
+        <div className="relative flex-none md:flex-1 w-full h-[46svh] min-h-[270px] max-h-[390px] md:h-[500px] md:min-h-0 md:max-h-none rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-gradient-to-b from-slate-900 to-slate-950">
           <div
             ref={containerRef}
             id="garage-3d-canvas-container"
@@ -615,7 +628,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
           </button>
 
           {/* Bottom Quick Car Selector Ribbon */}
-          <div className="absolute bottom-3 right-3 left-3 sm:left-32 z-10">
+          <div className="hidden sm:block absolute bottom-2 right-2 left-2 sm:bottom-3 sm:right-3 sm:left-32 z-20">
             <div className="mb-1.5 flex items-center justify-between px-2 text-[10px] font-bold tracking-wide text-slate-400 pointer-events-none">
               <span>MODEL GARAGE</span>
               <span className="text-cyan-300">Kéo / vuốt để xem thêm</span>
@@ -686,6 +699,41 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* V5.39: mobile selector lives OUTSIDE the 3D viewport so it can never cover the vehicle. */}
+        <div className="sm:hidden w-full rounded-2xl border border-cyan-500/25 bg-slate-950/95 p-2 shadow-xl">
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <div className="min-w-0">
+              <div className="text-[10px] font-black tracking-wider text-cyan-300">CHỌN XE</div>
+              <div className="truncate text-sm font-black text-white">{currentCar.name}</div>
+            </div>
+            <div className="flex gap-1">
+              <button type="button" aria-label="Xe trước" onClick={() => setSelectedCarIndex((prev) => (prev > 0 ? prev - 1 : CAR_CATALOG.length - 1))} className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-cyan-300 flex items-center justify-center">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button type="button" aria-label="Xe sau" onClick={() => setSelectedCarIndex((prev) => (prev < CAR_CATALOG.length - 1 ? prev + 1 : 0))} className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 text-cyan-300 flex items-center justify-center">
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2 overflow-x-auto overscroll-x-contain snap-x snap-mandatory pb-1">
+            {CAR_CATALOG.map((carItem, idx) => {
+              const selected = idx === selectedCarIndex;
+              const unlocked = profile.unlockedCars.includes(carItem.id);
+              const vehicleIcon = carItem.id === 'xedap_city_3d' ? '🚲' : carItem.category === 'motorcycle' ? '🛵' : carItem.id === 'rescue_truck_hauler_3d' ? '🚛' : '🏎️';
+              return (
+                <button key={`mobile-${carItem.id}`} type="button" onClick={() => setSelectedCarIndex(idx)} className={`snap-center flex-shrink-0 w-[124px] rounded-xl border px-2 py-2 text-left ${selected ? 'border-amber-300 bg-gradient-to-br from-amber-500/90 to-rose-500/90 text-slate-950' : 'border-slate-800 bg-slate-900 text-slate-200'}`}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xl">{vehicleIcon}</span>
+                    {!unlocked && <Lock className="w-3 h-3 text-amber-300" />}
+                  </div>
+                  <div className="truncate text-[11px] font-black">{carItem.name}</div>
+                  <div className={`truncate text-[9px] ${selected ? 'text-slate-800/75' : 'text-slate-500'}`}>{carItem.subTitle}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

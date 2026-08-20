@@ -6,3 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
+# V5.34: very large FBX masters stay in the downloadable source ZIP but are not pushed to GitHub Pages repo.
+assets-source-heavy/

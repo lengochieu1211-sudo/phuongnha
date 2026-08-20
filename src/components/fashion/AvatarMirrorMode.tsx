@@ -13,7 +13,7 @@ import { WARDROBE_ITEMS } from '../../utils/characterRenderer';
 import { detectGraphicsProfile } from '../../utils/graphicsQuality';
 import StaticFbxAvatar from './StaticFbxAvatar';
 
-type AvatarTheme = 'princess' | 'capy' | 'bunny' | 'cyber' | 'human_static' | 'child_girl_static';
+type AvatarTheme = 'princess' | 'capy' | 'bunny' | 'cyber' | 'human_static' | 'child_girl_static' | 'capybara_fbx';
 type PerfMode = 'auto' | 'phone' | 'tv' | 'pc';
 
 interface Props {
@@ -30,6 +30,7 @@ const avatars: { id: AvatarTheme; name: string; emoji: string; desc: string }[] 
   { id: 'cyber', name: 'Robo Cyber', emoji: '🤖', desc: 'Nhân vật robot phong cách tương lai' },
   { id: 'human_static', name: 'Người Mẫu 3D Thật', emoji: '🧍', desc: 'FBX thật ng1 • xoay theo thân, chưa có xương rig' },
   { id: 'child_girl_static', name: 'Bé Gái FBX Thật', emoji: '👧', desc: 'Child+girl • 49 material • chưa rig • texture ngoài chưa kèm' },
+  { id: 'capybara_fbx', name: 'Capybara Lowpoly FBX', emoji: '🦫', desc: 'Capybara lowpoly vui nhộn • dùng thêm trong đua xe' },
 ];
 
 function getPreviewColor(itemId?: string, fallback = '#d946ef') {
@@ -81,7 +82,7 @@ export default function AvatarMirrorMode({ isOpen, onClose, equippedIds }: Props
 
   if (!isOpen) return null;
 
-  const isStaticFbx = avatar === 'human_static' || avatar === 'child_girl_static';
+  const isStaticFbx = avatar === 'human_static' || avatar === 'child_girl_static' || avatar === 'capybara_fbx';
   const torsoYaw = clamp((anchors?.torsoYaw || 0), -0.9, 0.9);
   const bodyWidth = clamp(anchors?.shoulderWidth ? anchors.shoulderWidth * 220 : 110, 90, 170);
   const bodyHeight = clamp(anchors?.torsoHeight ? anchors.torsoHeight * 310 : 180, 150, 255);
@@ -182,9 +183,29 @@ export default function AvatarMirrorMode({ isOpen, onClose, equippedIds }: Props
                     yaw={torsoYaw}
                     roll={(anchors?.torsoRotation || 0) * (Math.PI / 180)}
                     quality={effectiveMode}
-                    file={avatar === 'child_girl_static' ? 'assets/avatars/child-girl-static.fbx' : 'assets/avatars/ng1-human-static.fbx'}
-                    title={avatar === 'child_girl_static' ? 'BÉ GÁI 3D THẬT' : 'NGƯỜI MẪU 3D THẬT'}
-                    description={avatar === 'child_girl_static' ? 'Child+girl FBX • màu vật liệu fallback • chưa có xương rig' : 'ng1 FBX • xoay/nghiêng theo thân người'}
+                    file={
+                      avatar === 'child_girl_static'
+                        ? 'assets/avatars/child-girl-static.fbx'
+                        : avatar === 'capybara_fbx'
+                          ? 'assets/avatars/capybara-lowpoly.fbx'
+                          : 'assets/avatars/ng1-human-static.fbx'
+                    }
+                    title={
+                      avatar === 'child_girl_static'
+                        ? 'BÉ GÁI 3D THẬT'
+                        : avatar === 'capybara_fbx'
+                          ? 'CAPYBARA LOWPOLY VUI NHỘN'
+                          : 'NGƯỜI MẪU 3D THẬT'
+                    }
+                    description={
+                      avatar === 'child_girl_static'
+                        ? 'Child+girl FBX • màu vật liệu fallback • chưa có xương rig'
+                        : avatar === 'capybara_fbx'
+                          ? 'Capybara lowpoly • tăng scale để thấy rõ • phong cách hài hước'
+                          : 'ng1 FBX • xoay/nghiêng theo thân người'
+                    }
+                    targetHeight={avatar === 'capybara_fbx' ? 2.55 : 2.05}
+                    cameraPreset={avatar === 'capybara_fbx' ? 'compact' : 'human'}
                   />
                 )}
 

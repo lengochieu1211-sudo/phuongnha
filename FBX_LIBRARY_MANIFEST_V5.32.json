@@ -1,0 +1,848 @@
+{
+  "version": "v5.33-github-ready",
+  "generatedBy": "bulk_fbx_import_optimizer",
+  "records": [
+    {
+      "title": "Nhân vật Cap",
+      "sourceFile": "cap.fbx",
+      "destFile": "assets-source/model-library/characters/cap-figure.fbx",
+      "type": "character",
+      "sizeBefore": 2925576,
+      "sizeAfter": 1842892,
+      "savedBytes": 1082684,
+      "savedPercent": 37.01,
+      "modelCount": 7,
+      "materialCount": 4,
+      "textureCount": 4,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Group2",
+        "Group3",
+        "Mesh1",
+        "Mesh2",
+        "Mesh3"
+      ],
+      "sampleMaterials": [
+        "ESCUDO_CAP",
+        "METAL4",
+        "M_6_captainamericaageofultron_0_2_0_0",
+        "M_6_captainamericaageofultronbodymat_0_2_0_0"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\cap\\ESCUDO_CAP.png",
+        "..\\..\\..\\Documents\\cap\\METAL4.jpg",
+        "..\\..\\..\\Documents\\cap\\M_6_captainamericaageofultron_0_2_0_0.png",
+        "..\\..\\..\\Documents\\cap\\M_6_captainamericaageofultronbodymat_0_2_0_0.png",
+        "cap/ESCUDO_CAP.png",
+        "..\\..\\..\\Documents\\cap\\ESCUDO_CAP.png",
+        "cap/METAL4.jpg",
+        "..\\..\\..\\Documents\\cap\\METAL4.jpg",
+        "cap/M_6_captainamericaageofultron_0_2_0_0.png",
+        "..\\..\\..\\Documents\\cap\\M_6_captainamericaageofultron_0_2_0_0.png"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Hulk Character",
+      "sourceFile": "hub.fbx",
+      "destFile": "assets-source/model-library/characters/hulk-character.fbx",
+      "type": "character",
+      "sizeBefore": 5472563,
+      "sizeAfter": 3271278,
+      "savedBytes": 2201285,
+      "savedPercent": 40.22,
+      "modelCount": 10,
+      "materialCount": 4,
+      "textureCount": 4,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Hulk_3",
+        "Mesh1",
+        "Hulk_2",
+        "Mesh2",
+        "Hulk_0",
+        "Mesh3",
+        "Hulk_1",
+        "Mesh4"
+      ],
+      "sampleMaterials": [
+        "Hulk_08___Default",
+        "Hulk_defaultMat",
+        "Hulk_07___Default",
+        "Hulk_Default"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\hub\\Hulk_08___Default.jpg",
+        "..\\..\\..\\Documents\\hub\\Hulk_defaultMat.jpg",
+        "..\\..\\..\\Documents\\hub\\Hulk_07___Default.jpg",
+        "..\\..\\..\\Documents\\hub\\Hulk_Default.jpg",
+        "hub/Hulk_08___Default.jpg",
+        "..\\..\\..\\Documents\\hub\\Hulk_08___Default.jpg",
+        "hub/Hulk_defaultMat.jpg",
+        "..\\..\\..\\Documents\\hub\\Hulk_defaultMat.jpg",
+        "hub/Hulk_07___Default.jpg",
+        "..\\..\\..\\Documents\\hub\\Hulk_07___Default.jpg"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Nhân vật Nhện",
+      "sourceFile": "nhen.fbx",
+      "destFile": "assets-source/model-library/characters/nhen-character.fbx",
+      "type": "character",
+      "sizeBefore": 1289969,
+      "sizeAfter": 826248,
+      "savedBytes": 463721,
+      "savedPercent": 35.95,
+      "modelCount": 3,
+      "materialCount": 4,
+      "textureCount": 4,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Mesh1"
+      ],
+      "sampleMaterials": [
+        "M_6_spidermancivilwarmat_1__0_2_0_0",
+        "M_6_spidermancivilwarmovie_0_2_0_0",
+        "M_6_spidermancivilwarmovie_2__0_2_0_0",
+        "M_6_spidermancivilwarmat_0_2_0_0"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\nhen\\M_6_spidermancivilwarmat_1__0_2_0_0.png",
+        "..\\..\\..\\Documents\\nhen\\M_6_spidermancivilwarmovie_0_2_0_0.png",
+        "..\\..\\..\\Documents\\nhen\\M_6_spidermancivilwarmovie_2__0_2_0_0.png",
+        "..\\..\\..\\Documents\\nhen\\M_6_spidermancivilwarmat_0_2_0_0.png",
+        "nhen/M_6_spidermancivilwarmat_1__0_2_0_0.png",
+        "..\\..\\..\\Documents\\nhen\\M_6_spidermancivilwarmat_1__0_2_0_0.png",
+        "nhen/M_6_spidermancivilwarmovie_0_2_0_0.png",
+        "..\\..\\..\\Documents\\nhen\\M_6_spidermancivilwarmovie_0_2_0_0.png",
+        "nhen/M_6_spidermancivilwarmovie_2__0_2_0_0.png",
+        "..\\..\\..\\Documents\\nhen\\M_6_spidermancivilwarmovie_2__0_2_0_0.png"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Mark 6 Armor",
+      "sourceFile": "mark+6.fbx",
+      "destFile": "assets-source/model-library/characters/mark-6-armor.fbx",
+      "type": "character",
+      "sizeBefore": 11133253,
+      "sizeAfter": 6403050,
+      "savedBytes": 4730203,
+      "savedPercent": 42.49,
+      "modelCount": 132,
+      "materialCount": 15,
+      "textureCount": 4,
+      "sampleModels": [
+        "Model",
+        "Iron_Man_Mark_II_1_1",
+        "Iron_man_mark_II1",
+        "Group1",
+        "Group2",
+        "Mesh1",
+        "Group3",
+        "Group4",
+        "Mesh2",
+        "Group5",
+        "Mesh3",
+        "Group6"
+      ],
+      "sampleMaterials": [
+        "Color_D06",
+        "Color_A06",
+        "Color_005",
+        "Color_004",
+        "Metal_Aluminum_Anodized",
+        "Iron_Man_2_arc_reactor_prop_by_ajb3art",
+        "Metal_Rough",
+        "Color_000"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\mark+6\\Metal_Aluminum_Anodized.jpg",
+        "..\\..\\..\\Documents\\mark+6\\Iron_Man_2_arc_reactor_prop_by_ajb3art.jpg",
+        "..\\..\\..\\Documents\\mark+6\\Metal_Rough.jpg",
+        "..\\..\\..\\Documents\\mark+6\\Translucent_Glass_Tinted.jpg",
+        "mark+6/Metal_Aluminum_Anodized.jpg",
+        "..\\..\\..\\Documents\\mark+6\\Metal_Aluminum_Anodized.jpg",
+        "mark+6/Iron_Man_2_arc_reactor_prop_by_ajb3art.jpg",
+        "..\\..\\..\\Documents\\mark+6\\Iron_Man_2_arc_reactor_prop_by_ajb3art.jpg",
+        "mark+6/Metal_Rough.jpg",
+        "..\\..\\..\\Documents\\mark+6\\Metal_Rough.jpg"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Iron Man Mark III",
+      "sourceFile": "IRON+MAN+Mark+III.fbx",
+      "destFile": "assets-source/model-library/characters/iron-man-mark-iii.fbx",
+      "type": "character",
+      "sizeBefore": 40629340,
+      "sizeAfter": 22918540,
+      "savedBytes": 17710800,
+      "savedPercent": 43.59,
+      "modelCount": 519,
+      "materialCount": 21,
+      "textureCount": 5,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Group2",
+        "Group3",
+        "Mesh1",
+        "Group4",
+        "HD_Ironm98_1",
+        "Mesh2",
+        "HD_Ironm99_1",
+        "Mesh3",
+        "HD_Ironm47_1",
+        "Mesh4"
+      ],
+      "sampleMaterials": [
+        "Iron_man_leg_red1",
+        "HD_Ironman_silve1",
+        "lambert1",
+        "Iron_man_leg_gol1",
+        "Color_A06",
+        "HD_Ironman_darks1",
+        "Color_H06",
+        "_Color_007_1"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\IRON+MAN+Mark+III\\_Metal_Seamed_1.jpg",
+        "..\\..\\..\\Documents\\IRON+MAN+Mark+III\\Metal_Aluminum_Anodized.jpg",
+        "..\\..\\..\\Documents\\IRON+MAN+Mark+III\\Brsuhed_brass.jpg",
+        "..\\..\\..\\Documents\\IRON+MAN+Mark+III\\_Metal_Aluminum_Anodized_1.jpg",
+        "..\\..\\..\\Documents\\IRON+MAN+Mark+III\\_Metal_Aluminum_Anodized_3.jpg",
+        "IRON+MAN+Mark+III/_Metal_Seamed_1.jpg",
+        "..\\..\\..\\Documents\\IRON+MAN+Mark+III\\_Metal_Seamed_1.jpg",
+        "IRON+MAN+Mark+III/Metal_Aluminum_Anodized.jpg",
+        "..\\..\\..\\Documents\\IRON+MAN+Mark+III\\Metal_Aluminum_Anodized.jpg",
+        "IRON+MAN+Mark+III/Brsuhed_brass.jpg"
+      ],
+      "notes": [
+        "Rất nặng, nên chỉ bật trên PC mạnh hoặc cần thêm bản lowpoly/GLB.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Zora Nao Robot",
+      "sourceFile": "Zora+Nao+Robot+Boeckx.fbx",
+      "destFile": "assets-source/model-library/characters/zora-nao-robot-boeckx.fbx",
+      "type": "character",
+      "sizeBefore": 36915072,
+      "sizeAfter": 23731404,
+      "savedBytes": 13183668,
+      "savedPercent": 35.71,
+      "modelCount": 87,
+      "materialCount": 14,
+      "textureCount": 1,
+      "sampleModels": [
+        "Model",
+        "skp189F_1_1",
+        "Group1",
+        "Mesh1",
+        "Zora_1_1",
+        "Group2",
+        "been_1_1",
+        "LEG21_1_1",
+        "Mesh2",
+        "JOINT11_1_1",
+        "Mesh3",
+        "LEG3056_1_1"
+      ],
+      "sampleMaterials": [
+        "Material__33",
+        "BackColor",
+        "Material__32",
+        "Material__44",
+        "FrontColor",
+        "Material__43",
+        "blauw",
+        "Material__34"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\Zora+Nao+Robot+Boeckx\\BOECKX_pos_rgb_trans.png",
+        "Zora+Nao+Robot+Boeckx/BOECKX_pos_rgb_trans.png",
+        "..\\..\\..\\Documents\\Zora+Nao+Robot+Boeckx\\BOECKX_pos_rgb_trans.png"
+      ],
+      "notes": [
+        "Rất nặng, nên chỉ bật trên PC mạnh hoặc cần thêm bản lowpoly/GLB.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Knut Character",
+      "sourceFile": "Knut.fbx",
+      "destFile": "assets-source/model-library/characters/knut-character.fbx",
+      "type": "character",
+      "sizeBefore": 3178821,
+      "sizeAfter": 1928334,
+      "savedBytes": 1250487,
+      "savedPercent": 39.34,
+      "modelCount": 21,
+      "materialCount": 6,
+      "textureCount": 1,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Mesh1",
+        "Scarf1",
+        "Mesh2",
+        "Head1",
+        "Group2",
+        "Mesh3",
+        "Eye1",
+        "Mesh4",
+        "Eye2",
+        "Mesh5"
+      ],
+      "sampleMaterials": [
+        "M_4",
+        "FrontColor",
+        "M_2",
+        "M_3",
+        "BackColor",
+        "M_1"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\Knut\\M_4.jpg",
+        "Knut/M_4.jpg",
+        "..\\..\\..\\Documents\\Knut\\M_4.jpg"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "MMDA Scene Asset",
+      "sourceFile": "mmda.fbx",
+      "destFile": "assets-source/model-library/props/mmda-scene.fbx",
+      "type": "prop",
+      "sizeBefore": 20408312,
+      "sizeAfter": 11770672,
+      "savedBytes": 8637640,
+      "savedPercent": 42.32,
+      "modelCount": 296,
+      "materialCount": 22,
+      "textureCount": 1,
+      "sampleModels": [
+        "Model",
+        "sketchup_download200703232003264_1",
+        "Group1",
+        "Group2",
+        "Group3",
+        "Mesh1",
+        "G_12_1",
+        "Mesh2",
+        "G_12_2",
+        "Mesh3",
+        "Group4",
+        "G_02_1"
+      ],
+      "sampleMaterials": [
+        "Color_008",
+        "BackColor",
+        "_DodgerBlue_",
+        "Color_1",
+        "_5",
+        "Color_009",
+        "Color_001",
+        "_Charcoal_"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\mmda\\_Metal_floor_.jpg",
+        "mmda/_Metal_floor_.jpg",
+        "..\\..\\..\\Documents\\mmda\\_Metal_floor_.jpg"
+      ],
+      "notes": [
+        "Khá nặng, TV/điện thoại nên dùng fallback hoặc preload chậm.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Dodge WC-51 Truck",
+      "sourceFile": "dodge_wc-51.fbx",
+      "destFile": "assets-source/model-library/vehicles/dodge-wc-51-truck.fbx",
+      "type": "vehicle",
+      "sizeBefore": 36307930,
+      "sizeAfter": 20566268,
+      "savedBytes": 15741662,
+      "savedPercent": 43.36,
+      "modelCount": 344,
+      "materialCount": 46,
+      "textureCount": 0,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "gancho1",
+        "Mesh1",
+        "elo1",
+        "Mesh2",
+        "elo2",
+        "Mesh3",
+        "elo3",
+        "Mesh4",
+        "elo4",
+        "Mesh5"
+      ],
+      "sampleMaterials": [
+        "Default1",
+        "pzgrau1",
+        "bseat1",
+        "baxis1",
+        "cab1",
+        "cboss1",
+        "capot1",
+        "stwheel1"
+      ],
+      "textureFiles": [],
+      "notes": [
+        "Rất nặng, nên chỉ bật trên PC mạnh hoặc cần thêm bản lowpoly/GLB.",
+        "Không có texture rời, chủ yếu màu/material nội bộ trong FBX.",
+        "Có node bánh xe/tire; có thể rig bánh sau này nếu cần đưa vào gara/đua xe."
+      ]
+    },
+    {
+      "title": "Người Character",
+      "sourceFile": "nguoi.fbx",
+      "destFile": "assets-source/model-library/characters/nguoi-character.fbx",
+      "type": "character",
+      "sizeBefore": 615418,
+      "sizeAfter": 370281,
+      "savedBytes": 245137,
+      "savedPercent": 39.83,
+      "modelCount": 2,
+      "materialCount": 18,
+      "textureCount": 3,
+      "sampleModels": [
+        "Model",
+        "Mesh1"
+      ],
+      "sampleMaterials": [
+        "bush",
+        "_0014_DarkSalmon_",
+        "_2",
+        "FrontColor",
+        "BackColor",
+        "Fig04",
+        "_Sk",
+        "_WhiteSmoke_"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\nguoi\\bush.bmp",
+        "..\\..\\..\\Documents\\nguoi\\_2.jpg",
+        "..\\..\\..\\Documents\\nguoi\\Tie.jpg",
+        "nguoi/bush.bmp",
+        "..\\..\\..\\Documents\\nguoi\\bush.bmp",
+        "nguoi/_2.jpg",
+        "..\\..\\..\\Documents\\nguoi\\_2.jpg",
+        "nguoi/Tie.jpg",
+        "..\\..\\..\\Documents\\nguoi\\Tie.jpg"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "US Soldier",
+      "sourceFile": "us_soldier.fbx",
+      "destFile": "assets-source/model-library/characters/us-soldier.fbx",
+      "type": "character",
+      "sizeBefore": 1576847,
+      "sizeAfter": 949074,
+      "savedBytes": 627773,
+      "savedPercent": 39.81,
+      "modelCount": 3,
+      "materialCount": 7,
+      "textureCount": 5,
+      "sampleModels": [
+        "Model",
+        "us_soldier",
+        "Mesh1"
+      ],
+      "sampleMaterials": [
+        "us_army_male_top1",
+        "FrontColor",
+        "BackColor",
+        "US_army_trousers1",
+        "us_army_male_hea1",
+        "US_army_hat_male1",
+        "Material__1"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\us_soldier\\us_army_male_top1.jpg",
+        "..\\..\\..\\Documents\\us_soldier\\US_army_trousers1.jpg",
+        "..\\..\\..\\Documents\\us_soldier\\us_army_male_hea1.jpg",
+        "..\\..\\..\\Documents\\us_soldier\\US_army_hat_male1.jpg",
+        "..\\..\\..\\Documents\\us_soldier\\Material__1.jpg",
+        "us_soldier/us_army_male_top1.jpg",
+        "..\\..\\..\\Documents\\us_soldier\\us_army_male_top1.jpg",
+        "us_soldier/US_army_trousers1.jpg",
+        "..\\..\\..\\Documents\\us_soldier\\US_army_trousers1.jpg",
+        "us_soldier/us_army_male_hea1.jpg"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Robot 19",
+      "sourceFile": "Robot_19.fbx",
+      "destFile": "assets-source/model-library/characters/robot-19.fbx",
+      "type": "character",
+      "sizeBefore": 7659036,
+      "sizeAfter": 4599167,
+      "savedBytes": 3059869,
+      "savedPercent": 39.95,
+      "modelCount": 3,
+      "materialCount": 15,
+      "textureCount": 1,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Mesh1"
+      ],
+      "sampleMaterials": [
+        "FrontColor",
+        "_Charcoal_",
+        "_Black_",
+        "_DimGray_",
+        "_Gray_",
+        "_LightGray_",
+        "BackColor",
+        "_DarkGray_"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\Robot_19\\_Glass_Gold_Tint_.jpg",
+        "Robot_19/_Glass_Gold_Tint_.jpg",
+        "..\\..\\..\\Documents\\Robot_19\\_Glass_Gold_Tint_.jpg"
+      ],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc."
+      ]
+    },
+    {
+      "title": "Người Xe NBN Archi",
+      "sourceFile": "NGUOI+XE+NBN+ARCHI.fbx",
+      "destFile": "assets-source/model-library/vehicles/nguoi-xe-nbn-archi.fbx",
+      "type": "vehicle",
+      "sizeBefore": 21218621,
+      "sizeAfter": 12062466,
+      "savedBytes": 9156155,
+      "savedPercent": 43.15,
+      "modelCount": 332,
+      "materialCount": 32,
+      "textureCount": 8,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Group2",
+        "Dream_TQ1",
+        "Group3",
+        "Component_2_1",
+        "Group4",
+        "Mesh1",
+        "Mesh2",
+        "Component_2_2",
+        "Group5",
+        "Mesh3"
+      ],
+      "sampleMaterials": [
+        "Clay_A01_50cm",
+        "BackColor",
+        "_Color_008_2",
+        "Color_L12",
+        "Color_A06",
+        "_Translucent_Glass_Corrugated_2",
+        "Color_D03",
+        "_Translucent_Glass_Corrugated_1"
+      ],
+      "textureFiles": [
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\Clay_A01_50cm.jpg",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\inox_2.png",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\S__TR_NG.png",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\Diamond_Round_FJ.png",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\Glass_20.png",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\Foam_B02_Black_40cm.jpg",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\Hatmat1.png",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\body2.jpg",
+        "NGUOI+XE+NBN+ARCHI/Clay_A01_50cm.jpg",
+        "..\\..\\..\\Documents\\NGUOI+XE+NBN+ARCHI\\Clay_A01_50cm.jpg"
+      ],
+      "notes": [
+        "Khá nặng, TV/điện thoại nên dùng fallback hoặc preload chậm.",
+        "Có texture/material tham chiếu; cần giữ cùng gói asset nếu muốn hiển thị đủ màu gốc.",
+        "Không thấy node bánh xe rõ ràng; nếu đưa vào gameplay nên để dạng tĩnh hoặc kiểm tra thủ công."
+      ]
+    },
+    {
+      "title": "Trực Thăng Helicopter",
+      "sourceFile": "truc thang.fbx",
+      "destFile": "assets-source/model-library/vehicles/truc-thang-helicopter.fbx",
+      "type": "vehicle",
+      "sizeBefore": 338858,
+      "sizeAfter": 192303,
+      "savedBytes": 146555,
+      "savedPercent": 43.25,
+      "modelCount": 33,
+      "materialCount": 5,
+      "textureCount": 0,
+      "sampleModels": [
+        "Model",
+        "helicopter_and_camera_pod1",
+        "Group1",
+        "Group2",
+        "Mesh1",
+        "Mesh2",
+        "Group3",
+        "Mesh3",
+        "Group4",
+        "Component_9_1",
+        "Mesh4",
+        "Component_9_2"
+      ],
+      "sampleMaterials": [
+        "_DarkGray_",
+        "_1",
+        "_Silver_",
+        "BackColor",
+        "FrontColor"
+      ],
+      "textureFiles": [],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Không có texture rời, chủ yếu màu/material nội bộ trong FBX.",
+        "Không thấy node bánh xe rõ ràng; nếu đưa vào gameplay nên để dạng tĩnh hoặc kiểm tra thủ công."
+      ]
+    },
+    {
+      "title": "Police Car",
+      "sourceFile": "cs.fbx",
+      "destFile": "assets-source/model-library/vehicles/police-car.fbx",
+      "type": "vehicle",
+      "sizeBefore": 229268,
+      "sizeAfter": 144781,
+      "savedBytes": 84487,
+      "savedPercent": 36.85,
+      "modelCount": 15,
+      "materialCount": 9,
+      "textureCount": 0,
+      "sampleModels": [
+        "Model",
+        "car_police1",
+        "Component_2_1",
+        "Mesh1",
+        "Component_2_2",
+        "Mesh2",
+        "car_wheel_2_1",
+        "Mesh3",
+        "car_wheel_2_2",
+        "Mesh4",
+        "car_wheel_2_3",
+        "Mesh5"
+      ],
+      "sampleMaterials": [
+        "_Charcoal_",
+        "BackColor",
+        "_Gainsboro_",
+        "_White_",
+        "_Gray_Glass_",
+        "Brake_Light_Red",
+        "_Orange_",
+        "_MediumBlue_"
+      ],
+      "textureFiles": [],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Không có texture rời, chủ yếu màu/material nội bộ trong FBX.",
+        "Có node bánh xe/tire; có thể rig bánh sau này nếu cần đưa vào gara/đua xe."
+      ]
+    },
+    {
+      "title": "Police Motorcycle",
+      "sourceFile": "mt cs.fbx",
+      "destFile": "assets-source/model-library/vehicles/police-motorcycle.fbx",
+      "type": "vehicle",
+      "sizeBefore": 543042,
+      "sizeAfter": 303130,
+      "savedBytes": 239912,
+      "savedPercent": 44.18,
+      "modelCount": 67,
+      "materialCount": 9,
+      "textureCount": 0,
+      "sampleModels": [
+        "Model",
+        "Motorcycle_police1",
+        "Group1",
+        "Mesh1",
+        "Group2",
+        "Mesh2",
+        "Group3",
+        "Mesh3",
+        "Group4",
+        "Mesh4",
+        "Group5",
+        "Mesh5"
+      ],
+      "sampleMaterials": [
+        "Glass",
+        "_Concrete_rough_",
+        "_White_",
+        "vvvvvvvdeep_red",
+        "FrontColor",
+        "BackColor",
+        "_MediumBlue_",
+        "_Orange_"
+      ],
+      "textureFiles": [],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Không có texture rời, chủ yếu màu/material nội bộ trong FBX.",
+        "Có node bánh xe/tire; có thể rig bánh sau này nếu cần đưa vào gara/đua xe."
+      ]
+    },
+    {
+      "title": "Ambulance",
+      "sourceFile": "cuu thuong.fbx",
+      "destFile": "assets-source/model-library/vehicles/ambulance.fbx",
+      "type": "vehicle",
+      "sizeBefore": 275488,
+      "sizeAfter": 172739,
+      "savedBytes": 102749,
+      "savedPercent": 37.3,
+      "modelCount": 29,
+      "materialCount": 9,
+      "textureCount": 0,
+      "sampleModels": [
+        "Model",
+        "Ambulance1",
+        "SUV_tire_2_1",
+        "Mesh1",
+        "SUV_tire_2_2",
+        "Mesh2",
+        "SUV_tire_2_3",
+        "Mesh3",
+        "SUV_tire_2_4",
+        "Mesh4",
+        "Component_13_1",
+        "Mesh5"
+      ],
+      "sampleMaterials": [
+        "_Charcoal_",
+        "BackColor",
+        "_Gray_",
+        "translucent_red",
+        "_White_",
+        "_Gray_Glass_",
+        "_GhostWhite_",
+        "FrontColor"
+      ],
+      "textureFiles": [],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Không có texture rời, chủ yếu màu/material nội bộ trong FBX.",
+        "Có node bánh xe/tire; có thể rig bánh sau này nếu cần đưa vào gara/đua xe."
+      ]
+    },
+    {
+      "title": "OilAge Machine",
+      "sourceFile": "OilAge.fbx",
+      "destFile": "assets-source/model-library/props/oil-age-machine.fbx",
+      "type": "prop",
+      "sizeBefore": 2749222,
+      "sizeAfter": 1857624,
+      "savedBytes": 891598,
+      "savedPercent": 32.43,
+      "modelCount": 9,
+      "materialCount": 24,
+      "textureCount": 0,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Mesh1",
+        "Group2",
+        "Mesh2",
+        "Group3",
+        "Mesh3",
+        "Group4",
+        "Mesh4"
+      ],
+      "sampleMaterials": [
+        "_18",
+        "_6",
+        "_1",
+        "_12",
+        "_7",
+        "_4",
+        "_2",
+        "FrontColor"
+      ],
+      "textureFiles": [],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Không có texture rời, chủ yếu màu/material nội bộ trong FBX."
+      ]
+    },
+    {
+      "title": "Drag Driver",
+      "sourceFile": "Drag-Driver.fbx",
+      "destFile": "assets-source/model-library/characters/drag-driver.fbx",
+      "type": "character",
+      "sizeBefore": 3562678,
+      "sizeAfter": 2382246,
+      "savedBytes": 1180432,
+      "savedPercent": 33.13,
+      "modelCount": 15,
+      "materialCount": 24,
+      "textureCount": 0,
+      "sampleModels": [
+        "Model",
+        "Group1",
+        "Mesh1",
+        "Group2",
+        "Mesh2",
+        "Group3",
+        "Mesh3",
+        "Group4",
+        "Mesh4",
+        "Group5",
+        "Mesh5",
+        "Group6"
+      ],
+      "sampleMaterials": [
+        "_1",
+        "_2",
+        "_4",
+        "_5",
+        "FrontColor",
+        "_9",
+        "_11",
+        "BackColor"
+      ],
+      "textureFiles": [],
+      "notes": [
+        "Dung lượng chấp nhận được sau tối ưu ASCII.",
+        "Không có texture rời, chủ yếu màu/material nội bộ trong FBX."
+      ]
+    }
+  ]
+}

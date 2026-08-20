@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { PlayerProgress, GameScreen, WorldConfig, GameGesture } from '../types';
 import { WORLDS, SKINS, ACHIEVEMENTS } from '../utils/progression';
-import { CHARACTERS_CONFIG } from '../utils/characterRenderer';
+import { CHARACTERS_CONFIG, getCharacterEmoji } from '../utils/characterRenderer';
 import { audio } from '../lib/AudioEngine';
 
 interface MainMenuProps {
@@ -113,6 +113,7 @@ export default function MainMenu({
   const activeSkinConfig = SKINS.find((s) => s.id === progress.activeSkin) || SKINS[0];
   const activeAccConfig = SKINS.find((s) => s.id === progress.activeAccessory);
   const activeCompanion = CHARACTERS_CONFIG.find((c) => c.id === progress.selectedCharacter) || CHARACTERS_CONFIG[0];
+  const activeCompanionEmoji = getCharacterEmoji(activeCompanion.id);
 
   // Gestures label mapping
   const gestureLabel: { [key in GameGesture]?: string } = {
@@ -207,7 +208,7 @@ export default function MainMenu({
               className="hidden sm:flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 md:px-3 md:py-1.5 rounded-full border-2 border-emerald-300 shadow-xs transition active:scale-95 animate-in fade-in duration-200 shrink-0"
               title="Đổi bạn đồng hành"
             >
-              <span className="text-sm md:text-base">🐻</span>
+              <span className="text-sm md:text-base">{activeCompanionEmoji}</span>
               <span className="font-black text-emerald-800 text-xs">{activeCompanion.name}</span>
             </button>
           </div>
@@ -542,11 +543,7 @@ export default function MainMenu({
                       className="absolute -bottom-2 -left-2 w-12 h-12 bg-emerald-100 rounded-full border-2 border-emerald-300 shadow-md flex items-center justify-center text-2xl cursor-pointer hover:scale-110 transition"
                       title={`Bạn đồng hành: ${activeCompanion.name}`}
                     >
-                      {activeCompanion.id === 'bara' && '🐻'}
-                      {activeCompanion.id === 'may' && '🐶'}
-                      {activeCompanion.id === 'bong' && '🐰'}
-                      {activeCompanion.id === 'miu' && '🐱'}
-                      {activeCompanion.id === 'lumi' && '🦊'}
+                      {activeCompanionEmoji}
                     </div>
                   </div>
                 </div>

@@ -302,7 +302,8 @@ export type CarModelId =
   | 'vespa_studio_3d'
   | 's14_sport_3d'
   | 'rescue_truck_hauler_3d'
-  | 'xedap_city_3d';
+  | 'xedap_city_3d'
+  | 'capybara_parade_3d';
 
 export type CarCategory =
   | 'city'

@@ -1,0 +1,66 @@
+{
+  "version": "5.34.0",
+  "runtimeScenery": [
+    "public/assets/scenery/pine-tree-low.fbx",
+    "public/assets/scenery/tank-static-low.fbx",
+    "public/assets/scenery/police-car-static.fbx",
+    "public/assets/scenery/ambulance-static.fbx",
+    "public/assets/scenery/helicopter-static.fbx"
+  ],
+  "newUploads": [
+    {
+      "name": "Pine Tree",
+      "source": "Pine+Tree_260112.fbx",
+      "runtime": "public/assets/scenery/pine-tree-low.fbx",
+      "before": 931440,
+      "after": 585929,
+      "usage": "Mountain real FBX trees; 2 phone / 4 TV / 5-8 desktop clones."
+    },
+    {
+      "name": "Tank",
+      "source": "tank (1).fbx",
+      "runtime": "public/assets/scenery/tank-static-low.fbx",
+      "before": 11942013,
+      "after": 6865727,
+      "usage": "Mountain special roadside prop; desktop High only."
+    },
+    {
+      "name": "Canon",
+      "source": "canon.fbx",
+      "runtime": null,
+      "before": 91457264,
+      "after": 43270727,
+      "usage": "Source-only pending visual classification; filename says canon but hierarchy contains steering-wheel clue, so not auto-placed."
+    },
+    {
+      "name": "Robot 4",
+      "source": "ROBOT+4.fbx",
+      "runtime": null,
+      "before": 15083383,
+      "after": 8600673,
+      "usage": "Source library only; not treated as scenery until role/visual direction is verified."
+    },
+    {
+      "name": "House Landscape NBN",
+      "source": "NHA+BAO+CANH+NBN+ARCHI+SHARE.fbx",
+      "runtime": null,
+      "before": 136576638,
+      "after": 74281802,
+      "usage": "Very large master (13,765 model nodes). Kept local/source-heavy only; never auto-loaded in web race."
+    },
+    {
+      "name": "Prime 1",
+      "source": "prime+1.fbx",
+      "runtime": null,
+      "before": 22204518,
+      "after": 12658169,
+      "usage": "Source library only; character/large prop candidate."
+    }
+  ],
+  "policy": {
+    "phone": "Pine only; procedural scenery remains primary.",
+    "tv": "Pine + lightweight parked/emergency/helicopter FBX; no tank/heavy masters.",
+    "desktop": "Pine + lightweight traffic props; tank only on High.",
+    "heavyHouse": "source-only; requires Blender/GLB decimation or split building modules before runtime use."
+  }
+}
