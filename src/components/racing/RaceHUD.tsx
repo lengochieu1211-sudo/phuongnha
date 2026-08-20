@@ -145,6 +145,25 @@ export const RaceHUD: React.FC<RaceHUDProps> = ({
               <span>KHIÊN BẢO VỆ ({Math.ceil(player.shieldDuration)}s)</span>
             </div>
           )}
+
+
+          {/* Lightweight arcade damage indicator. No mesh deformation is required. */}
+          {player.damage > 1 && (
+            <div className="w-[132px] rounded-xl border border-rose-500/35 bg-slate-950/82 px-2.5 py-2 shadow-lg backdrop-blur-md md:w-[158px]">
+              <div className="mb-1 flex items-center justify-between text-[9px] font-black uppercase tracking-wide text-slate-300">
+                <span>Tình trạng xe</span>
+                <span className={player.damage >= 70 ? 'text-rose-400' : player.damage >= 40 ? 'text-amber-400' : 'text-emerald-400'}>
+                  {Math.max(0, Math.round(100 - player.damage))}%
+                </span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-slate-700">
+                <div
+                  className={`h-full rounded-full transition-all ${player.damage >= 70 ? 'bg-rose-500' : player.damage >= 40 ? 'bg-amber-400' : 'bg-emerald-400'}`}
+                  style={{ width: `${Math.max(0, 100 - player.damage)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Center: Track Name & Timers */}

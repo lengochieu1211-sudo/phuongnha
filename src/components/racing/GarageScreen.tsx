@@ -247,8 +247,9 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     };
   }, []);
 
-  // Swap only the vehicle inside the persistent showroom. A short settle delay
-  // prevents parsing a 20–50 MB FBX for every card the user merely swipes past.
+  // V5.27: double-buffer showroom vehicle swaps. Keep the current car visible
+  // while the new FBX is loading/parsing, then replace it once. This removes the
+  // old -> procedural fallback -> FBX flash that looked like the car was blinking.
   useEffect(() => {
     const scene = sceneRef.current;
     const camera = cameraRef.current;
@@ -257,70 +258,91 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     const token = ++carSwapTokenRef.current;
     let cancelled = false;
     let attachTimer: number | null = null;
-    let localExternalHandle: ExternalCarHandle | null = null;
+    let stagedExternalHandle: ExternalCarHandle | null = null;
+    let committed = false;
 
-    const previous = carInstanceRef.current;
-    if (previous) {
-      externalGarageHandleRef.current?.dispose();
-      externalGarageHandleRef.current = null;
-      scene.remove(previous.root);
-      previous.root.traverse((obj: any) => {
+    const nextCarInst = buildCar3D(currentCar.id, currentCustomization, graphicsProfile.carDetail);
+    nextCarInst.root.rotation.y = turntableAngleRef.current;
+
+    const disposeCarInstance = (inst: Car3DInstance) => {
+      inst.root.traverse((obj: any) => {
         obj.geometry?.dispose?.();
         const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
         mats.forEach((m: any) => m.dispose?.());
       });
-    }
+    };
 
-    if (currentCar.id === 'rescue_truck_hauler_3d') {
-      camera.position.set(0, 3.55, 13.2);
-      camera.lookAt(0, 1.45, 0);
-    } else if (currentCar.id === 'xedap_city_3d') {
-      camera.position.set(0, 1.18, 3.0);
-      camera.lookAt(0, 0.72, 0);
-    } else if (currentCar.category === 'motorcycle') {
-      camera.position.set(0, 1.28, 3.25);
-      camera.lookAt(0, 0.72, 0);
+    const applyCameraForCar = () => {
+      // Move only when the new model is committed, not while it is loading.
+      if (currentCar.id === 'rescue_truck_hauler_3d') {
+        camera.position.set(0, 3.55, 13.2);
+        camera.lookAt(0, 1.45, 0);
+      } else if (currentCar.id === 'xedap_city_3d') {
+        camera.position.set(0, 1.18, 3.0);
+        camera.lookAt(0, 0.72, 0);
+      } else if (currentCar.category === 'motorcycle') {
+        camera.position.set(0, 1.28, 3.25);
+        camera.lookAt(0, 0.72, 0);
+      } else {
+        camera.position.set(0, 1.85, 5.7);
+        camera.lookAt(0, 0.4, 0);
+      }
+    };
+
+    const commitSwap = () => {
+      if (cancelled || committed || token !== carSwapTokenRef.current) return;
+      committed = true;
+
+      const previous = carInstanceRef.current;
+      if (previous) {
+        externalGarageHandleRef.current?.dispose();
+        externalGarageHandleRef.current = null;
+        scene.remove(previous.root);
+        disposeCarInstance(previous);
+      }
+
+      scene.add(nextCarInst.root);
+      carInstanceRef.current = nextCarInst;
+      externalGarageHandleRef.current = stagedExternalHandle;
+      applyCameraForCar();
+    };
+
+    const wantsExternal =
+      isExternalCar(currentCar.id) && shouldUseExternalCar(currentCar.id, actualDeviceClass);
+
+    if (!wantsExternal) {
+      // Procedural cars are ready immediately; no loading flash is needed.
+      commitSwap();
     } else {
-      camera.position.set(0, 1.85, 5.7);
-      camera.lookAt(0, 0.4, 0);
-    }
-
-    const carInst = buildCar3D(currentCar.id, currentCustomization, graphicsProfile.carDetail);
-    carInst.root.rotation.y = turntableAngleRef.current;
-    scene.add(carInst.root);
-    carInstanceRef.current = carInst;
-
-    if (isExternalCar(currentCar.id) && shouldUseExternalCar(currentCar.id, actualDeviceClass)) {
+      // Let rapid swipes settle before starting an expensive ASCII-FBX parse.
       attachTimer = window.setTimeout(() => {
         if (cancelled || token !== carSwapTokenRef.current) return;
-        attachExternalCarModel(carInst, currentCar.id, currentCustomization, graphicsProfile.carDetail)
+        attachExternalCarModel(nextCarInst, currentCar.id, currentCustomization, graphicsProfile.carDetail)
           .then((handle) => {
-            if (!handle) return;
             if (cancelled || token !== carSwapTokenRef.current) {
-              handle.dispose();
+              handle?.dispose();
               return;
             }
-            localExternalHandle = handle;
-            externalGarageHandleRef.current = handle;
+            stagedExternalHandle = handle;
+            // If the external model cannot be used, the prepared procedural car is still valid.
+            commitSwap();
           })
-          .catch((err) => console.warn('Garage FBX preview failed; keeping procedural fallback.', err));
-      }, 180);
+          .catch((err) => {
+            console.warn('Garage FBX preview failed; swapping to procedural fallback.', err);
+            if (!cancelled && token === carSwapTokenRef.current) commitSwap();
+          });
+      }, 320);
     }
 
     return () => {
       cancelled = true;
       if (attachTimer !== null) window.clearTimeout(attachTimer);
-      if (localExternalHandle && externalGarageHandleRef.current === localExternalHandle) {
-        localExternalHandle.dispose();
-        externalGarageHandleRef.current = null;
+      // A committed model belongs to the persistent showroom and is removed only
+      // when the *next* model is ready. Dispose only uncommitted staging objects.
+      if (!committed) {
+        stagedExternalHandle?.dispose();
+        disposeCarInstance(nextCarInst);
       }
-      if (carInstanceRef.current === carInst) carInstanceRef.current = null;
-      if (sceneRef.current === scene) scene.remove(carInst.root);
-      carInst.root.traverse((obj: any) => {
-        obj.geometry?.dispose?.();
-        const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
-        mats.forEach((m: any) => m.dispose?.());
-      });
     };
     // currentCustomization intentionally does not trigger FBX reload; paint/parts use applyCustomization().
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -343,13 +365,8 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     isDraggingRef.current = false;
   };
 
-  // Keep the selected model visible and centered in the selector strip.
-  useEffect(() => {
-    const strip = carSelectorRef.current;
-    if (!strip) return;
-    const selected = strip.querySelector<HTMLElement>(`[data-car-index="${selectedCarIndex}"]`);
-    selected?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }, [selectedCarIndex]);
+  // V5.27: do not auto-center the ribbon on every selection. The user controls
+  // the strip directly by drag/swipe, so selection no longer causes a second smooth scroll.
 
   const handleSelectorPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -616,7 +633,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
               <div
                 ref={carSelectorRef}
                 id="garage-model-selector-strip"
-                className="garage-car-strip min-w-0 flex-1 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-mandatory p-1.5 pb-2 bg-slate-950/90 backdrop-blur-md rounded-2xl border border-slate-800/80 cursor-grab active:cursor-grabbing touch-pan-y"
+                className="garage-car-strip min-w-0 flex-1 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain snap-x snap-proximity p-1.5 pb-2 bg-slate-950/90 backdrop-blur-md rounded-2xl border border-slate-800/80 cursor-grab active:cursor-grabbing touch-pan-y"
                 onPointerDown={handleSelectorPointerDown}
                 onPointerMove={handleSelectorPointerMove}
                 onPointerUp={handleSelectorPointerEnd}
@@ -631,7 +648,13 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                       key={carItem.id}
                       type="button"
                       data-car-index={idx}
-                      onClick={() => setSelectedCarIndex(idx)}
+                      onClick={(e) => {
+                        if (selectorMovedRef.current) {
+                          e.preventDefault();
+                          return;
+                        }
+                        setSelectedCarIndex(idx);
+                      }}
                       className={`snap-center flex-shrink-0 w-[158px] px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-2 border transition-all ${
                         isSelected
                           ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 border-white shadow-md scale-[1.03]'

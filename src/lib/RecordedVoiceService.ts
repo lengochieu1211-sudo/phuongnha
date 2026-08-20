@@ -45,8 +45,8 @@ class RecordedVoiceService {
       const status = res.ok ? await res.json() : null;
       if (status?.recordedPackAvailable === true) {
         this.enabled = true;
-        this.preload('common');
-        this.preload('camera');
+        // V5.27: do not preload dozens of MP3 files at startup. They are only an
+        // explicit fallback and should not compete with FBX/network/GPU loading.
         voiceGuide.registerRecordedVoicePlayer(this);
       } else {
         this.enabled = false;
@@ -84,7 +84,7 @@ class RecordedVoiceService {
       const fullKey = `${category}.${subKey}`;
       if (!this.audioCache[fullKey]) {
         const audioObj = new Audio(this.resolveAssetPath(entry.path));
-        audioObj.preload = 'auto';
+        audioObj.preload = 'metadata';
         this.audioCache[fullKey] = audioObj;
       }
     });
@@ -131,15 +131,23 @@ class RecordedVoiceService {
     let audioObj = this.audioCache[key];
     if (!audioObj) {
       audioObj = new Audio(this.resolveAssetPath(entry.path));
+      audioObj.preload = 'metadata';
       this.audioCache[key] = audioObj;
     }
 
     // Duck the background music
     audio.duckMusic(true);
 
-    // Attempt to play the offline file
+    // Attempt to play the offline file. Always restart a voice line cleanly;
+    // this avoids stale paused positions after priority pre-emption.
     let playPromise: Promise<void> | undefined;
     audioObj.volume = this.volume;
+    try {
+      audioObj.pause();
+      audioObj.currentTime = 0;
+    } catch {
+      // Metadata may not be available yet; play() below will start at the beginning.
+    }
 
     // Remove old listeners to prevent leak
     audioObj.onended = null;
@@ -158,7 +166,7 @@ class RecordedVoiceService {
       fallbackTriggered = true;
       // The bundled female pack must stay female. If one file cannot be played,
       // stop this sentence instead of falling back to an unpredictable device TTS voice.
-      console.warn(`[Voice] Offline female file failed for ${key}; sentence skipped.`);
+      console.warn(`[Voice] Offline MP3 fallback failed for ${key}; sentence skipped.`);
       audio.duckMusic(false);
       this.activeAudio = null;
       callbacks?.onEnd?.();

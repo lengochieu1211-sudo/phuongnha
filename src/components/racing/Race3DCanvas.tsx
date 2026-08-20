@@ -13,6 +13,7 @@ import {
   RaceSettings,
 } from '../../types';
 import { RaceEngine } from '../../lib/racing/RaceEngine';
+import { raceAudio } from '../../lib/racing/RaceAudio';
 import { buildCar3D, Car3DInstance } from '../../lib/racing/Car3DBuilder';
 import { attachExternalCarModel, isExternalCar, shouldUseExternalCar, ExternalCarHandle } from '../../lib/racing/ExternalCarModelLoader';
 import { getInterpolatedTrackPoint } from '../../lib/racing/TrackData';
@@ -223,6 +224,95 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     scene.add(particles);
     particlesRef.current = particles;
 
+    // V5.26: pooled arcade impact particles. One THREE.Points draw-call per effect type;
+    // no per-impact Mesh creation, no realtime fire lights and no physics library.
+    type ImpactParticle = {
+      life: number; maxLife: number;
+      x: number; y: number; z: number;
+      vx: number; vy: number; vz: number;
+    };
+    const impactScale = profile.quality === 'high' ? 1 : profile.quality === 'balanced' ? 0.68 : 0.38;
+    const makeImpactPool = (count: number, color: number, size: number, additive: boolean) => {
+      const states: ImpactParticle[] = Array.from({ length: count }, () => ({
+        life: 0, maxLife: 1, x: 0, y: -9999, z: 0, vx: 0, vy: 0, vz: 0,
+      }));
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) positions[i * 3 + 1] = -9999;
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({
+        color,
+        size,
+        transparent: true,
+        opacity: additive ? 0.92 : 0.34,
+        depthWrite: false,
+        blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+        sizeAttenuation: true,
+      });
+      const points = new THREE.Points(geometry, material);
+      points.frustumCulled = false;
+      scene.add(points);
+      return { states, positions, geometry, points };
+    };
+
+    const sparkPool = makeImpactPool(Math.max(10, Math.round(42 * impactScale)), 0xffc23d, profile.quality === 'high' ? 0.20 : 0.16, true);
+    const smokePool = makeImpactPool(Math.max(8, Math.round(30 * impactScale)), 0x94a3b8, profile.quality === 'high' ? 0.62 : 0.48, false);
+    const firePool = makeImpactPool(Math.max(5, Math.round(18 * impactScale)), 0xff5a1f, profile.quality === 'high' ? 0.34 : 0.27, true);
+
+    const spawnFromPool = (
+      pool: ReturnType<typeof makeImpactPool>,
+      count: number,
+      x: number, y: number, z: number,
+      spread: number,
+      lift: number,
+      duration: [number, number],
+    ) => {
+      let spawned = 0;
+      for (const p of pool.states) {
+        if (spawned >= count) break;
+        if (p.life > 0) continue;
+        p.maxLife = duration[0] + Math.random() * (duration[1] - duration[0]);
+        p.life = p.maxLife;
+        p.x = x + (Math.random() - 0.5) * spread;
+        p.y = y + Math.random() * 0.45;
+        p.z = z + (Math.random() - 0.5) * spread;
+        p.vx = (Math.random() - 0.5) * spread * 2.2;
+        p.vy = lift * (0.55 + Math.random() * 0.8);
+        p.vz = (Math.random() - 0.5) * spread * 2.2;
+        spawned += 1;
+      }
+    };
+
+    const updateImpactPool = (pool: ReturnType<typeof makeImpactPool>, delta: number, drag: number, gravity: number) => {
+      for (let i = 0; i < pool.states.length; i++) {
+        const p = pool.states[i];
+        if (p.life <= 0) {
+          pool.positions[i * 3 + 1] = -9999;
+          continue;
+        }
+        p.life -= delta;
+        if (p.life <= 0) {
+          pool.positions[i * 3 + 1] = -9999;
+          continue;
+        }
+        p.vx *= Math.max(0, 1 - drag * delta);
+        p.vz *= Math.max(0, 1 - drag * delta);
+        p.vy += gravity * delta;
+        p.x += p.vx * delta;
+        p.y += p.vy * delta;
+        p.z += p.vz * delta;
+        pool.positions[i * 3] = p.x;
+        pool.positions[i * 3 + 1] = p.y;
+        pool.positions[i * 3 + 2] = p.z;
+      }
+      (pool.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    };
+
+    let lastCollisionPulse = engine.physics.player.collisionPulse;
+    let cameraShakeSec = 0;
+    let cameraShakeStrength = 0;
+    let damageFxAccumulator = 0;
+
     // Put camera at the start grid before shader compilation so the first visible
     // frame does not jump from the origin to the chase camera.
     const startPt = getInterpolatedTrackPoint(engine.waypoints, 0);
@@ -351,11 +441,56 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         particlesRef.current.position.set(px, py, pz);
       }
 
+      // Arcade collisions -> sparks / smoke / short fire burst. Effects use pooled Points,
+      // so repeated impacts do not allocate dozens of meshes or trigger GC spikes.
+      const collisionPulse = engine.physics.player.collisionPulse;
+      if (collisionPulse !== lastCollisionPulse) {
+        lastCollisionPulse = collisionPulse;
+        const severity = Math.max(0.15, engine.physics.player.lastCollisionSeverity);
+        const side = engine.physics.player.lastCollisionSide || 1;
+        const impactX = px + pt.normal.x * side * (car.category === 'motorcycle' ? 0.55 : 1.05);
+        const impactY = py + (car.category === 'motorcycle' ? 0.58 : 0.72);
+        const impactZ = pz + pt.normal.z * side * (car.category === 'motorcycle' ? 0.55 : 1.05);
+        spawnFromPool(sparkPool, Math.max(3, Math.round((8 + severity * 22) * impactScale)), impactX, impactY, impactZ, 1.1 + severity, 2.7 + severity * 2.0, [0.25, 0.72]);
+        if (severity > 0.36) {
+          spawnFromPool(smokePool, Math.max(2, Math.round((3 + severity * 7) * impactScale)), impactX, impactY, impactZ, 0.8, 0.7, [0.8, 1.8]);
+        }
+        if (severity > 0.72 && profile.quality !== 'lite') {
+          spawnFromPool(firePool, Math.max(2, Math.round((3 + severity * 5) * impactScale)), impactX, impactY, impactZ, 0.55, 1.45, [0.18, 0.55]);
+        }
+        cameraShakeSec = 0.12 + severity * 0.16;
+        cameraShakeStrength = (profile.quality === 'lite' ? 0.06 : 0.11) + severity * 0.11;
+        raceAudio.playSoftBump();
+      }
+
+      // Progressive visual damage without deforming imported FBX meshes.
+      damageFxAccumulator += delta;
+      const damage = engine.physics.player.damage;
+      const fxInterval = profile.quality === 'high' ? 0.12 : profile.quality === 'balanced' ? 0.20 : 0.32;
+      if (damageFxAccumulator >= fxInterval) {
+        damageFxAccumulator = 0;
+        if (damage >= 35) {
+          spawnFromPool(smokePool, damage >= 70 ? 2 : 1, px - pt.tangent.x * 0.55, py + 0.9, pz - pt.tangent.z * 0.55, 0.36, 0.52, [1.0, 2.2]);
+        }
+        if (damage >= 78 && profile.quality !== 'lite') {
+          spawnFromPool(firePool, 1, px - pt.tangent.x * 0.45, py + 0.78, pz - pt.tangent.z * 0.45, 0.20, 0.85, [0.18, 0.46]);
+        }
+      }
+      updateImpactPool(sparkPool, delta, 3.4, -7.8);
+      updateImpactPool(smokePool, delta, 1.3, 0.28);
+      updateImpactPool(firePool, delta, 2.2, 0.5);
+
       // Update Camera Tracking View
       updateCameraPosition(
         camera, px, py, pz, pt.tangent, cameraViewRef.current, engine.physics.player.isNitroActive,
         car.id, car.category
       );
+      if (cameraShakeSec > 0) {
+        cameraShakeSec = Math.max(0, cameraShakeSec - delta);
+        const fade = Math.min(1, cameraShakeSec / 0.16);
+        camera.position.x += (Math.random() - 0.5) * cameraShakeStrength * fade;
+        camera.position.y += (Math.random() - 0.5) * cameraShakeStrength * 0.65 * fade;
+      }
 
       // Runtime safety net for PC / phone / Android TV. Do not wait for a crash:
       // reduce render resolution progressively if FPS falls below the profile target.

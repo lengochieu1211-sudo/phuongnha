@@ -56,6 +56,11 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
     voiceGuide.setSettings({ rate });
   };
 
+  const handleOfflineMp3FallbackToggle = () => {
+    audio.playMenuClick();
+    voiceGuide.setSettings({ offlineMp3Fallback: !settings.offlineMp3Fallback });
+  };
+
   const handleVoiceChange = (voiceName: string) => {
     voiceGuide.setSettings({ selectedVoiceName: voiceName });
   };
@@ -84,8 +89,8 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
       id: 'female_gentle',
       name: 'Chị Phương Nhã',
       title: 'Giọng Nữ Dịu Dàng',
-      description: 'Ưu tiên giọng nữ tiếng Việt tự nhiên nếu thiết bị có. Nếu thiết bị không có giọng nữ tự nhiên, game dùng bộ MP3 nữ tổng hợp offline dự phòng. Bộ này không phải giọng người thu thật và app không tự chuyển sang giọng nam.',
-      pitchDesc: 'NỮ TỰ NHIÊN ƯU TIÊN • MP3 TỔNG HỢP DỰ PHÒNG',
+      description: 'Ưu tiên giọng tiếng Việt của thiết bị và loại các giọng được nhận diện là nam. Bộ MP3 tổng hợp offline vẫn được giữ nhưng mặc định tắt vì nghe máy/robot trên một số thiết bị.',
+      pitchDesc: 'GIỌNG HỆ THỐNG ƯU TIÊN • MP3 OFFLINE TÙY CHỌN',
       emoji: '👩‍🏫',
       badge: 'Nữ • Mặc Định',
       icon: Heart,
@@ -282,14 +287,38 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
               {settings.voiceStyle === 'female_gentle' ? (
                 <><strong>Nguồn giọng nữ:</strong> {femaleVoiceStatus.activeSource === 'natural-system-female'
                   ? `Đang dùng giọng nữ tự nhiên của thiết bị${femaleVoiceStatus.naturalFemaleName ? ` – ${femaleVoiceStatus.naturalFemaleName}` : ''}.`
+                  : femaleVoiceStatus.activeSource === 'safe-system-vi'
+                  ? `Đang dùng giọng tiếng Việt hệ thống không bị nhận diện là nam${femaleVoiceStatus.naturalFemaleName ? ` – ${femaleVoiceStatus.naturalFemaleName}` : ''}.`
                   : femaleVoiceStatus.activeSource === 'offline-fallback'
-                  ? 'Thiết bị chưa có giọng nữ Việt tự nhiên; đang dùng MP3 nữ tổng hợp offline dự phòng (không phải bản thu người thật).'
-                  : 'Chưa tìm thấy nguồn giọng nữ phù hợp.'}</>
+                  ? 'Đang dùng MP3 tổng hợp offline vì bạn đã bật chế độ dự phòng.'
+                  : 'Chưa tìm thấy giọng tiếng Việt phù hợp. MP3 offline đang tắt để tránh giọng máy/robot.'}</>
               ) : (
                 <><strong>Giọng hệ thống:</strong> {settings.selectedVoiceName || 'Tự động tiếng Việt trên thiết bị'}. Hai kiểu Nam/Em bé vẫn dùng Web Speech của thiết bị.</>
               )}
             </div>
           </div>
+
+          {settings.voiceStyle === 'female_gentle' && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/90 p-3">
+              <div className="min-w-0">
+                <div className="text-xs font-black text-slate-700">MP3 offline dự phòng</div>
+                <div className="mt-0.5 text-[10px] leading-snug text-slate-500">
+                  Chỉ bật khi máy không có giọng Việt phù hợp. Bộ MP3 hiện tại là giọng tổng hợp, không phải người thu thật.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleOfflineMp3FallbackToggle}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black transition ${
+                  settings.offlineMp3Fallback
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {settings.offlineMp3Fallback ? 'ĐANG BẬT' : 'ĐANG TẮT'}
+              </button>
+            </div>
+          )}
 
           {showAdvanced && (
             <div className="flex flex-col gap-4 pt-2 border-t border-slate-100">

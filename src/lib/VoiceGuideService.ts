@@ -16,6 +16,8 @@ export interface VoiceGuideSettings {
   rate: number; // 0.8 to 1.4
   pitch: number; // 0.6 to 1.8
   selectedVoiceName?: string;
+  /** MP3 tổng hợp offline chỉ dùng khi người dùng chủ động cho phép. */
+  offlineMp3Fallback?: boolean;
 }
 
 type Priority = 'high' | 'medium' | 'low';
@@ -63,6 +65,9 @@ class VoiceGuideService {
     volume: 1.0,
     rate: 1.02,
     pitch: 1.25,
+    // V5.27: bộ MP3 hiện tại là synthetic 22.05 kHz, giữ lại nhưng KHÔNG tự phát.
+    // Ưu tiên Web Speech tiếng Việt an toàn để tránh giọng MP3 máy/robot và giảm I/O lúc load FBX.
+    offlineMp3Fallback: false,
   };
 
   private lastPraiseTime: number = 0;
@@ -133,7 +138,12 @@ class VoiceGuideService {
 
   private voiceMatchesStyle(v: SpeechSynthesisVoice, style: VoiceStyle): boolean {
     if (style === 'male_warm') return this.isLikelyMaleVoice(v);
-    if (style === 'female_gentle' || style === 'baby_cute') return this.isLikelyFemaleVoice(v);
+    if (style === 'female_gentle') {
+      return v.lang.toLowerCase().startsWith('vi') && !this.isLikelyMaleVoice(v);
+    }
+    if (style === 'baby_cute') {
+      return v.lang.toLowerCase().startsWith('vi') && !this.isLikelyMaleVoice(v);
+    }
     return true;
   }
 
@@ -158,22 +168,24 @@ class VoiceGuideService {
     if (this.synth) this.voices = this.synth.getVoices();
     const viVoices = this.voices.filter((v) => v.lang.toLowerCase().startsWith('vi'));
     const femaleViVoice = this.getNaturalFemaleVoice();
+    const safeNonMaleViVoice = viVoices.find((v) => !this.isLikelyMaleVoice(v)) || null;
+    const preferredFemaleVoice = femaleViVoice || safeNonMaleViVoice;
     const maleViVoice = viVoices.find((v) => this.isLikelyMaleVoice(v));
-    const neutralViVoice = viVoices.find((v) => !this.isLikelyMaleVoice(v)) || viVoices[0] || null;
 
     this.settings.voiceStyle = style;
     if (style === 'female_gentle') {
       this.settings.rate = 0.98;
-      this.settings.pitch = femaleViVoice ? 1.08 : 1.45;
-      this.selectedVoice = femaleViVoice || neutralViVoice || null;
+      // Do not push a neutral TTS voice to 1.45x pitch: that sounds metallic/chipmunk-like.
+      this.settings.pitch = femaleViVoice ? 1.08 : preferredFemaleVoice ? 1.16 : 1.08;
+      this.selectedVoice = preferredFemaleVoice || null;
     } else if (style === 'male_warm') {
       this.settings.rate = 0.94;
       this.settings.pitch = 0.82;
       this.selectedVoice = maleViVoice || viVoices[0] || null;
     } else {
       this.settings.rate = 1.12;
-      this.settings.pitch = femaleViVoice ? 1.35 : 1.72;
-      this.selectedVoice = femaleViVoice || neutralViVoice || null;
+      this.settings.pitch = preferredFemaleVoice ? 1.28 : 1.35;
+      this.selectedVoice = preferredFemaleVoice || null;
     }
 
     // Clear stale stored names if no matching Vietnamese voice exists.
@@ -187,15 +199,29 @@ class VoiceGuideService {
   public getFemaleVoiceStatus() {
     if (this.synth) this.voices = this.synth.getVoices();
     const female = this.getNaturalFemaleVoice();
+    const safeSystem = this.getSafeNonMaleVietnameseVoice();
     return {
       naturalFemaleAvailable: Boolean(female),
-      naturalFemaleName: female?.name || '',
+      naturalFemaleName: female?.name || safeSystem?.name || '',
       offlinePackAvailable: Boolean(this.recordedVoicePlayer),
+      offlineMp3Enabled: Boolean(this.settings.offlineMp3Fallback),
       activeSource:
         this.settings.voiceStyle !== 'female_gentle' ? 'system' :
         female ? 'natural-system-female' :
-        this.recordedVoicePlayer ? 'offline-fallback' : 'unavailable',
+        safeSystem ? 'safe-system-vi' :
+        this.settings.offlineMp3Fallback && this.recordedVoicePlayer ? 'offline-fallback' : 'unavailable',
     } as const;
+  }
+
+  private getSafeNonMaleVietnameseVoice(): SpeechSynthesisVoice | null {
+    if (this.synth) this.voices = this.synth.getVoices();
+    return this.voices.find(
+      (v) => v.lang.toLowerCase().startsWith('vi') && !this.isLikelyMaleVoice(v)
+    ) || null;
+  }
+
+  private getPreferredFemaleSystemVoice(): SpeechSynthesisVoice | null {
+    return this.getNaturalFemaleVoice() || this.getSafeNonMaleVietnameseVoice();
   }
 
   private getNaturalFemaleVoice(): SpeechSynthesisVoice | null {
@@ -249,7 +275,9 @@ class VoiceGuideService {
     }
     if (newSettings.selectedVoiceName) {
       const match = this.voices.find((v) => v.name === newSettings.selectedVoiceName);
-      if (match) this.selectedVoice = match;
+      if (match && this.voiceMatchesStyle(match, this.settings.voiceStyle)) {
+        this.selectedVoice = match;
+      }
     }
     this.saveSettings();
     this.notifySettingsChanged();
@@ -275,13 +303,13 @@ class VoiceGuideService {
     // exposes one. The bundled offline pack is retained as a fallback for
     // devices that only expose a male/neutral Vietnamese voice.
     if (style === 'female_gentle') {
-      const naturalFemale = this.getNaturalFemaleVoice();
-      if (naturalFemale) {
-        this.selectedVoice = naturalFemale;
+      const preferredFemale = this.getPreferredFemaleSystemVoice();
+      if (preferredFemale) {
+        this.selectedVoice = preferredFemale;
         this.speakSynthesized('Xin chào Phương Nhã! Mình cùng bắt đầu cuộc phiêu lưu nhé!', 'high');
         return;
       }
-      if (this.recordedVoicePlayer) {
+      if (this.settings.offlineMp3Fallback && this.recordedVoicePlayer) {
         this.playKey('common.welcome', 'high');
         return;
       }
@@ -314,16 +342,16 @@ class VoiceGuideService {
     if (this.settings.voiceStyle === 'female_gentle') {
       // First choice: a verified Vietnamese female system voice. These voices
       // are usually much more natural than the small bundled fallback clips.
-      const naturalFemale = this.getNaturalFemaleVoice();
-      if (naturalFemale) {
-        this.selectedVoice = naturalFemale;
+      const preferredFemale = this.getPreferredFemaleSystemVoice();
+      if (preferredFemale) {
+        this.selectedVoice = preferredFemale;
         this.speakSynthesized(text, priority, callbacks);
         return;
       }
 
-      // Second choice: bundled offline pack. It guarantees that a device which
-      // only has a Vietnamese male voice never changes speaker unexpectedly.
-      if (this.recordedVoicePlayer) {
+      // V5.27: the bundled MP3 pack is synthetic and can sound robotic.
+      // Keep it only as an explicit opt-in fallback, never as an automatic source.
+      if (this.settings.offlineMp3Fallback && this.recordedVoicePlayer) {
         const manifestKey = this.findManifestKeyByText(text);
         if (manifestKey) {
           const mappedPriority: any =
@@ -354,11 +382,11 @@ class VoiceGuideService {
 
     if (entry) {
       if (this.settings.voiceStyle === 'female_gentle') {
-        const naturalFemale = this.getNaturalFemaleVoice();
-        if (naturalFemale) {
-          this.selectedVoice = naturalFemale;
+        const preferredFemale = this.getPreferredFemaleSystemVoice();
+        if (preferredFemale) {
+          this.selectedVoice = preferredFemale;
           this.speakSynthesized(entry.text, priority, callbacks);
-        } else if (this.recordedVoicePlayer) {
+        } else if (this.settings.offlineMp3Fallback && this.recordedVoicePlayer) {
           const mappedPriority: any =
             priority === 'high' ? 'instruction' :
             priority === 'low' ? 'praise' : 'event';

@@ -25,6 +25,11 @@ export interface VehicleState {
   rank: number;
   lap: number;
   currentLapProgress: number; // 0 to 1
+  damage: number; // 0 pristine -> 100 heavily damaged
+  collisionPulse: number; // increments once for each resolved impact
+  lastCollisionSeverity: number; // 0..1, consumed by the renderer
+  lastCollisionKind: 'ai' | 'barrier' | 'none';
+  lastCollisionSide: number; // -1 left, +1 right, 0 centered
 }
 
 export interface AIRacerState {
@@ -48,6 +53,7 @@ export class VehiclePhysicsEngine {
   public aiRacers: AIRacerState[] = [];
 
   private roadHalfWidth: number = 11.5;
+  private collisionCooldownSec: number = 0;
 
   constructor(stats: CarStats) {
     const topKmh = 140 + stats.topSpeed * 1.2;
@@ -71,6 +77,11 @@ export class VehiclePhysicsEngine {
       rank: 1,
       lap: 1,
       currentLapProgress: 0,
+      damage: 0,
+      collisionPulse: 0,
+      lastCollisionSeverity: 0,
+      lastCollisionKind: 'none',
+      lastCollisionSide: 0,
     };
   }
 
@@ -112,6 +123,7 @@ export class VehiclePhysicsEngine {
     totalLaps: number
   ) {
     const dt = Math.min(delta, 0.05);
+    this.collisionCooldownSec = Math.max(0, this.collisionCooldownSec - dt);
 
     // 1. Nitro Logic
     if (nitroRequested && this.player.nitroMeter > 5 && !this.player.isNitroActive) {
@@ -177,12 +189,14 @@ export class VehiclePhysicsEngine {
     const lateralSpeed = steer * (this.player.speedKmh * 0.08) * speedRatio;
     this.player.lateralOffset += lateralSpeed * dt;
 
-    // Road barrier soft bounce
+    // Road barrier arcade collision. Bounding/lane math is intentionally cheap so it
+    // remains safe on phones and Android TV; the visual particles live in Race3DCanvas.
     if (Math.abs(this.player.lateralOffset) > this.roadHalfWidth) {
-      this.player.lateralOffset =
-        Math.sign(this.player.lateralOffset) * this.roadHalfWidth;
-      this.player.speedKmh *= 0.94; // Mild slowdown, no harsh penalty
-      this.player.bounceOffset.x = -Math.sign(this.player.lateralOffset) * 0.6;
+      const side = Math.sign(this.player.lateralOffset) || 1;
+      const impactSpeed = Math.min(1, this.player.speedKmh / Math.max(80, this.player.maxSpeedKmh));
+      this.player.lateralOffset = side * this.roadHalfWidth;
+      this.player.bounceOffset.x = -side * (0.45 + impactSpeed * 0.45);
+      this.registerCollision('barrier', Math.max(0.22, impactSpeed * 0.72), side);
     } else {
       this.player.bounceOffset.x += (0 - this.player.bounceOffset.x) * 0.2;
     }
@@ -206,7 +220,10 @@ export class VehiclePhysicsEngine {
     // 7. Update AI Opponents (with Rubber-Banding)
     this.updateAIRacers(dt, trackLengthMeters, totalLaps);
 
-    // 8. Calculate Race Rankings
+    // 8. Lightweight player <-> AI arcade collisions.
+    this.resolveAICollisions(trackLengthMeters);
+
+    // 9. Calculate Race Rankings
     this.calculateRankings();
   }
 
@@ -245,6 +262,49 @@ export class VehiclePhysicsEngine {
       ai.progress += (aiMps * dt) / trackLengthMeters;
       ai.lap = Math.min(totalLaps, Math.floor(ai.progress) + 1);
     });
+  }
+
+
+  private registerCollision(kind: 'ai' | 'barrier', severity: number, side: number) {
+    if (this.collisionCooldownSec > 0) return;
+
+    const clampedSeverity = Math.max(0.12, Math.min(1, severity));
+    const shieldFactor = this.player.isShieldActive ? 0.18 : 1;
+    const speedLoss = this.player.isShieldActive ? 0.035 : 0.055 + clampedSeverity * 0.12;
+
+    this.player.speedKmh *= Math.max(0.68, 1 - speedLoss);
+    this.player.damage = Math.min(100, this.player.damage + clampedSeverity * 13 * shieldFactor);
+    this.player.collisionPulse += 1;
+    this.player.lastCollisionSeverity = clampedSeverity;
+    this.player.lastCollisionKind = kind;
+    this.player.lastCollisionSide = Math.sign(side);
+    this.collisionCooldownSec = kind === 'ai' ? 0.48 : 0.34;
+  }
+
+  private resolveAICollisions(trackLengthMeters: number) {
+    if (this.collisionCooldownSec > 0 || this.player.speedKmh < 6) return;
+
+    for (const ai of this.aiRacers) {
+      const longitudinalMeters = Math.abs(ai.progress - this.player.progress) * trackLengthMeters;
+      const lateralMeters = Math.abs(ai.lateralOffset - this.player.lateralOffset);
+
+      // Cheap swept-lane proxy rather than mesh-to-mesh physics. It is stable even when
+      // the visible vehicle is a large imported FBX or a procedural fallback.
+      if (longitudinalMeters > 4.4 || lateralMeters > 2.7) continue;
+
+      const relativeSpeed = Math.abs(this.player.speedKmh - ai.speedKmh);
+      const closingSeverity = Math.min(1, (relativeSpeed + this.player.speedKmh * 0.18) / 120);
+      const severity = Math.max(0.28, closingSeverity);
+      const side = ai.lateralOffset >= this.player.lateralOffset ? -1 : 1;
+
+      this.player.lateralOffset += side * (0.45 + severity * 0.75);
+      ai.lateralOffset -= side * (0.35 + severity * 0.45);
+      ai.targetLateralOffset = Math.max(-9, Math.min(9, ai.targetLateralOffset - side * 1.8));
+      ai.speedKmh *= 0.94;
+      this.player.bounceOffset.x = side * (0.45 + severity * 0.5);
+      this.registerCollision('ai', severity, side);
+      break;
+    }
   }
 
   private calculateRankings() {

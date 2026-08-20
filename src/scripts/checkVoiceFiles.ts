@@ -63,14 +63,14 @@ function checkVoiceFiles() {
   fs.mkdirSync(path.dirname(statusPath), { recursive: true });
   fs.writeFileSync(statusPath, JSON.stringify({
     recordedPackAvailable: invalidFiles === 0 && missingFiles === 0,
-    voiceStyle: 'female_offline_vi_fallback',
-    generator: 'bundled offline Vietnamese female-formant synthetic fallback',
+    voiceStyle: 'female_offline_vi_optional_fallback',
+    generator: 'bundled offline Vietnamese female-formant synthetic fallback (manual opt-in)',
     totalFiles,
     validFiles,
     invalidFiles,
     missingFiles,
     checkedAt: new Date().toISOString(),
-    note: 'Synthetic offline fallback pack, not a human recording. The app prefers a verified Vietnamese female system voice when available and never silently switches female mode to a detected male voice.',
+    note: 'Synthetic offline fallback pack, not a human recording. V5.27 keeps MP3 fallback disabled by default; Web Speech Vietnamese non-male/female voices are preferred.',
   }, null, 2));
 
   if (invalidFiles > 0 || missingFiles > 0) {
