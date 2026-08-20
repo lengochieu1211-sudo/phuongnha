@@ -17,8 +17,8 @@ import {
 export const CAR_CATALOG: CarConfig[] = [
   {
     id: 'roadster_883_3d',
-    name: '883 ROADSTER 3D',
-    subTitle: 'Motorcycle • Model FBX thật',
+    name: 'Roadster 883 Heritage',
+    subTitle: 'Classic Performance Motorcycle',
     category: 'motorcycle',
     description:
       'Mẫu xe máy 3D chi tiết do người dùng cung cấp. Kích thước và camera được chuẩn hóa riêng cho xe hai bánh; điện thoại yếu dùng fallback nhẹ.',
@@ -38,8 +38,8 @@ export const CAR_CATALOG: CarConfig[] = [
   },
   {
     id: 'vespa_studio_3d',
-    name: 'VESPA STUDIO 3D',
-    subTitle: 'Retro Scooter • Model FBX thật',
+    name: 'Vespa Classic Studio',
+    subTitle: 'Italian Retro Scooter',
     category: 'motorcycle',
     description:
       'Scooter cổ điển 3D với nhiều chi tiết vật liệu. Bản TV/PC dùng FBX thật; điện thoại dùng fallback để giữ khung hình ổn định.',
@@ -59,8 +59,8 @@ export const CAR_CATALOG: CarConfig[] = [
   },
   {
     id: 'canis_mesa_3d',
-    name: 'CANIS MESA 3D',
-    subTitle: 'Off-road 4x4 • Model FBX thật',
+    name: 'Canis Mesa Trail 4x4',
+    subTitle: 'Off-Road Utility 4×4',
     category: 'suv_perf',
     description:
       'Mẫu 4x4 3D chi tiết do người dùng cung cấp. Bản PC/TV ưu tiên model FBX thật; điện thoại yếu tự chuyển sang mô hình nhẹ để giữ FPS.',
@@ -80,8 +80,8 @@ export const CAR_CATALOG: CarConfig[] = [
   },
   {
     id: 'v12_sv_3d',
-    name: 'V12 SV 3D',
-    subTitle: 'Supercar • Model FBX thật',
+    name: 'V12 SV Strada',
+    subTitle: 'V12 Performance Supercar',
     category: 'supercar',
     description:
       'Siêu xe V12 3D chi tiết do người dùng cung cấp. Chạy model thật trên PC/TV đủ mạnh và dùng fallback nhẹ khi thiết bị yếu.',
@@ -102,8 +102,8 @@ export const CAR_CATALOG: CarConfig[] = [
 
   {
     id: 's14_sport_3d',
-    name: 'S14 SPORT 3D',
-    subTitle: 'Sport Coupe • FBX thật',
+    name: 'S14 Street Spec',
+    subTitle: 'JDM Drift Coupe',
     category: 'jdm',
     description:
       'Mẫu coupe S14 do người dùng cung cấp. Đã xác minh hướng đầu +Z từ hình học thật; hierarchy SketchUp không có tên bánh an toàn nên bánh được giữ tĩnh thay vì quay sai.',
@@ -116,8 +116,8 @@ export const CAR_CATALOG: CarConfig[] = [
   },
   {
     id: 'rescue_truck_hauler_3d',
-    name: 'RESCUE TRUCK HAULER 3D',
-    subTitle: 'Truck + Trailer • FBX thật • PC',
+    name: 'Rescue Hauler XT',
+    subTitle: 'Heavy Rescue Truck & Trailer',
     category: 'suv_perf',
     description:
       'File “Ban tai” thực tế là xe tải cứu hộ/hauler kèm trailer nhiều trục. Model rất nặng nên FBX thật chỉ parse trên desktop; thiết bị khác dùng fallback để tránh đứng giao diện.',
@@ -130,8 +130,8 @@ export const CAR_CATALOG: CarConfig[] = [
   },
   {
     id: 'xedap_city_3d',
-    name: 'XE ĐẠP THÀNH PHỐ 3D',
-    subTitle: 'City Bicycle • FBX thật • PC',
+    name: 'Urban City Bicycle',
+    subTitle: 'Classic Commuter Bicycle',
     category: 'motorcycle',
     description:
       'Xe đạp 3D thật, đầu xe được xác minh theo -X. File không có rig và tên wheel group không đủ tin cậy, vì vậy giữ bánh tĩnh an toàn; desktop dùng FBX thật.',

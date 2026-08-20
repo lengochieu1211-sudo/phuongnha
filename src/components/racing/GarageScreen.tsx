@@ -120,6 +120,14 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const prevMouseXRef = useRef(0);
   const turntableAngleRef = useRef(0.6);
 
+  // V5.24: the model ribbon is a real draggable/swipeable carousel instead of
+  // hiding its scrollbar and forcing users to step through with arrow buttons.
+  const carSelectorRef = useRef<HTMLDivElement>(null);
+  const selectorDraggingRef = useRef(false);
+  const selectorMovedRef = useRef(false);
+  const selectorStartXRef = useRef(0);
+  const selectorStartScrollLeftRef = useRef(0);
+
   // Setup 3D Turntable Scene
   useEffect(() => {
     if (!containerRef.current) return;
@@ -278,6 +286,56 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
 
   const handlePointerUp = () => {
     isDraggingRef.current = false;
+  };
+
+  // Keep the selected model visible and centered in the selector strip.
+  useEffect(() => {
+    const strip = carSelectorRef.current;
+    if (!strip) return;
+    const selected = strip.querySelector<HTMLElement>(`[data-car-index="${selectedCarIndex}"]`);
+    selected?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [selectedCarIndex]);
+
+  const handleSelectorPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const strip = carSelectorRef.current;
+    if (!strip) return;
+    selectorDraggingRef.current = true;
+    selectorMovedRef.current = false;
+    selectorStartXRef.current = e.clientX;
+    selectorStartScrollLeftRef.current = strip.scrollLeft;
+    strip.setPointerCapture?.(e.pointerId);
+  };
+
+  const handleSelectorPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!selectorDraggingRef.current) return;
+    const strip = carSelectorRef.current;
+    if (!strip) return;
+    const dx = e.clientX - selectorStartXRef.current;
+    if (Math.abs(dx) > 4) selectorMovedRef.current = true;
+    strip.scrollLeft = selectorStartScrollLeftRef.current - dx;
+  };
+
+  const handleSelectorPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    const strip = carSelectorRef.current;
+    selectorDraggingRef.current = false;
+    if (strip?.hasPointerCapture?.(e.pointerId)) strip.releasePointerCapture(e.pointerId);
+    // Delay clearing moved so the synthetic click after a drag can be ignored.
+    window.setTimeout(() => { selectorMovedRef.current = false; }, 0);
+  };
+
+  const handleSelectorWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const strip = carSelectorRef.current;
+    if (!strip) return;
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (delta !== 0) strip.scrollLeft += delta;
+  };
+
+  const scrollCarSelector = (direction: -1 | 1) => {
+    carSelectorRef.current?.scrollBy({
+      left: direction * Math.max(220, (carSelectorRef.current?.clientWidth || 320) * 0.7),
+      behavior: 'smooth',
+    });
   };
 
   // Update Customization in State and 3D Model
@@ -475,29 +533,74 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
           </button>
 
           {/* Bottom Quick Car Selector Ribbon */}
-          <div className="absolute bottom-3 right-3 left-32 flex items-center gap-1.5 overflow-x-auto p-1.5 bg-slate-950/80 backdrop-blur-md rounded-2xl border border-slate-800/80 scrollbar-none z-10">
-            {CAR_CATALOG.map((carItem, idx) => {
-              const isSelected = idx === selectedCarIndex;
-              const isItemUnlocked = profile.unlockedCars.includes(carItem.id);
-              return (
-                <button
-                  key={carItem.id}
-                  onClick={() => setSelectedCarIndex(idx)}
-                  className={`flex-shrink-0 px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1.5 border transition-all ${
-                    isSelected
-                      ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 border-white shadow-md scale-105'
-                      : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-600'
-                  }`}
-                >
-                  <span
-                    className="w-2.5 h-2.5 rounded-full border border-black/30 flex-shrink-0"
-                    style={{ backgroundColor: carItem.defaultColor }}
-                  />
-                  <span className="whitespace-nowrap">{carItem.name}</span>
-                  {!isItemUnlocked && <Lock className="w-3 h-3 text-amber-300 ml-0.5" />}
-                </button>
-              );
-            })}
+          <div className="absolute bottom-3 right-3 left-3 sm:left-32 z-10">
+            <div className="mb-1.5 flex items-center justify-between px-2 text-[10px] font-bold tracking-wide text-slate-400 pointer-events-none">
+              <span>MODEL GARAGE</span>
+              <span className="text-cyan-300">Kéo / vuốt để xem thêm</span>
+            </div>
+            <div className="relative flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="Cuộn danh sách xe sang trái"
+                onClick={() => scrollCarSelector(-1)}
+                className="flex-shrink-0 w-8 h-9 rounded-xl bg-slate-900/95 hover:bg-slate-800 border border-cyan-500/30 text-cyan-300 flex items-center justify-center shadow-lg active:scale-95 transition-all"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <div
+                ref={carSelectorRef}
+                id="garage-model-selector-strip"
+                className="garage-car-strip min-w-0 flex-1 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain scroll-smooth snap-x snap-mandatory p-1.5 pb-2 bg-slate-950/90 backdrop-blur-md rounded-2xl border border-slate-800/80 cursor-grab active:cursor-grabbing touch-pan-y"
+                onPointerDown={handleSelectorPointerDown}
+                onPointerMove={handleSelectorPointerMove}
+                onPointerUp={handleSelectorPointerEnd}
+                onPointerCancel={handleSelectorPointerEnd}
+                onWheel={handleSelectorWheel}
+              >
+                {CAR_CATALOG.map((carItem, idx) => {
+                  const isSelected = idx === selectedCarIndex;
+                  const isItemUnlocked = profile.unlockedCars.includes(carItem.id);
+                  return (
+                    <button
+                      key={carItem.id}
+                      type="button"
+                      data-car-index={idx}
+                      onClick={() => {
+                        if (selectorMovedRef.current) return;
+                        setSelectedCarIndex(idx);
+                      }}
+                      className={`snap-center flex-shrink-0 w-[158px] px-3 py-2 rounded-xl text-[11px] font-bold flex items-center gap-2 border transition-all ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 border-white shadow-md scale-[1.03]'
+                          : 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-cyan-500/40 hover:bg-slate-800/95'
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-black/30 flex-shrink-0"
+                        style={{ backgroundColor: carItem.defaultColor }}
+                      />
+                      <span className="min-w-0 text-left leading-tight">
+                        <span className="block truncate whitespace-nowrap">{carItem.name}</span>
+                        <span className={`block mt-0.5 truncate text-[9px] font-semibold whitespace-nowrap ${isSelected ? 'text-slate-800/75' : 'text-slate-500'}`}>
+                          {carItem.subTitle}
+                        </span>
+                      </span>
+                      {!isItemUnlocked && <Lock className="w-3 h-3 text-amber-300 ml-auto flex-shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                aria-label="Cuộn danh sách xe sang phải"
+                onClick={() => scrollCarSelector(1)}
+                className="flex-shrink-0 w-8 h-9 rounded-xl bg-slate-900/95 hover:bg-slate-800 border border-cyan-500/30 text-cyan-300 flex items-center justify-center shadow-lg active:scale-95 transition-all"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 

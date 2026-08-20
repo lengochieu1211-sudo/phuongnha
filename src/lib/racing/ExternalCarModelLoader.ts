@@ -77,6 +77,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
     policy: 'tv_up',
     rideHeight: 0.18,
     wheelMode: 'named',
+    // The original desert-camo textures are not bundled. Treat their diffuse material family as body paint.
+    paintMaterialPattern: /desert_camo_256/i,
   },
   v12_sv_3d: {
     file: 'assets/cars/v12-sv-supercar.fbx',
@@ -87,6 +89,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
     policy: 'desktop_only',
     rideHeight: 0.14,
     wheelMode: 'named',
+    // Verified from the FBX material assignment: c1 is the large yellow exterior shell (Mesh62).
+    paintMaterialPattern: /(?:^|\s)c1(?:\s|$)/i,
   },
   roadster_883_3d: {
     file: 'assets/cars/roadster-883-3d.fbx',
@@ -109,10 +113,9 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
     rideHeight: 0.09,
     // Source wheel pivots are at world origin; keep static until a clean separated wheel rig is supplied.
     wheelMode: 'none',
-    // The raw SketchUp geometry points along -X, but FBXLoader already normalizes the file axes.
-    // Applying the generic -X -> +Z yaw a second time makes this Vespa appear sideways/diagonal in Race.
-    // Cancel that post-loader quarter-turn while preserving forwardAxis as source metadata.
-    visualYawOffset: -Math.PI / 2,
+    // The two verified wheel centres show this SketchUp export is actually ~40.1° off the nominal -X axis.
+    // Correct only that residual export angle so the scooter points exactly along local +Z in Race.
+    visualYawOffset: -THREE.MathUtils.degToRad(40.1),
     // This particular FBX has a messy exported transform/pivot. Dynamic whole-model lean exaggerates the
     // crooked appearance, so keep it upright until the model is cleanly re-exported/rigged.
     maxLeanRad: 0,

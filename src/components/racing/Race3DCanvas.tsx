@@ -159,7 +159,9 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         paintFinish: 'metallic',
         wheelStyle: 'sport',
         wheelColor: '#1e293b',
-        spoilerStyle: 'sport_wing',
+        // V5.22: a tall sport wing on the first AI car sits directly in front of the chase camera
+        // at the start grid and looks like a detached table/platform. Keep AI spoilers compact.
+        spoilerStyle: 'stock',
         neonUnderglow: 'cyan',
         windowTint: 'smoke',
         decal: 'none',
