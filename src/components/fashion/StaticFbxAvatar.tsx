@@ -10,12 +10,23 @@ interface Props {
   yaw: number;
   roll: number;
   quality: 'phone' | 'tv' | 'pc' | 'auto';
+  file?: string;
+  title?: string;
+  description?: string;
 }
+
 
 const WHITE_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z7iEAAAAASUVORK5CYII=';
 
-export default function StaticFbxAvatar({ yaw, roll, quality }: Props) {
+export default function StaticFbxAvatar({
+  yaw,
+  roll,
+  quality,
+  file = 'assets/avatars/ng1-human-static.fbx',
+  title = 'NGƯỜI MẪU 3D THẬT',
+  description = 'Model FBX • xoay/nghiêng theo thân người',
+}: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const rigRef = useRef<THREE.Group | null>(null);
   const targetYawRef = useRef(0);
@@ -93,7 +104,7 @@ export default function StaticFbxAvatar({ yaw, roll, quality }: Props) {
     let disposed = false;
 
     loader.load(
-      `${base}assets/avatars/ng1-human-static.fbx`,
+      `${base}${file}`,
       (fbx) => {
         if (disposed) return;
 
@@ -106,10 +117,24 @@ export default function StaticFbxAvatar({ yaw, roll, quality }: Props) {
           const src = Array.isArray(obj.material) ? obj.material : [obj.material];
           const next = src.map((m: any) => {
             const c = m?.color?.isColor ? m.color.clone() : new THREE.Color(0xd6b59c);
+            const materialName = `${obj.name} ${m?.name || ''}`.toLowerCase();
+            if (/glass|cornea|tear|lacrimal/.test(materialName)) {
+              return new THREE.MeshPhysicalMaterial({
+                color: c,
+                roughness: 0.12,
+                metalness: 0.02,
+                transparent: true,
+                opacity: 0.34,
+                transmission: 0.22,
+                side: THREE.DoubleSide,
+              });
+            }
             return new THREE.MeshStandardMaterial({
               color: c,
-              roughness: 0.62,
+              roughness: /hair/.test(materialName) ? 0.74 : 0.62,
               metalness: 0.04,
+              transparent: /eyelash/.test(materialName),
+              opacity: /eyelash/.test(materialName) ? 0.72 : 1,
               side: THREE.DoubleSide,
             });
           });
@@ -132,7 +157,7 @@ export default function StaticFbxAvatar({ yaw, roll, quality }: Props) {
         mannequinRoot.add(fbx);
       },
       undefined,
-      (err) => console.warn('Không tải được ng1.fbx, giữ Avatar 2.5D làm fallback.', err),
+      (err) => console.warn(`Không tải được ${file}, giữ Avatar 2.5D làm fallback.`, err),
     );
 
     let raf = 0;
@@ -179,15 +204,15 @@ export default function StaticFbxAvatar({ yaw, roll, quality }: Props) {
       renderer.dispose();
       if (renderer.domElement.parentElement === host) host.removeChild(renderer.domElement);
     };
-  }, [quality]);
+  }, [quality, file]);
 
   return (
     <div className="absolute inset-0 z-40 bg-slate-950">
       <div ref={hostRef} className="absolute inset-0" />
       <div className="absolute top-4 left-4 right-4 flex items-start justify-between gap-2 pointer-events-none">
         <div className="rounded-2xl bg-black/45 border border-cyan-300/20 backdrop-blur px-3 py-2">
-          <div className="font-black text-cyan-200 text-xs">👤 NGƯỜI MẪU 3D THẬT</div>
-          <div className="text-[10px] text-slate-300 mt-1">Model FBX nhẹ • xoay/nghiêng theo thân người</div>
+          <div className="font-black text-cyan-200 text-xs">👤 {title}</div>
+          <div className="text-[10px] text-slate-300 mt-1">{description}</div>
         </div>
         <div className="rounded-full bg-amber-500/15 border border-amber-300/25 px-3 py-1 text-[10px] font-black text-amber-100">
           Chưa có xương rig
@@ -195,7 +220,7 @@ export default function StaticFbxAvatar({ yaw, roll, quality }: Props) {
       </div>
 
       <div className="absolute bottom-4 left-4 right-4 rounded-2xl bg-black/45 border border-white/10 backdrop-blur px-3 py-2 text-[10px] text-slate-200">
-        Model này không có Skeleton/Bone nên V5.9 chỉ điều khiển <b>xoay/nghiêng toàn thân</b>.
+        Model FBX hiện tại không có Skeleton/Bone nên chỉ điều khiển <b>xoay/nghiêng toàn thân</b>.
         Muốn tay/chân bắt chước chính xác cần Auto Rig model trước.
       </div>
     </div>

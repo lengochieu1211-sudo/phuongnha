@@ -25,6 +25,12 @@ interface ExternalVehicleConfig {
   policy: 'tv_up' | 'desktop_only';
   rideHeight: number;
   wheelMode: WheelMode;
+  /** Extra visual yaw applied after FBXLoader axis conversion. Keep raw forwardAxis metadata intact. */
+  visualYawOffset?: number;
+  /** Per-model lean cap. Use 0 for models whose exported transform makes lean look crooked. */
+  maxLeanRad?: number;
+  /** Optional verified material-name matcher for models exported with generic material names. */
+  paintMaterialPattern?: RegExp;
 }
 
 interface WheelRigNode {
@@ -39,6 +45,27 @@ const WHITE_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z7iEAAAAASUVORK5CYII=';
 
 const FBX_CACHE = new Map<string, Promise<THREE.Group>>();
+
+const DEFAULT_PAINT_MATERIAL_RE =
+  /body|paint|carroz|carroceria|fairing|tank|serb|frontcolor|biancospino|color[_ ]|_color/;
+
+function shouldPaintMaterial(
+  name: string,
+  sourceMaterial: any,
+  cfg: ExternalVehicleConfig,
+): boolean {
+  const n = name.toLowerCase();
+  const opacity = Number.isFinite(sourceMaterial?.opacity) ? Number(sourceMaterial.opacity) : 1;
+
+  // Never turn glass, lamps, tyres, cabin trim or metal hardware into body paint.
+  if (opacity < 0.92) return false;
+  if (/glass|vidro|wind|window|translucent|pneu|tire|tyre|rubber|gomma|seat|sella|saddle|interior|dash|steer|handle|grip|chrome|cromado|metal|aluminum|aluminium|ottone|brass|calota|rim|wheel|exhaust|scarico|grade|grille|fork|light|farol|lamp|head|tail|faro|fanale/.test(n)) {
+    return false;
+  }
+
+  return DEFAULT_PAINT_MATERIAL_RE.test(n) || (cfg.paintMaterialPattern?.test(n) ?? false);
+}
+
 
 const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   canis_mesa_3d: {
@@ -82,7 +109,55 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
     rideHeight: 0.09,
     // Source wheel pivots are at world origin; keep static until a clean separated wheel rig is supplied.
     wheelMode: 'none',
+    // The raw SketchUp geometry points along -X, but FBXLoader already normalizes the file axes.
+    // Applying the generic -X -> +Z yaw a second time makes this Vespa appear sideways/diagonal in Race.
+    // Cancel that post-loader quarter-turn while preserving forwardAxis as source metadata.
+    visualYawOffset: -Math.PI / 2,
+    // This particular FBX has a messy exported transform/pivot. Dynamic whole-model lean exaggerates the
+    // crooked appearance, so keep it upright until the model is cleanly re-exported/rigged.
+    maxLeanRad: 0,
   },
+
+  s14_sport_3d: {
+    file: 'assets/cars/s14-sport-coupe.fbx',
+    targetLength: 4.45,
+    // V5.21 verified from the actual uploaded point-cloud silhouette: bonnet/front is toward +Z.
+    forwardAxis: '+z',
+    kind: 'car',
+    policy: 'tv_up',
+    rideHeight: 0.14,
+    // SketchUp nodes are only Component/Mesh names; no trustworthy wheel group names.
+    wheelMode: 'none',
+    // Red source-material family is the painted exterior. Keep glass/metal/grey materials untouched.
+    paintMaterialPattern: /(?:^|\s)_auto_(?:11|12|2|5|7)?(?:\s|$)/i,
+  },
+  rescue_truck_hauler_3d: {
+    file: 'assets/cars/rescue-truck-hauler.fbx',
+    targetLength: 9.0,
+    // Verified from uploaded side silhouette: cab/nose is at larger +Z, trailer extends toward -Z.
+    forwardAxis: '+z',
+    kind: 'car',
+    // 50+ MB ASCII FBX with 260 meshes: parse only on desktop; lighter fallback elsewhere.
+    policy: 'desktop_only',
+    rideHeight: 0.20,
+    // The file contains truck wheels PLUS many trailer wheels; selecting four by name would be unsafe.
+    wheelMode: 'none',
+    paintMaterialPattern: /(frontcolor|color_d01|(?:^|\s)_11(?:\s|$)|(?:^|\s)_8(?:\s|$))/i,
+  },
+  xedap_city_3d: {
+    file: 'assets/cars/xedap-city-bike.fbx',
+    targetLength: 1.82,
+    // Verified from actual uploaded side silhouette: front wheel/fork/handlebar are toward -X.
+    forwardAxis: '-x',
+    kind: 'motorcycle',
+    // 29 MB ASCII FBX; keep phone/TV responsive by using the procedural fallback there.
+    policy: 'desktop_only',
+    rideHeight: 0.07,
+    wheelMode: 'none',
+    maxLeanRad: 0.16,
+    paintMaterialPattern: /(color_a06|m_0047_khaki|_redwood_)/i,
+  },
+
 };
 
 export function isExternalCar(modelId: CarModelId): boolean {
@@ -105,18 +180,19 @@ function sourceColorOf(material: any, fallback: THREE.Color): THREE.Color {
   return fallback.clone();
 }
 
-function classifyMaterial(name: string, paint: THREE.Color, sourceMaterial?: any): THREE.Material {
+function classifyMaterial(name: string, paint: THREE.Color, sourceMaterial?: any, forcePaint = false): THREE.Material {
   const n = name.toLowerCase();
   const original = sourceColorOf(sourceMaterial, paint);
+  const sourceOpacity = Number.isFinite(sourceMaterial?.opacity) ? Number(sourceMaterial.opacity) : 1;
 
-  if (/glass|vidro|wind|windscre|window|translucent/.test(n)) {
+  if (/glass|vidro|wind|windscre|window|translucent/.test(n) || sourceOpacity < 0.92) {
     return new THREE.MeshPhysicalMaterial({
       color: original.clone().lerp(new THREE.Color(0x17202d), 0.55),
       metalness: 0.08,
       roughness: 0.07,
       transmission: 0.38,
       transparent: true,
-      opacity: 0.55,
+      opacity: Math.max(0.18, Math.min(0.82, sourceOpacity < 0.92 ? sourceOpacity : 0.55)),
       clearcoat: 1,
       clearcoatRoughness: 0.04,
       side: THREE.DoubleSide,
@@ -161,8 +237,7 @@ function classifyMaterial(name: string, paint: THREE.Color, sourceMaterial?: any
 
   // Paint only likely body/paint materials; preserve original FBX diffuse colors
   // for unknown materials so scooters/motorcycles do not become one solid color.
-  const looksPainted =
-    /body|paint|carroz|carroceria|fairing|tank|serb|frontcolor|biancospino|color[_ ]|_color/.test(n);
+  const looksPainted = forcePaint || DEFAULT_PAINT_MATERIAL_RE.test(n);
 
   return new THREE.MeshPhysicalMaterial({
     color: looksPainted ? paint.clone() : original,
@@ -486,7 +561,7 @@ export async function attachExternalCarModel(
 
   // Do NOT guess the visual front from bbox length. Different FBX exporters use
   // different forward signs. V5.15 stores the verified source forward axis per model.
-  holder.rotation.y = forwardYaw(cfg.forwardAxis);
+  holder.rotation.y = forwardYaw(cfg.forwardAxis) + (cfg.visualYawOffset ?? 0);
 
   let box = new THREE.Box3().setFromObject(holder);
   let size = box.getSize(new THREE.Vector3());
@@ -509,8 +584,10 @@ export async function attachExternalCarModel(
     const sourceMats = Array.isArray(obj.material) ? obj.material : [obj.material];
     const nextMats = sourceMats.map((m: any) => {
       const sourceName = `${obj.name} ${m?.name || ''}`;
-      const next = classifyMaterial(sourceName, paint, m);
+      const paintable = shouldPaintMaterial(sourceName, m, cfg);
+      const next = classifyMaterial(sourceName, paint, m, paintable);
       next.name = sourceName;
+      next.userData.apPaintable = paintable;
       return next;
     });
     obj.material = Array.isArray(obj.material) ? nextMats : nextMats[0];
@@ -530,7 +607,9 @@ export async function attachExternalCarModel(
 
     if (cfg.kind === 'motorcycle') {
       const speedFactor = Math.min(1, Math.abs(speed) / 45);
-      const targetLean = -THREE.MathUtils.clamp(steerAngleRad, -0.55, 0.55) * 0.42 * speedFactor;
+      const leanCap = cfg.maxLeanRad ?? 0.42;
+      const normalizedSteer = THREE.MathUtils.clamp(steerAngleRad, -0.55, 0.55) / 0.55;
+      const targetLean = -normalizedSteer * leanCap * speedFactor;
       holder.rotation.z += (baseHolderZ + targetLean - holder.rotation.z) * Math.min(1, delta * 7.5);
     }
   };
@@ -544,10 +623,7 @@ export async function attachExternalCarModel(
       if (!obj.isMesh) return;
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       mats.forEach((m: any) => {
-        const n = `${obj.name} ${m?.name || ''}`.toLowerCase();
-        const paintable =
-          /body|paint|carroz|carroceria|fairing|tank|serb|frontcolor|biancospino|color[_ ]|_color/.test(n);
-        if (paintable && m?.color) m.color.copy(nextPaint);
+        if (m?.userData?.apPaintable === true && m?.color) m.color.copy(nextPaint);
       });
     });
   };

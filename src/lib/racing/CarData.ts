@@ -99,6 +99,49 @@ export const CAR_CATALOG: CarConfig[] = [
     defaultColor: '#f2c300',
     specialAura: '⚡ V12 SV tốc độ cao',
   },
+
+  {
+    id: 's14_sport_3d',
+    name: 'S14 SPORT 3D',
+    subTitle: 'Sport Coupe • FBX thật',
+    category: 'jdm',
+    description:
+      'Mẫu coupe S14 do người dùng cung cấp. Đã xác minh hướng đầu +Z từ hình học thật; hierarchy SketchUp không có tên bánh an toàn nên bánh được giữ tĩnh thay vì quay sai.',
+    baseStats: { topSpeed: 88, acceleration: 86, handling: 84, drift: 91, nitro: 85, braking: 83 },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#8b1018',
+    specialAura: '🏁 S14 drift coupe',
+  },
+  {
+    id: 'rescue_truck_hauler_3d',
+    name: 'RESCUE TRUCK HAULER 3D',
+    subTitle: 'Truck + Trailer • FBX thật • PC',
+    category: 'suv_perf',
+    description:
+      'File “Ban tai” thực tế là xe tải cứu hộ/hauler kèm trailer nhiều trục. Model rất nặng nên FBX thật chỉ parse trên desktop; thiết bị khác dùng fallback để tránh đứng giao diện.',
+    baseStats: { topSpeed: 60, acceleration: 52, handling: 48, drift: 35, nitro: 58, braking: 74 },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#f3f4f6',
+    specialAura: '🚛 Heavy rescue hauler',
+  },
+  {
+    id: 'xedap_city_3d',
+    name: 'XE ĐẠP THÀNH PHỐ 3D',
+    subTitle: 'City Bicycle • FBX thật • PC',
+    category: 'motorcycle',
+    description:
+      'Xe đạp 3D thật, đầu xe được xác minh theo -X. File không có rig và tên wheel group không đủ tin cậy, vì vậy giữ bánh tĩnh an toàn; desktop dùng FBX thật.',
+    baseStats: { topSpeed: 42, acceleration: 66, handling: 95, drift: 45, nitro: 52, braking: 88 },
+    unlockCostStars: 0,
+    unlockCostDiamonds: 0,
+    isUnlockedByDefault: true,
+    defaultColor: '#d7924f',
+    specialAura: '🚲 City ride',
+  },
   {
     id: 'bara_gt',
     name: 'BARA GT',
@@ -480,7 +523,7 @@ const RACING_SAVE_KEY = 'bara_speed_racing_profile_v1';
 
 export function getInitialRaceProfile(): PlayerRaceProfile {
   return {
-    unlockedCars: ['bara_gt', 'ap_r1', 'canis_mesa_3d', 'v12_sv_3d', 'roadster_883_3d', 'vespa_studio_3d'],
+    unlockedCars: ['bara_gt', 'ap_r1', 'canis_mesa_3d', 'v12_sv_3d', 'roadster_883_3d', 'vespa_studio_3d', 's14_sport_3d', 'rescue_truck_hauler_3d', 'xedap_city_3d'],
     selectedCarId: 'bara_gt',
     carCustomizations: {
       bara_gt: {
@@ -520,6 +563,9 @@ export function loadRaceProfile(): PlayerRaceProfile {
         'v12_sv_3d',
         'roadster_883_3d',
         'vespa_studio_3d',
+        's14_sport_3d',
+        'rescue_truck_hauler_3d',
+        'xedap_city_3d',
       ])) as CarModelId[];
       return {
         ...initial,

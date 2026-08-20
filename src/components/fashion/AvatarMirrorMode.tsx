@@ -13,7 +13,7 @@ import { WARDROBE_ITEMS } from '../../utils/characterRenderer';
 import { detectGraphicsProfile } from '../../utils/graphicsQuality';
 import StaticFbxAvatar from './StaticFbxAvatar';
 
-type AvatarTheme = 'princess' | 'capy' | 'bunny' | 'cyber' | 'human_static';
+type AvatarTheme = 'princess' | 'capy' | 'bunny' | 'cyber' | 'human_static' | 'child_girl_static';
 type PerfMode = 'auto' | 'phone' | 'tv' | 'pc';
 
 interface Props {
@@ -29,6 +29,7 @@ const avatars: { id: AvatarTheme; name: string; emoji: string; desc: string }[] 
   { id: 'bunny', name: 'Thỏ Ma Thuật', emoji: '🐰', desc: 'Thỏ fantasy, tai dài và má hồng' },
   { id: 'cyber', name: 'Robo Cyber', emoji: '🤖', desc: 'Nhân vật robot phong cách tương lai' },
   { id: 'human_static', name: 'Người Mẫu 3D Thật', emoji: '🧍', desc: 'FBX thật ng1 • xoay theo thân, chưa có xương rig' },
+  { id: 'child_girl_static', name: 'Bé Gái FBX Thật', emoji: '👧', desc: 'Child+girl • 49 material • chưa rig • texture ngoài chưa kèm' },
 ];
 
 function getPreviewColor(itemId?: string, fallback = '#d946ef') {
@@ -80,6 +81,7 @@ export default function AvatarMirrorMode({ isOpen, onClose, equippedIds }: Props
 
   if (!isOpen) return null;
 
+  const isStaticFbx = avatar === 'human_static' || avatar === 'child_girl_static';
   const torsoYaw = clamp((anchors?.torsoYaw || 0), -0.9, 0.9);
   const bodyWidth = clamp(anchors?.shoulderWidth ? anchors.shoulderWidth * 220 : 110, 90, 170);
   const bodyHeight = clamp(anchors?.torsoHeight ? anchors.torsoHeight * 310 : 180, 150, 255);
@@ -175,27 +177,30 @@ export default function AvatarMirrorMode({ isOpen, onClose, equippedIds }: Props
               </div>
 
               <div className="absolute inset-0">
-                {avatar === 'human_static' && (
+                {isStaticFbx && (
                   <StaticFbxAvatar
                     yaw={torsoYaw}
                     roll={(anchors?.torsoRotation || 0) * (Math.PI / 180)}
                     quality={effectiveMode}
+                    file={avatar === 'child_girl_static' ? 'assets/avatars/child-girl-static.fbx' : 'assets/avatars/ng1-human-static.fbx'}
+                    title={avatar === 'child_girl_static' ? 'BÉ GÁI 3D THẬT' : 'NGƯỜI MẪU 3D THẬT'}
+                    description={avatar === 'child_girl_static' ? 'Child+girl FBX • màu vật liệu fallback • chưa có xương rig' : 'ng1 FBX • xoay/nghiêng theo thân người'}
                   />
                 )}
 
                 {/* accessory overlays behind body */}
-                {avatar !== 'human_static' && equippedIds.wings && (
+                {!isStaticFbx && equippedIds.wings && (
                   <div style={overlayStyle(0.5, 0.48, 0.42, 0.36, 2, 0, 1 + Math.abs(torsoYaw) * 0.14)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.wings} category="wings" />
                   </div>
                 )}
-                {avatar !== 'human_static' && equippedIds.backpack && (
+                {!isStaticFbx && equippedIds.backpack && (
                   <div style={overlayStyle(0.5, 0.50, 0.23, 0.28, 3)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.backpack} category="backpack" />
                   </div>
                 )}
 
-                {avatar !== 'human_static' && (
+                {!isStaticFbx && (
                 <svg viewBox="0 0 320 520" className="absolute inset-0 w-full h-full">
                   <defs>
                     <linearGradient id="avatarCostume" x1="0" x2="1">
@@ -272,37 +277,37 @@ export default function AvatarMirrorMode({ isOpen, onClose, equippedIds }: Props
                 )}
 
                 {/* accessory overlays in front */}
-                {avatar !== 'human_static' && equippedIds.hair && (
+                {!isStaticFbx && equippedIds.hair && (
                   <div style={overlayStyle(0.5, 0.18, 0.25, 0.25, 8, anchors?.faceRotation || 0, 1 - Math.abs(torsoYaw)*0.1)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.hair} category="hair" />
                   </div>
                 )}
-                {avatar !== 'human_static' && equippedIds.headaccessory && (
+                {!isStaticFbx && equippedIds.headaccessory && (
                   <div style={overlayStyle(0.5, 0.15, 0.20, 0.12, 9, anchors?.faceRotation || 0)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.headaccessory} category="headaccessory" />
                   </div>
                 )}
-                {avatar !== 'human_static' && equippedIds.hat && (
+                {!isStaticFbx && equippedIds.hat && (
                   <div style={overlayStyle(0.5, 0.14, 0.22, 0.15, 10, anchors?.faceRotation || 0)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.hat} category="hat" />
                   </div>
                 )}
-                {avatar !== 'human_static' && equippedIds.glasses && !equippedIds.mask && (
+                {!isStaticFbx && equippedIds.glasses && !equippedIds.mask && (
                   <div style={overlayStyle(0.5, 0.185, 0.16, 0.08, 11, anchors?.faceRotation || 0)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.glasses} category="glasses" />
                   </div>
                 )}
-                {avatar !== 'human_static' && equippedIds.mask && (
+                {!isStaticFbx && equippedIds.mask && (
                   <div style={overlayStyle(0.5, 0.205, 0.18, 0.10, 12, anchors?.faceRotation || 0)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.mask} category="mask" />
                   </div>
                 )}
-                {avatar !== 'human_static' && equippedIds.necklace && (
+                {!isStaticFbx && equippedIds.necklace && (
                   <div style={overlayStyle(0.5, 0.31, 0.13, 0.08, 9)}>
                     <RealisticWardrobeOverlay itemId={equippedIds.necklace} category="necklace" />
                   </div>
                 )}
-                {avatar !== 'human_static' && equippedIds.gloves && (
+                {!isStaticFbx && equippedIds.gloves && (
                   <>
                     <div style={overlayStyle(rig.lw.x / 320, rig.lw.y / 520, 0.09, 0.09, 10)}>
                       <RealisticWardrobeOverlay itemId={equippedIds.gloves} category="gloves" side="left" />
@@ -312,7 +317,7 @@ export default function AvatarMirrorMode({ isOpen, onClose, equippedIds }: Props
                     </div>
                   </>
                 )}
-                {avatar !== 'human_static' && equippedIds.shoes && (
+                {!isStaticFbx && equippedIds.shoes && (
                   <>
                     <div style={overlayStyle(rig.la.x / 320, rig.la.y / 520 + 0.015, 0.11, 0.08, 10)}>
                       <RealisticWardrobeOverlay itemId={equippedIds.shoes} category="shoes" side="left" />

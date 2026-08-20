@@ -135,7 +135,16 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    if (currentCar.category === 'motorcycle') {
+    // V5.21: the newly imported truck/bicycle need their own framing. A fixed
+    // camera that fits a normal 4–5 m car can clip into the 9 m hauler or make
+    // a bicycle look tiny. Keep the turntable camera independent from model transforms.
+    if (currentCar.id === 'rescue_truck_hauler_3d') {
+      camera.position.set(0, 3.55, 13.2);
+      camera.lookAt(0, 1.45, 0);
+    } else if (currentCar.id === 'xedap_city_3d') {
+      camera.position.set(0, 1.18, 3.0);
+      camera.lookAt(0, 0.72, 0);
+    } else if (currentCar.category === 'motorcycle') {
       camera.position.set(0, 1.28, 3.25);
       camera.lookAt(0, 0.72, 0);
     } else {

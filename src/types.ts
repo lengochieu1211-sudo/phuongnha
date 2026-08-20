@@ -299,7 +299,10 @@ export type CarModelId =
   | 'canis_mesa_3d'
   | 'v12_sv_3d'
   | 'roadster_883_3d'
-  | 'vespa_studio_3d';
+  | 'vespa_studio_3d'
+  | 's14_sport_3d'
+  | 'rescue_truck_hauler_3d'
+  | 'xedap_city_3d';
 
 export type CarCategory =
   | 'city'

@@ -140,7 +140,13 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       new THREE.CircleGeometry(1.0, profile.quality === 'high' ? 36 : 20),
       new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false })
     );
-    contactShadow.scale.set(car.category === 'motorcycle' ? 0.42 : 1.15, car.category === 'motorcycle' ? 1.12 : 2.25, 1);
+    if (car.id === 'rescue_truck_hauler_3d') {
+      contactShadow.scale.set(1.8, 4.8, 1);
+    } else if (car.id === 'xedap_city_3d') {
+      contactShadow.scale.set(0.34, 0.92, 1);
+    } else {
+      contactShadow.scale.set(car.category === 'motorcycle' ? 0.42 : 1.15, car.category === 'motorcycle' ? 1.12 : 2.25, 1);
+    }
     contactShadow.rotation.x = -Math.PI / 2;
     contactShadow.renderOrder = 2;
     scene.add(contactShadow);
@@ -220,6 +226,8 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       startPt.tangent,
       cameraView,
       false,
+      car.id,
+      car.category,
     );
 
     // V5.17 warm-up: wait for the selected FBX (normally already preloaded), render a
@@ -327,7 +335,10 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       }
 
       // Update Camera Tracking View
-      updateCameraPosition(camera, px, py, pz, pt.tangent, cameraView, engine.physics.player.isNitroActive);
+      updateCameraPosition(
+        camera, px, py, pz, pt.tangent, cameraView, engine.physics.player.isNitroActive,
+        car.id, car.category
+      );
 
       // Runtime safety net for PC / phone / Android TV. Do not wait for a crash:
       // reduce render resolution progressively if FPS falls below the profile target.
@@ -431,21 +442,54 @@ function updateCameraPosition(
   pz: number,
   tangent: { x: number; y: number; z: number },
   viewMode: CameraViewMode,
-  isNitro: boolean
+  isNitro: boolean,
+  carId: string,
+  carCategory: string
 ) {
-  // Keep the car visually prominent on phones. Nitro widens the view, but not so
-  // much that the player car becomes tiny.
-  const fovTarget = isNitro ? 56 : 49;
+  // V5.19: chase camera is vehicle-size aware. A fixed 3.25 m offset placed the
+  // camera inside the long V12 SV while making Vespa/883 motorcycles look tiny.
+  // Keep per-model values explicit instead of guessing from FBX hierarchy/bounds at runtime.
+  const isMotorcycle = carCategory === 'motorcycle';
+  const closeDistanceByModel: Record<string, number> = {
+    v12_sv_3d: 5.65,
+    canis_mesa_3d: 5.15,
+    roadster_883_3d: 2.75,
+    vespa_studio_3d: 2.55,
+    s14_sport_3d: 5.05,
+    rescue_truck_hauler_3d: 10.8,
+    xedap_city_3d: 2.45,
+  };
+  const chaseDistanceByModel: Record<string, number> = {
+    v12_sv_3d: 6.65,
+    canis_mesa_3d: 6.15,
+    roadster_883_3d: 3.65,
+    vespa_studio_3d: 3.35,
+    s14_sport_3d: 6.05,
+    rescue_truck_hauler_3d: 12.6,
+    xedap_city_3d: 3.25,
+  };
+  const closeDistance = closeDistanceByModel[carId] ?? (isMotorcycle ? 2.75 : 4.15);
+  const chaseDistance = chaseDistanceByModel[carId] ?? (isMotorcycle ? 3.65 : 5.35);
+  const cameraHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.15, xedap_city_3d: 1.20 };
+  const chaseHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 3.85, xedap_city_3d: 1.62 };
+  const lookHeightByModel: Record<string, number> = { rescue_truck_hauler_3d: 1.75, xedap_city_3d: 0.62 };
+  const cameraHeight = cameraHeightByModel[carId] ?? (isMotorcycle ? 1.32 : 1.72);
+  const chaseHeight = chaseHeightByModel[carId] ?? (isMotorcycle ? 1.78 : 2.28);
+  const lookHeight = lookHeightByModel[carId] ?? (isMotorcycle ? 0.72 : 0.92);
+
+  // Slightly narrower FOV for motorcycles so they remain readable without moving the
+  // camera dangerously close to the model.
+  const fovTarget = isNitro ? (isMotorcycle ? 53 : 56) : (isMotorcycle ? 46 : 49);
   camera.fov += (fovTarget - camera.fov) * 0.1;
   camera.updateProjectionMatrix();
 
   switch (viewMode) {
     case 'close_chase': {
-      const camX = px - tangent.x * 3.25;
-      const camY = py + 1.48;
-      const camZ = pz - tangent.z * 3.25;
+      const camX = px - tangent.x * closeDistance;
+      const camY = py + cameraHeight;
+      const camZ = pz - tangent.z * closeDistance;
       camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.2);
-      camera.lookAt(px + tangent.x * 5.0, py + 0.78, pz + tangent.z * 5.0);
+      camera.lookAt(px + tangent.x * 5.0, py + lookHeight, pz + tangent.z * 5.0);
       break;
     }
     case 'hood': {
@@ -475,11 +519,11 @@ function updateCameraPosition(
     }
     case 'chase':
     default: {
-      const camX = px - tangent.x * 5.15;
-      const camY = py + 2.1;
-      const camZ = pz - tangent.z * 5.15;
+      const camX = px - tangent.x * chaseDistance;
+      const camY = py + chaseHeight;
+      const camZ = pz - tangent.z * chaseDistance;
       camera.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.16);
-      camera.lookAt(px + tangent.x * 4.8, py + 1.02, pz + tangent.z * 4.8);
+      camera.lookAt(px + tangent.x * 4.8, py + lookHeight + 0.12, pz + tangent.z * 4.8);
       break;
     }
   }

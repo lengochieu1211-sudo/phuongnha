@@ -1,3 +1,13 @@
+## V5.21 – Bổ sung 4 FBX người/xe và hardening đổi màu
+
+- Thêm **Child+girl.fbx** vào Avatar 3D tĩnh. Model có 1 mesh / 49 material / 40 texture tham chiếu ngoài nhưng **không có Skeleton/Skin/Animation**, vì vậy chỉ xoay/nghiêng toàn thân; texture thiếu được thay bằng fallback an toàn để không crash.
+- Thêm **S14 SPORT 3D** vào Garage/Race; hướng thật đã kiểm tra là **+Z**. Hierarchy SketchUp không có wheel group đáng tin nên bánh để tĩnh.
+- Thêm **RESCUE TRUCK HAULER 3D**; đây là xe cứu hộ kéo moóc rất dài, nhiều bánh xe tải + bánh trailer, hướng thật **+Z**. Chỉ parse FBX thật trên desktop để tránh đứng điện thoại/TV.
+- Thêm **XE ĐẠP THÀNH PHỐ 3D**; hướng thật **-X**, không có rig/bone và không có wheel group an toàn. FBX thật chỉ bật desktop; thiết bị yếu dùng fallback.
+- Cơ chế đổi màu FBX được siết lại: chỉ material thân xe được đánh dấu mới đổi màu; kính/lốp/mâm/đèn/nội thất không bị nhuộm theo và bục Garage không liên quan material xe.
+- Camera Garage/Race và contact shadow có metadata riêng cho xe tải/xe đạp để tránh camera chui vào model hoặc model quá nhỏ.
+- Xem chi tiết: `AUDIT-V5.21-NEW-FBX-MODELS.md`.
+
 ## V5.5 – AR body-rig + Companion Pro + sửa nguồn giọng nữ
 
 - **Gương Phép Thuật:** áo tự fit vai/hông/thân, xoay phối cảnh theo hướng người; ống tay tách vai→khuỷu→cổ tay và tự đi theo tay. Có Z-order tay gần/tay xa và tự giảm tần suất rig trên điện thoại/TV để đỡ lag.
