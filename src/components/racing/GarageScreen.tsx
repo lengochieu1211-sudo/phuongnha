@@ -26,7 +26,27 @@ import {
   saveRaceProfile,
 } from '../../lib/racing/CarData';
 import { buildCar3D, Car3DInstance } from '../../lib/racing/Car3DBuilder';
-import { attachExternalCarModel, isExternalCar, shouldUseExternalCar, ExternalCarHandle } from '../../lib/racing/ExternalCarModelLoader';
+import {
+  attachExternalCarModel,
+  isExternalCar,
+  shouldUseExternalCar,
+  ExternalCarHandle,
+  getCompatibleExternalCarModelIds,
+  getExternalCarAssetUrls,
+  getExternalCarAssetBytes,
+  getExternalVehicleUrl,
+  prefetchExternalCarAsset,
+} from '../../lib/racing/ExternalCarModelLoader';
+import {
+  cacheModelAsset,
+  cacheModelPack,
+  cleanupOldModelCaches,
+  clearPersistentModelCache,
+  getCachedModelCount,
+  isModelAssetCached,
+  supportsPersistentModelCache,
+  requestPersistentModelStorage,
+} from '../../lib/racing/ModelAssetCache';
 import { raceAudio } from '../../lib/racing/RaceAudio';
 import { resolveRacingGraphicsProfile, detectDeviceClass } from '../../utils/graphicsQuality';
 import {
@@ -45,6 +65,10 @@ import {
   Check,
   Star,
   Flame,
+  Download,
+  Trash2,
+  HardDrive,
+  Loader2,
 } from 'lucide-react';
 
 interface GarageScreenProps {
@@ -123,6 +147,25 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const prevMouseXRef = useRef(0);
   const turntableAngleRef = useRef(0.6);
 
+  // V5.41: persistent local model pack. Raw FBX bytes are cached on-device so
+  // repeat visits do not re-download large files from GitHub Pages.
+  const [modelCacheCount, setModelCacheCount] = useState(0);
+  const [currentModelCached, setCurrentModelCached] = useState(false);
+  const [modelCacheBusy, setModelCacheBusy] = useState(false);
+  const [modelCacheMessage, setModelCacheMessage] = useState('');
+  const [modelPackProgress, setModelPackProgress] = useState({ done: 0, total: 0 });
+  const persistentCacheSupported = useRef(supportsPersistentModelCache()).current;
+  const compatibleExternalIds = getCompatibleExternalCarModelIds(actualDeviceClass);
+  const compatibleExternalUrls = getExternalCarAssetUrls(compatibleExternalIds);
+  const compatiblePackMiB = getExternalCarAssetBytes(compatibleExternalIds) / (1024 * 1024);
+
+  const refreshModelCacheStatus = async () => {
+    const count = await getCachedModelCount(compatibleExternalUrls);
+    setModelCacheCount(count);
+    const currentUrl = getExternalVehicleUrl(currentCar.id);
+    setCurrentModelCached(currentUrl ? await isModelAssetCached(currentUrl) : false);
+  };
+
   // V5.24: the model ribbon is a real draggable/swipeable carousel instead of
   // hiding its scrollbar and forcing users to step through with arrow buttons.
   const carSelectorRef = useRef<HTMLDivElement>(null);
@@ -131,6 +174,77 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const selectorStartXRef = useRef(0);
   const selectorStartScrollLeftRef = useRef(0);
   const selectorPointerCarIndexRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    void cleanupOldModelCaches().then(refreshModelCacheStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    void refreshModelCacheStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCar.id]);
+
+  // Idle neighbor prefetch: only warm raw bytes, never parse them here. Respect
+  // data-saver/slow connections and device policy so phones do not silently pull PC-only FBXs.
+  useEffect(() => {
+    const connection = (navigator as any).connection;
+    if (connection?.saveData || /(^|-)2g$/.test(connection?.effectiveType || '')) return;
+    const timer = window.setTimeout(() => {
+      const neighbors = [
+        CAR_CATALOG[(selectedCarIndex + 1) % CAR_CATALOG.length],
+        CAR_CATALOG[(selectedCarIndex - 1 + CAR_CATALOG.length) % CAR_CATALOG.length],
+      ];
+      for (const item of neighbors) {
+        if (isExternalCar(item.id) && shouldUseExternalCar(item.id, actualDeviceClass)) {
+          void prefetchExternalCarAsset(item.id);
+        }
+      }
+    }, 1600);
+    return () => window.clearTimeout(timer);
+  }, [selectedCarIndex, actualDeviceClass]);
+
+  const downloadCurrentModel = async () => {
+    const url = getExternalVehicleUrl(currentCar.id);
+    if (!url) {
+      setModelCacheMessage('Xe này dùng model nhẹ có sẵn trong game.');
+      return;
+    }
+    setModelCacheBusy(true);
+    setModelCacheMessage(`Đang tải ${currentCar.name} về máy…`);
+    const ok = await cacheModelAsset(url);
+    setModelCacheBusy(false);
+    setModelCacheMessage(ok ? 'Đã lưu model này trên thiết bị ✓' : 'Không thể lưu model. Kiểm tra mạng/dung lượng.');
+    await refreshModelCacheStatus();
+  };
+
+  const downloadCompatibleModelPack = async () => {
+    if (!compatibleExternalUrls.length) return;
+    setModelCacheBusy(true);
+    // Best-effort request; browsers may deny it without affecting the download.
+    void requestPersistentModelStorage();
+    setModelPackProgress({ done: 0, total: compatibleExternalUrls.length });
+    setModelCacheMessage(`Đang tải gói 3D phù hợp thiết bị: ${compatibleExternalUrls.length} model…`);
+    const result = await cacheModelPack(compatibleExternalUrls, (progress) => {
+      setModelPackProgress({ done: progress.done, total: progress.total });
+    });
+    setModelCacheBusy(false);
+    setModelCacheMessage(
+      result.failed === 0
+        ? `Đã tải cục bộ ${result.ok}/${compatibleExternalUrls.length} model ✓`
+        : `Đã tải ${result.ok}; lỗi ${result.failed} model.`,
+    );
+    await refreshModelCacheStatus();
+  };
+
+  const clearDownloadedModels = async () => {
+    setModelCacheBusy(true);
+    const ok = await clearPersistentModelCache();
+    setModelCacheBusy(false);
+    setModelCacheMessage(ok ? 'Đã xóa gói model tải cục bộ.' : 'Không có cache model để xóa.');
+    setModelPackProgress({ done: 0, total: 0 });
+    await refreshModelCacheStatus();
+  };
 
   // Setup one persistent 3D showroom. V5.25: do NOT recreate a WebGLRenderer
   // every time a car is selected; doing so caused visible flicker and could exhaust
@@ -841,6 +955,57 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                   {currentCar.specialAura}
                 </div>
               )}
+
+              <div className="rounded-2xl border border-cyan-500/20 bg-cyan-950/20 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-[11px] font-black text-cyan-200">
+                    <HardDrive className="h-4 w-4" /> MODEL 3D CỤC BỘ
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {modelCacheCount}/{compatibleExternalUrls.length} đã tải
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={downloadCurrentModel}
+                    disabled={modelCacheBusy || !isExternalCar(currentCar.id)}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-cyan-500/30 bg-slate-950/70 px-2 py-2 text-[10px] font-bold text-cyan-200 disabled:opacity-40"
+                  >
+                    {modelCacheBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                    {currentModelCached ? 'Đã có model ✓' : 'Tải xe này'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadCompatibleModelPack}
+                    disabled={modelCacheBusy || compatibleExternalUrls.length === 0}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-2 py-2 text-[10px] font-bold text-emerald-200 disabled:opacity-40"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Tải gói ~{compatiblePackMiB.toFixed(0)} MB
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearDownloadedModels}
+                    disabled={modelCacheBusy || !persistentCacheSupported}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-500/25 bg-rose-950/20 px-2 py-2 text-[10px] font-bold text-rose-200 disabled:opacity-40"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Xóa model tải
+                  </button>
+                </div>
+                {modelPackProgress.total > 0 && modelCacheBusy && (
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-cyan-400 transition-all"
+                      style={{ width: `${Math.round((modelPackProgress.done / modelPackProgress.total) * 100)}%` }}
+                    />
+                  </div>
+                )}
+                <p className="mt-2 text-[10px] leading-snug text-slate-400">
+                  {modelCacheMessage || (persistentCacheSupported
+                    ? 'Model đã tải được dùng lại ở lần mở sau; game chỉ parse model khi thật sự cần.'
+                    : 'Trình duyệt này không cho lưu model lâu dài; game vẫn dùng cache HTTP bình thường.')}
+                </p>
+              </div>
 
               {/* Stats Bars */}
               <div className="flex flex-col gap-2 bg-slate-950/40 p-3 rounded-2xl border border-slate-800/60">

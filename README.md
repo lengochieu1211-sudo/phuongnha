@@ -119,3 +119,12 @@ Race scenery can now layer small real FBX props over the existing procedural wor
 - Adds police car/motorcycle, ambulance, tank, helicopter, Dodge WC-51, Spider, robots and character FBXs as selectable Garage/Race entries.
 - Fixes Capybara race direction by 180° and adds robust height-based framing for character racers.
 - Device-aware loading keeps the heaviest FBXs desktop-only.
+
+
+## V5.41 – Local Model Pack & On-Demand Cache
+- Large external FBX bytes now use persistent browser Cache Storage before Three.js parsing.
+- Garage adds controls to download the current 3D model, download a device-compatible model pack, and clear downloaded models.
+- The pack is device-aware: phone/TV do not automatically download desktop-only heavy FBXs.
+- Garage idle-prefetches neighboring compatible models only when Data Saver/2G is not active; prefetch warms raw bytes without parsing.
+- Model loading still uses procedural fallback when an external FBX is not permitted or fails.
+- This removes repeat network downloads; it does not hide the remaining ASCII-FBX parse cost. GLB/LOD remains the next recommended asset-format upgrade.

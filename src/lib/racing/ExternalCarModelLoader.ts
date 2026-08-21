@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { CarModelId, CarCustomization } from '../../types';
 import { Car3DInstance } from './Car3DBuilder';
+import { cacheModelAsset, getModelAssetArrayBuffer } from './ModelAssetCache';
 
 export interface ExternalCarHandle {
   root: THREE.Group;
@@ -400,6 +401,41 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
 
 };
 
+const EXTERNAL_ASSET_BYTES: Partial<Record<CarModelId, number>> = {
+  canis_mesa_3d: 3991186,
+  v12_sv_3d: 19918714,
+  roadster_883_3d: 6375849,
+  vespa_studio_3d: 23327246,
+  s14_sport_3d: 5629877,
+  rescue_truck_hauler_3d: 23224114,
+  xedap_city_3d: 16965468,
+  capybara_parade_3d: 512271,
+  police_car_3d: 144781,
+  police_motorcycle_3d: 303130,
+  ambulance_3d: 172739,
+  tank_racer_3d: 6865727,
+  helicopter_racer_3d: 192303,
+  dodge_wc51_3d: 20566268,
+  spider_racer_3d: 826248,
+  robot19_racer_3d: 4599167,
+  robot4_racer_3d: 8600673,
+  prime1_racer_3d: 12658169,
+  ironman_mark3_racer_3d: 22918540,
+  zora_nao_racer_3d: 23731404,
+  mark6_racer_3d: 6403050,
+  hulk_racer_3d: 3271278,
+  captain_racer_3d: 1842892,
+  knut_racer_3d: 1928334,
+  us_soldier_racer_3d: 949074,
+  human_racer_3d: 370281,
+  drag_driver_racer_3d: 2382246,
+};
+
+export function getExternalCarAssetBytes(ids?: CarModelId[]): number {
+  const source = ids || (Object.keys(EXTERNAL_CARS) as CarModelId[]);
+  return source.reduce((sum, id) => sum + (EXTERNAL_ASSET_BYTES[id] || 0), 0);
+}
+
 export function isExternalCar(modelId: CarModelId): boolean {
   return !!EXTERNAL_CARS[modelId];
 }
@@ -760,7 +796,7 @@ function createExternalLoadingManager(): THREE.LoadingManager {
   return manager;
 }
 
-function getExternalVehicleUrl(modelId: CarModelId): string | null {
+export function getExternalVehicleUrl(modelId: CarModelId): string | null {
   const cfg = EXTERNAL_CARS[modelId];
   if (!cfg) return null;
   const base = ((import.meta as any).env?.BASE_URL || '/');
@@ -774,17 +810,19 @@ function loadExternalTemplate(modelId: CarModelId): Promise<THREE.Group> | null 
   let cached = FBX_CACHE.get(url);
   if (!cached) {
     const loader = new FBXLoader(createExternalLoadingManager());
-    cached = new Promise<THREE.Group>((resolve, reject) => {
-      loader.load(
-        url,
-        resolve,
-        undefined,
-        (error) => {
-          FBX_CACHE.delete(url);
-          reject(error);
-        },
-      );
-    });
+    cached = getModelAssetArrayBuffer(url)
+      .then((buffer) => {
+        // Parse from locally cached bytes. `path` is retained for any embedded relative refs;
+        // external image refs are intentionally substituted by the LoadingManager fallback.
+        const resolved = typeof window !== 'undefined' ? new URL(url, window.location.href).href : url;
+        const slash = resolved.lastIndexOf('/');
+        const path = slash >= 0 ? resolved.slice(0, slash + 1) : '';
+        return loader.parse(buffer, path) as THREE.Group;
+      })
+      .catch((error) => {
+        FBX_CACHE.delete(url);
+        throw error;
+      });
     FBX_CACHE.set(url, cached);
   }
   return cached;
@@ -797,12 +835,23 @@ function loadExternalTemplate(modelId: CarModelId): Promise<THREE.Group> | null 
 export async function prefetchExternalCarAsset(modelId: CarModelId): Promise<boolean> {
   const url = getExternalVehicleUrl(modelId);
   if (!url) return false;
-  try {
-    const response = await fetch(url, { cache: 'force-cache' });
-    return response.ok;
-  } catch {
-    return false;
-  }
+  return cacheModelAsset(url);
+}
+
+/** IDs/URLs exposed to the Garage model-pack UI. */
+export function getExternalCarModelIds(): CarModelId[] {
+  return Object.keys(EXTERNAL_CARS) as CarModelId[];
+}
+
+export function getCompatibleExternalCarModelIds(deviceClass: DeviceClass): CarModelId[] {
+  return getExternalCarModelIds().filter((id) => shouldUseExternalCar(id, deviceClass));
+}
+
+export function getExternalCarAssetUrls(ids?: CarModelId[]): string[] {
+  const source = ids || getExternalCarModelIds();
+  return source
+    .map((id) => getExternalVehicleUrl(id))
+    .filter((url): url is string => Boolean(url));
 }
 
 /**

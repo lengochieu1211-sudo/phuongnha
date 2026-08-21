@@ -1,0 +1,272 @@
+{
+  "version": "5.41.0",
+  "cacheNamespace": "phuong-nha-model-assets-v5.41",
+  "entries": [
+    {
+      "id": "canis_mesa_3d",
+      "file": "assets/cars/canis-mesa-cronoz.fbx",
+      "policy": "tv_up",
+      "bytes": 3991186
+    },
+    {
+      "id": "v12_sv_3d",
+      "file": "assets/cars/v12-sv-supercar.fbx",
+      "policy": "desktop_only",
+      "bytes": 19918714
+    },
+    {
+      "id": "roadster_883_3d",
+      "file": "assets/cars/roadster-883-3d.fbx",
+      "policy": "tv_up",
+      "bytes": 6375849
+    },
+    {
+      "id": "vespa_studio_3d",
+      "file": "assets/cars/vespa-studio-3d.fbx",
+      "policy": "desktop_only",
+      "bytes": 23327246
+    },
+    {
+      "id": "s14_sport_3d",
+      "file": "assets/cars/s14-sport-coupe.fbx",
+      "policy": "tv_up",
+      "bytes": 5629877
+    },
+    {
+      "id": "rescue_truck_hauler_3d",
+      "file": "assets/cars/rescue-truck-hauler.fbx",
+      "policy": "desktop_only",
+      "bytes": 23224114
+    },
+    {
+      "id": "xedap_city_3d",
+      "file": "assets/cars/xedap-city-bike.fbx",
+      "policy": "desktop_only",
+      "bytes": 16965468
+    },
+    {
+      "id": "capybara_parade_3d",
+      "file": "assets/cars/capybara-lowpoly-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 512271
+    },
+    {
+      "id": "police_car_3d",
+      "file": "assets/scenery/police-car-static.fbx",
+      "policy": "all_devices",
+      "bytes": 144781
+    },
+    {
+      "id": "police_motorcycle_3d",
+      "file": "assets/vehicles-extra/police-motorcycle-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 303130
+    },
+    {
+      "id": "ambulance_3d",
+      "file": "assets/scenery/ambulance-static.fbx",
+      "policy": "all_devices",
+      "bytes": 172739
+    },
+    {
+      "id": "tank_racer_3d",
+      "file": "assets/scenery/tank-static-low.fbx",
+      "policy": "tv_up",
+      "bytes": 6865727
+    },
+    {
+      "id": "helicopter_racer_3d",
+      "file": "assets/scenery/helicopter-static.fbx",
+      "policy": "all_devices",
+      "bytes": 192303
+    },
+    {
+      "id": "dodge_wc51_3d",
+      "file": "assets/vehicles-extra/dodge-wc51-racer.fbx",
+      "policy": "desktop_only",
+      "bytes": 20566268
+    },
+    {
+      "id": "spider_racer_3d",
+      "file": "assets/racers-extra/spider-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 826248
+    },
+    {
+      "id": "robot19_racer_3d",
+      "file": "assets/racers-extra/robot19-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 4599167
+    },
+    {
+      "id": "robot4_racer_3d",
+      "file": "assets/racers-extra/robot4-racer.fbx",
+      "policy": "tv_up",
+      "bytes": 8600673
+    },
+    {
+      "id": "prime1_racer_3d",
+      "file": "assets/racers-extra/prime1-racer.fbx",
+      "policy": "desktop_only",
+      "bytes": 12658169
+    },
+    {
+      "id": "ironman_mark3_racer_3d",
+      "file": "assets/racers-extra/ironman-mark3-racer.fbx",
+      "policy": "desktop_only",
+      "bytes": 22918540
+    },
+    {
+      "id": "zora_nao_racer_3d",
+      "file": "assets/racers-extra/zora-nao-racer.fbx",
+      "policy": "desktop_only",
+      "bytes": 23731404
+    },
+    {
+      "id": "mark6_racer_3d",
+      "file": "assets/racers-extra/mark6-racer.fbx",
+      "policy": "tv_up",
+      "bytes": 6403050
+    },
+    {
+      "id": "hulk_racer_3d",
+      "file": "assets/racers-extra/hulk-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 3271278
+    },
+    {
+      "id": "captain_racer_3d",
+      "file": "assets/racers-extra/captain-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 1842892
+    },
+    {
+      "id": "knut_racer_3d",
+      "file": "assets/racers-extra/knut-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 1928334
+    },
+    {
+      "id": "us_soldier_racer_3d",
+      "file": "assets/racers-extra/us-soldier-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 949074
+    },
+    {
+      "id": "human_racer_3d",
+      "file": "assets/racers-extra/human-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 370281
+    },
+    {
+      "id": "drag_driver_racer_3d",
+      "file": "assets/racers-extra/drag-driver-racer.fbx",
+      "policy": "all_devices",
+      "bytes": 2382246
+    }
+  ],
+  "packs": {
+    "phone": {
+      "count": 13,
+      "bytes": 17494744,
+      "modelIds": [
+        "capybara_parade_3d",
+        "police_car_3d",
+        "police_motorcycle_3d",
+        "ambulance_3d",
+        "helicopter_racer_3d",
+        "spider_racer_3d",
+        "robot19_racer_3d",
+        "hulk_racer_3d",
+        "captain_racer_3d",
+        "knut_racer_3d",
+        "us_soldier_racer_3d",
+        "human_racer_3d",
+        "drag_driver_racer_3d"
+      ]
+    },
+    "tablet": {
+      "count": 19,
+      "bytes": 55361106,
+      "modelIds": [
+        "canis_mesa_3d",
+        "roadster_883_3d",
+        "s14_sport_3d",
+        "capybara_parade_3d",
+        "police_car_3d",
+        "police_motorcycle_3d",
+        "ambulance_3d",
+        "tank_racer_3d",
+        "helicopter_racer_3d",
+        "spider_racer_3d",
+        "robot19_racer_3d",
+        "robot4_racer_3d",
+        "mark6_racer_3d",
+        "hulk_racer_3d",
+        "captain_racer_3d",
+        "knut_racer_3d",
+        "us_soldier_racer_3d",
+        "human_racer_3d",
+        "drag_driver_racer_3d"
+      ]
+    },
+    "tv": {
+      "count": 19,
+      "bytes": 55361106,
+      "modelIds": [
+        "canis_mesa_3d",
+        "roadster_883_3d",
+        "s14_sport_3d",
+        "capybara_parade_3d",
+        "police_car_3d",
+        "police_motorcycle_3d",
+        "ambulance_3d",
+        "tank_racer_3d",
+        "helicopter_racer_3d",
+        "spider_racer_3d",
+        "robot19_racer_3d",
+        "robot4_racer_3d",
+        "mark6_racer_3d",
+        "hulk_racer_3d",
+        "captain_racer_3d",
+        "knut_racer_3d",
+        "us_soldier_racer_3d",
+        "human_racer_3d",
+        "drag_driver_racer_3d"
+      ]
+    },
+    "desktop": {
+      "count": 27,
+      "bytes": 218671029,
+      "modelIds": [
+        "canis_mesa_3d",
+        "v12_sv_3d",
+        "roadster_883_3d",
+        "vespa_studio_3d",
+        "s14_sport_3d",
+        "rescue_truck_hauler_3d",
+        "xedap_city_3d",
+        "capybara_parade_3d",
+        "police_car_3d",
+        "police_motorcycle_3d",
+        "ambulance_3d",
+        "tank_racer_3d",
+        "helicopter_racer_3d",
+        "dodge_wc51_3d",
+        "spider_racer_3d",
+        "robot19_racer_3d",
+        "robot4_racer_3d",
+        "prime1_racer_3d",
+        "ironman_mark3_racer_3d",
+        "zora_nao_racer_3d",
+        "mark6_racer_3d",
+        "hulk_racer_3d",
+        "captain_racer_3d",
+        "knut_racer_3d",
+        "us_soldier_racer_3d",
+        "human_racer_3d",
+        "drag_driver_racer_3d"
+      ]
+    }
+  }
+}
