@@ -34,8 +34,10 @@ import {
   getCompatibleExternalCarModelIds,
   getExternalCarAssetUrls,
   getExternalCarAssetBytes,
+  getExternalCarAssetBytesForId,
   getExternalVehicleUrl,
   prefetchExternalCarAsset,
+  shouldAutoPreviewExternalCar,
 } from '../../lib/racing/ExternalCarModelLoader';
 import {
   cacheModelAsset,
@@ -48,6 +50,7 @@ import {
   requestPersistentModelStorage,
 } from '../../lib/racing/ModelAssetCache';
 import { raceAudio } from '../../lib/racing/RaceAudio';
+import { isCharacterRacerModel, supportsAutomotiveSpoilerForModel } from '../../lib/racing/RacerVisualPolicy';
 import { resolveRacingGraphicsProfile, detectDeviceClass } from '../../utils/graphicsQuality';
 import {
   Sparkles,
@@ -154,10 +157,18 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const [modelCacheBusy, setModelCacheBusy] = useState(false);
   const [modelCacheMessage, setModelCacheMessage] = useState('');
   const [modelPackProgress, setModelPackProgress] = useState({ done: 0, total: 0 });
+  const [manualHdPreviewId, setManualHdPreviewId] = useState<CarModelId | null>(null);
   const persistentCacheSupported = useRef(supportsPersistentModelCache()).current;
   const compatibleExternalIds = getCompatibleExternalCarModelIds(actualDeviceClass);
   const compatibleExternalUrls = getExternalCarAssetUrls(compatibleExternalIds);
   const compatiblePackMiB = getExternalCarAssetBytes(compatibleExternalIds) / (1024 * 1024);
+  const currentExternalBytes = getExternalCarAssetBytesForId(currentCar.id);
+  const currentExternalMiB = currentExternalBytes / (1024 * 1024);
+  const currentExternalCompatible = isExternalCar(currentCar.id) && shouldUseExternalCar(currentCar.id, actualDeviceClass);
+  const currentAutoHdPreview = currentExternalCompatible && shouldAutoPreviewExternalCar(currentCar.id, actualDeviceClass);
+  const currentManualHdPreview = manualHdPreviewId === currentCar.id;
+  const supportsCurrentSpoiler = supportsAutomotiveSpoilerForModel(currentCar.id, currentCar.category);
+  const currentIsCharacterRacer = isCharacterRacerModel(currentCar.id);
 
   const refreshModelCacheStatus = async () => {
     const count = await getCachedModelCount(compatibleExternalUrls);
@@ -461,11 +472,15 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
       applyCameraForCar();
     };
 
-    const wantsExternal =
+    const externalCompatible =
       isExternalCar(currentCar.id) && shouldUseExternalCar(currentCar.id, actualDeviceClass);
+    const autoPreview = externalCompatible && shouldAutoPreviewExternalCar(currentCar.id, actualDeviceClass);
+    const wantsExternal = externalCompatible && (autoPreview || manualHdPreviewId === currentCar.id);
 
     if (!wantsExternal) {
-      // Procedural cars are ready immediately; no loading flash is needed.
+      // V5.42: large cached FBXs stay on the instant fallback while browsing. Cache Storage
+      // removes network latency but NOT the synchronous FBXLoader parse that caused the white
+      // flashes/stutters in the user's Garage video. Real HD is opt-in for heavy models.
       commitSwap();
     } else {
       // Let rapid swipes settle before starting an expensive ASCII-FBX parse.
@@ -478,6 +493,9 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
               return;
             }
             stagedExternalHandle = handle;
+            if (handle && manualHdPreviewId === currentCar.id) {
+              setModelCacheMessage(`Đã mở model 3D HD ${currentCar.name} ✓`);
+            }
             // If the external model cannot be used, the prepared procedural car is still valid.
             commitSwap();
           })
@@ -500,7 +518,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     };
     // currentCustomization intentionally does not trigger FBX reload; paint/parts use applyCustomization().
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentCar.id]);
+  }, [currentCar.id, manualHdPreviewId]);
 
   // Pointer drag listeners for 360 degree turntable rotation
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -562,8 +580,16 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   const handleSelectorWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     const strip = carSelectorRef.current;
     if (!strip) return;
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    if (delta !== 0) strip.scrollLeft += delta;
+    // A normal mouse-wheel gesture must continue scrolling the Garage page vertically.
+    // Only an actual horizontal wheel/trackpad gesture (or Shift+wheel) moves the model strip.
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      strip.scrollLeft += e.deltaX;
+      return;
+    }
+    if (e.shiftKey && e.deltaY !== 0) {
+      e.preventDefault();
+      strip.scrollLeft += e.deltaY;
+    }
   };
 
   const scrollCarSelector = (direction: -1 | 1) => {
@@ -678,7 +704,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   return (
     <div
       id="garage-showroom-screen"
-      className="relative w-full min-h-[100svh] bg-slate-950 text-white flex flex-col select-none overflow-x-hidden overflow-y-auto"
+      className="relative w-full h-[100svh] max-h-[100svh] bg-slate-950 text-white flex flex-col select-none overflow-x-hidden overflow-y-auto overscroll-y-contain"
     >
       {/* 1. TOP HEADER: Back, Currencies, Car Title */}
       <header className="relative z-30 flex items-center justify-between gap-2 p-2.5 sm:p-4 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
@@ -715,7 +741,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
       </header>
 
       {/* 2. MAIN 3D SHOWROOM & CAR SELECTOR */}
-      <div className="relative flex-1 flex flex-col md:flex-row items-stretch md:items-center justify-start md:justify-between p-2.5 sm:p-4 gap-3 md:gap-4 overflow-visible md:overflow-hidden">
+      <div className="relative flex-none md:flex-row flex flex-col items-stretch md:items-start justify-start md:justify-between p-2.5 sm:p-4 gap-3 md:gap-4 overflow-visible pb-8">
         {/* Left: 3D Turntable Viewport */}
         <div className="relative flex-none md:flex-1 w-full h-[46svh] min-h-[270px] max-h-[390px] md:h-[500px] md:min-h-0 md:max-h-none rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-gradient-to-b from-slate-900 to-slate-950">
           <div
@@ -965,7 +991,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                     {modelCacheCount}/{compatibleExternalUrls.length} đã tải
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <button
                     type="button"
                     onClick={downloadCurrentModel}
@@ -974,6 +1000,19 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                   >
                     {modelCacheBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
                     {currentModelCached ? 'Đã có model ✓' : 'Tải xe này'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!currentExternalCompatible) return;
+                      setModelCacheMessage(`Đang parse ${currentCar.name} HD từ ${currentModelCached ? 'bộ nhớ máy' : 'nguồn web'}…`);
+                      setManualHdPreviewId(currentCar.id);
+                    }}
+                    disabled={modelCacheBusy || !currentExternalCompatible || currentAutoHdPreview || currentManualHdPreview}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-950/30 px-2 py-2 text-[10px] font-bold text-violet-200 disabled:opacity-40"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {currentAutoHdPreview || currentManualHdPreview ? 'Đang dùng HD ✓' : `Xem HD${currentExternalMiB > 0 ? ` ${currentExternalMiB.toFixed(1)}MB` : ''}`}
                   </button>
                   <button
                     type="button"
@@ -1002,7 +1041,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
                 )}
                 <p className="mt-2 text-[10px] leading-snug text-slate-400">
                   {modelCacheMessage || (persistentCacheSupported
-                    ? 'Model đã tải được dùng lại ở lần mở sau; game chỉ parse model khi thật sự cần.'
+                    ? 'Model đã tải được dùng lại ở lần mở sau. Model lớn không tự parse khi lướt Garage; bấm Xem HD khi cần để tránh đứng hình.'
                     : 'Trình duyệt này không cho lưu model lâu dài; game vẫn dùng cache HTTP bình thường.')}
                 </p>
               </div>
@@ -1065,10 +1104,12 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
           {/* TAB 3: PARTS & ACCESSORIES */}
           {activeTab === 'parts' && (
             <div className="flex flex-col gap-3 overflow-y-auto max-h-[220px] pr-1">
-              {/* Spoilers: automotive-only. Two-wheel FBX/fallbacks must not render a floating car wing. */}
-              {currentCar.category === 'motorcycle' ? (
+              {/* Spoilers are automotive-only. Characters/robots/tank/helicopter/two-wheel racers never inherit a car wing. */}
+              {!supportsCurrentSpoiler ? (
                 <div className="rounded-xl border border-cyan-500/25 bg-cyan-950/25 px-3 py-2 text-[11px] font-bold text-cyan-200">
-                  🛵 Xe hai bánh không dùng cánh gió ô tô. Phần này được tắt để tránh vật thể lạ phía trước/sau model.
+                  {currentIsCharacterRacer
+                    ? '🧍 Nhân vật/robot không dùng cánh gió ô tô. Cản gió được tắt hoàn toàn cho model này.'
+                    : '🚫 Model này không dùng cánh gió ô tô. Phần cản gió được tắt để tránh vật thể thừa.'}
                 </div>
               ) : (
                 <>

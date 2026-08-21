@@ -128,3 +128,9 @@ Race scenery can now layer small real FBX props over the existing procedural wor
 - Garage idle-prefetches neighboring compatible models only when Data Saver/2G is not active; prefetch warms raw bytes without parsing.
 - Model loading still uses procedural fallback when an external FBX is not permitted or fails.
 - This removes repeat network downloads; it does not hide the remaining ASCII-FBX parse cost. GLB/LOD remains the next recommended asset-format upgrade.
+
+
+## V5.42 – All FBX orientation + Garage performance
+- Corrected verified forward axes for police car, police motorcycle, ambulance, helicopter, and Dodge WC-51.
+- Heavy cached FBX models no longer auto-parse while swiping Garage; HD preview is explicit.
+- Character/robot fallbacks no longer inherit automotive spoilers.

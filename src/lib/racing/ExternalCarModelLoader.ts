@@ -54,6 +54,19 @@ const WHITE_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z7iEAAAAASUVORK5CYII=';
 
 const FBX_CACHE = new Map<string, Promise<THREE.Group>>();
+const FBX_CACHE_ORDER: string[] = [];
+const MAX_PARSED_FBX_TEMPLATES = 4;
+
+function touchParsedTemplate(url: string) {
+  const existing = FBX_CACHE_ORDER.indexOf(url);
+  if (existing >= 0) FBX_CACHE_ORDER.splice(existing, 1);
+  FBX_CACHE_ORDER.push(url);
+  while (FBX_CACHE_ORDER.length > MAX_PARSED_FBX_TEMPLATES) {
+    const evict = FBX_CACHE_ORDER.shift();
+    if (evict && evict !== url) FBX_CACHE.delete(evict);
+  }
+}
+
 
 const DEFAULT_PAINT_MATERIAL_RE =
   /body|paint|carroz|carroceria|fairing|tank|serb|frontcolor|biancospino|color[_ ]|_color/;
@@ -195,7 +208,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   police_car_3d: {
     file: 'assets/scenery/police-car-static.fbx',
     targetLength: 4.35,
-    forwardAxis: '+z',
+    // V5.42 geometry audit: vehicle length is X; Brake_Light_Red polygons sit at max +X, so nose is -X.
+    forwardAxis: '-x',
     kind: 'car',
     policy: 'all_devices',
     rideHeight: 0.11,
@@ -205,7 +219,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   police_motorcycle_3d: {
     file: 'assets/vehicles-extra/police-motorcycle-racer.fbx',
     targetLength: 2.25,
-    forwardAxis: '+z',
+    // V5.42 verified from named nodes: headlights at X≈2.44, tail lights at X≈4.0 => forward is -X.
+    forwardAxis: '-x',
     kind: 'motorcycle',
     policy: 'all_devices',
     rideHeight: 0.09,
@@ -215,7 +230,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   ambulance_3d: {
     file: 'assets/scenery/ambulance-static.fbx',
     targetLength: 5.25,
-    forwardAxis: '+z',
+    // V5.42 geometry/material audit: front-color geometry is at the min-X nose; length axis is X.
+    forwardAxis: '-x',
     kind: 'car',
     policy: 'all_devices',
     rideHeight: 0.13,
@@ -235,7 +251,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   helicopter_racer_3d: {
     file: 'assets/scenery/helicopter-static.fbx',
     targetLength: 5.7,
-    forwardAxis: '+z',
+    // V5.42 side-profile audit: cockpit/nose is at the -X end and tail boom extends toward +X.
+    forwardAxis: '-x',
     kind: 'car',
     policy: 'all_devices',
     // Hover above the road while the race root follows the track.
@@ -246,7 +263,8 @@ const EXTERNAL_CARS: Partial<Record<CarModelId, ExternalVehicleConfig>> = {
   dodge_wc51_3d: {
     file: 'assets/vehicles-extra/dodge-wc51-racer.fbx',
     targetLength: 5.1,
-    forwardAxis: '+z',
+    // V5.42 named-node audit: farol1/farol2 are at Z≈-3.95, therefore the WC-51 nose is -Z.
+    forwardAxis: '-z',
     kind: 'car',
     policy: 'desktop_only',
     rideHeight: 0.16,
@@ -434,6 +452,23 @@ const EXTERNAL_ASSET_BYTES: Partial<Record<CarModelId, number>> = {
 export function getExternalCarAssetBytes(ids?: CarModelId[]): number {
   const source = ids || (Object.keys(EXTERNAL_CARS) as CarModelId[]);
   return source.reduce((sum, id) => sum + (EXTERNAL_ASSET_BYTES[id] || 0), 0);
+}
+
+export function getExternalCarAssetBytesForId(modelId: CarModelId): number {
+  return EXTERNAL_ASSET_BYTES[modelId] || 0;
+}
+
+/**
+ * Garage should not synchronously parse every cached ASCII FBX while the user swipes.
+ * Local Cache Storage removes network time, not FBXLoader CPU parse time. Auto-preview
+ * only genuinely small assets; larger models stay on an instant procedural preview until
+ * the player explicitly asks for 3D HD or starts the race.
+ */
+export function shouldAutoPreviewExternalCar(modelId: CarModelId, deviceClass: DeviceClass): boolean {
+  if (!shouldUseExternalCar(modelId, deviceClass)) return false;
+  const bytes = getExternalCarAssetBytesForId(modelId);
+  const limit = deviceClass === 'desktop' ? 2_500_000 : deviceClass === 'tv' || deviceClass === 'tablet' ? 1_500_000 : 1_000_000;
+  return bytes > 0 && bytes <= limit;
 }
 
 export function isExternalCar(modelId: CarModelId): boolean {
@@ -764,6 +799,9 @@ function buildNamedWheelRig(
 
 function disposeObject(root: THREE.Object3D) {
   root.traverse((obj: any) => {
+    // Geometry is shared with the CPU template, but dispose() only releases renderer GPU buffers;
+    // Three.js can upload it again later. This prevents Garage model swaps from accumulating VRAM.
+    obj.geometry?.dispose?.();
     const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
     mats.forEach((m: any) => {
       m.map?.dispose?.();
@@ -808,6 +846,7 @@ function loadExternalTemplate(modelId: CarModelId): Promise<THREE.Group> | null 
   if (!url) return null;
 
   let cached = FBX_CACHE.get(url);
+  if (cached) touchParsedTemplate(url);
   if (!cached) {
     const loader = new FBXLoader(createExternalLoadingManager());
     cached = getModelAssetArrayBuffer(url)
@@ -821,9 +860,12 @@ function loadExternalTemplate(modelId: CarModelId): Promise<THREE.Group> | null 
       })
       .catch((error) => {
         FBX_CACHE.delete(url);
+        const idx = FBX_CACHE_ORDER.indexOf(url);
+        if (idx >= 0) FBX_CACHE_ORDER.splice(idx, 1);
         throw error;
       });
     FBX_CACHE.set(url, cached);
+    touchParsedTemplate(url);
   }
   return cached;
 }

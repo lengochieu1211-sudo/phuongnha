@@ -4,6 +4,7 @@ import { RacingTrackConfig } from '../../types';
 import { RaceEngine } from './RaceEngine';
 import { getInterpolatedTrackPoint } from './TrackData';
 import { GraphicsProfile } from '../../utils/graphicsQuality';
+import { getModelAssetArrayBuffer } from './ModelAssetCache';
 
 export interface FbxSceneryHandle {
   root: THREE.Group;
@@ -12,10 +13,13 @@ export interface FbxSceneryHandle {
 
 type ScenicAssetId = 'pine' | 'tank' | 'police' | 'ambulance' | 'helicopter';
 
+type ScenicForwardAxis = '+x' | '-x' | '+z' | '-z';
+
 interface ScenicAssetConfig {
   file: string;
   scaleMode: 'height' | 'length';
   targetSize: number;
+  forwardAxis?: ScenicForwardAxis;
   yawOffset?: number;
 }
 
@@ -24,10 +28,11 @@ const WHITE_PIXEL =
 
 const SCENIC_ASSETS: Record<ScenicAssetId, ScenicAssetConfig> = {
   pine: { file: 'assets/scenery/pine-tree-low.fbx', scaleMode: 'height', targetSize: 7.2 },
-  tank: { file: 'assets/scenery/tank-static-low.fbx', scaleMode: 'length', targetSize: 6.2 },
-  police: { file: 'assets/scenery/police-car-static.fbx', scaleMode: 'length', targetSize: 4.35 },
-  ambulance: { file: 'assets/scenery/ambulance-static.fbx', scaleMode: 'length', targetSize: 5.1 },
-  helicopter: { file: 'assets/scenery/helicopter-static.fbx', scaleMode: 'length', targetSize: 8.5 },
+  // Tank source has no semantic front/back nodes; retain the existing +Z orientation rather than guessing.
+  tank: { file: 'assets/scenery/tank-static-low.fbx', scaleMode: 'length', targetSize: 6.2, forwardAxis: '+z' },
+  police: { file: 'assets/scenery/police-car-static.fbx', scaleMode: 'length', targetSize: 4.35, forwardAxis: '-x' },
+  ambulance: { file: 'assets/scenery/ambulance-static.fbx', scaleMode: 'length', targetSize: 5.1, forwardAxis: '-x' },
+  helicopter: { file: 'assets/scenery/helicopter-static.fbx', scaleMode: 'length', targetSize: 8.5, forwardAxis: '-x' },
 };
 
 function createManager() {
@@ -44,7 +49,21 @@ async function loadAsset(id: ScenicAssetId): Promise<THREE.Group> {
   const base = ((import.meta as any).env?.BASE_URL || '/');
   const url = `${base}${cfg.file}`;
   const loader = new FBXLoader(createManager());
-  return await new Promise<THREE.Group>((resolve, reject) => loader.load(url, resolve, undefined, reject));
+  const buffer = await getModelAssetArrayBuffer(url);
+  const resolved = typeof window !== 'undefined' ? new URL(url, window.location.href).href : url;
+  const slash = resolved.lastIndexOf('/');
+  const path = slash >= 0 ? resolved.slice(0, slash + 1) : '';
+  return loader.parse(buffer, path) as THREE.Group;
+}
+
+function scenicForwardYaw(axis?: ScenicForwardAxis): number {
+  switch (axis) {
+    case '+z': return 0;
+    case '-z': return Math.PI;
+    case '+x': return -Math.PI / 2;
+    case '-x': return Math.PI / 2;
+    default: return 0;
+  }
 }
 
 function normalizeModel(model: THREE.Group, cfg: ScenicAssetConfig) {
@@ -67,6 +86,8 @@ function normalizeModel(model: THREE.Group, cfg: ScenicAssetConfig) {
     obj.material = Array.isArray(obj.material) ? next : next[0];
   });
 
+  // Normalize the source's verified forward axis once; track placement can then assume local +Z.
+  model.rotation.y = scenicForwardYaw(cfg.forwardAxis);
   model.updateWorldMatrix(true, true);
   let box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());

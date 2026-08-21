@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { CarModelId, CarCustomization } from '../../types';
+import { isCharacterRacerModel, supportsAutomotiveSpoilerForModel } from './RacerVisualPolicy';
 
 
 interface CarBodyProfile {
@@ -621,13 +622,7 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
   // 5. Spoiler Group
   // V5.25: motorcycle/bicycle procedural fallbacks must never inherit an automotive
   // rear wing. On XEDAP this looked exactly like a detached table in front of the bike.
-  const supportsAutomotiveSpoiler = ![
-    'roadster_883_3d', 'vespa_studio_3d', 'xedap_city_3d',
-    'police_motorcycle_3d', 'tank_racer_3d', 'helicopter_racer_3d',
-    'spider_racer_3d', 'robot19_racer_3d', 'robot4_racer_3d', 'prime1_racer_3d',
-    'ironman_mark3_racer_3d', 'zora_nao_racer_3d', 'mark6_racer_3d',
-    'hulk_racer_3d', 'captain_racer_3d', 'knut_racer_3d', 'us_soldier_racer_3d', 'human_racer_3d', 'drag_driver_racer_3d',
-  ].includes(modelId);
+  const supportsAutomotiveSpoiler = supportsAutomotiveSpoilerForModel(modelId);
   const spoilerGroup = new THREE.Group();
   if (supportsAutomotiveSpoiler) {
     rebuildSpoiler(spoilerGroup, initialCustom.spoilerStyle, carbonMaterial, chromeMaterial);
@@ -811,6 +806,30 @@ export function buildCar3D(modelId: CarModelId, initialCustom: CarCustomization,
       nitroLight.intensity = 0;
     }
   };
+
+  // V5.42: if a character/robot FBX is too heavy for this device (or while HD is not
+  // explicitly parsed in Garage), show a lightweight humanoid runner rather than a car body.
+  // This also guarantees there is never an automotive spoiler attached to a person.
+  if (isCharacterRacerModel(modelId)) {
+    root.children.forEach((child) => { child.visible = false; });
+    const runner = new THREE.Group();
+    runner.name = 'ProceduralCharacterRacerFallback';
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xf0c8a0, roughness: 0.72, metalness: 0.02 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x172033, roughness: 0.68, metalness: 0.08 });
+    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.62, 6, 12), bodyMaterial);
+    torso.position.y = 1.05;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 18, 14), skinMat);
+    head.position.y = 1.72;
+    const hip = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.20, 0.25), darkMat);
+    hip.position.y = 0.66;
+    const limbGeo = new THREE.CapsuleGeometry(0.075, 0.48, 5, 10);
+    const armL = new THREE.Mesh(limbGeo, bodyMaterial); armL.position.set(-0.36, 1.08, 0); armL.rotation.z = -0.22;
+    const armR = armL.clone(); armR.position.x = 0.36; armR.rotation.z = 0.22;
+    const legL = new THREE.Mesh(limbGeo, darkMat); legL.position.set(-0.14, 0.36, 0); legL.rotation.z = -0.05;
+    const legR = legL.clone(); legR.position.x = 0.14; legR.rotation.z = 0.05;
+    runner.add(torso, head, hip, armL, armR, legL, legR);
+    root.add(runner);
+  }
 
   const applyCustomization = (custom: CarCustomization) => {
     bodyMaterial.color.set(custom.paintColor || '#ef4444');
