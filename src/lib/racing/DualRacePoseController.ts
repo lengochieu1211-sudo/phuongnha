@@ -141,10 +141,10 @@ class DualRacePoseController {
 
   async start(video: HTMLVideoElement): Promise<boolean> {
     this.video = video;
-    this.attachKeyboardFallback();
     // Reuse the two light Pose instances between Duo Setup -> Track Select -> Race.
     // Recreating WASM/model state during 3-2-1 caused a visible hitch on TV boxes.
     if (this.poseP1 && this.poseP2) {
+      this.attachKeyboardFallback();
       this.running = true;
       this.lastInference = 0;
       if (this.raf === null) this.loop();
@@ -154,6 +154,7 @@ class DualRacePoseController {
     this.stop();
     this.video = video;
     this.running = true;
+    this.attachKeyboardFallback();
     try {
       await this.ensurePoseScript();
       if (!this.running || !(window as any).Pose) return false;
