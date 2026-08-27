@@ -67,12 +67,18 @@ export function DuoRaceSetup(props: Props) {
 
         {lowDevice && <div className="mt-4 flex gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-xs text-amber-100"><AlertTriangle className="w-5 h-5 shrink-0"/><span>Thiết bị {props.deviceClass === 'tv' ? 'Android TV/Mi Box' : 'điện thoại'} sẽ tự giảm DPR, shadow, particle và pose inference khi chơi 2 người. FBX nặng dùng fallback nhẹ để giữ FPS.</span></div>}
 
-        <button onClick={props.onContinue} disabled={!props.p1Detected || !props.p2Detected} className={`mt-5 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2 ${props.p1Detected && props.p2Detected ? 'bg-gradient-to-r from-cyan-400 via-violet-500 to-pink-500 text-white shadow-xl' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}>
-          <Play className="w-5 h-5 fill-current"/> {props.p1Detected && props.p2Detected ? 'TIẾP TỤC CHỌN ĐƯỜNG ĐUA' : 'CẦN THẤY CẢ P1 VÀ P2'}
+        {(!props.p1Detected || !props.p2Detected) && (
+          <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-xs font-bold text-amber-100">
+            Camera chưa nhận đủ 2 người. Vẫn có thể vào đua: người chưa được nhận sẽ dùng auto-throttle + phím dự phòng, và tự chuyển lại cử chỉ ngay khi MediaPipe nhận được.
+            <div className="mt-2 text-[10px] text-amber-200/80">P1: A/D lái · S phanh · Shift trái/Space Nitro · P2: ←/→ lái · ↓ phanh · Shift phải/Enter/Numpad0 Nitro</div>
+          </div>
+        )}
+        <button onClick={props.onContinue} className="mt-5 w-full rounded-2xl py-4 font-black flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-400 via-violet-500 to-pink-500 text-white shadow-xl active:scale-[0.99]">
+          <Play className="w-5 h-5 fill-current"/> {props.p1Detected && props.p2Detected ? 'TIẾP TỤC CHỌN ĐƯỜNG ĐUA' : 'TIẾP TỤC · CÓ FALLBACK'}
         </button>
         {(!props.p1Detected || !props.p2Detected) && (
           <button onClick={props.onSwitchToSolo} className="mt-2 w-full rounded-2xl border border-white/15 bg-white/5 py-3 text-xs font-black text-slate-200 hover:bg-white/10">
-            Không có webcam / thiếu người? Chuyển sang 1 người
+            Muốn chơi nhẹ hơn? Chuyển sang 1 người
           </button>
         )}
       </div>
