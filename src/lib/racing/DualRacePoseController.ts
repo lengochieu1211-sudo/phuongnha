@@ -75,10 +75,64 @@ class DualRacePoseController {
   private fpsStarted = performance.now();
   private lastPlayers: [DualRacePosePlayer, DualRacePosePlayer] = [emptyPlayer(1), emptyPlayer(2)];
   private lastSeenAt: [number, number] = [0, 0];
+  private fallbackKeys = new Set<string>();
+  private keyboardListenersAttached = false;
   private state: [PlayerSmoothingState, PlayerSmoothingState] = [
     { landmarks: [], baselineShoulderY: 0.44, baselineReady: false, lastGesture: 'standing', gestureCandidate: 'standing', hold: 0 },
     { landmarks: [], baselineShoulderY: 0.44, baselineReady: false, lastGesture: 'standing', gestureCandidate: 'standing', hold: 0 },
   ];
+
+  private handleKeyDown = (event: KeyboardEvent) => {
+    this.fallbackKeys.add(event.code);
+  };
+
+  private handleKeyUp = (event: KeyboardEvent) => {
+    this.fallbackKeys.delete(event.code);
+  };
+
+  private attachKeyboardFallback() {
+    if (this.keyboardListenersAttached || typeof window === 'undefined') return;
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
+    this.keyboardListenersAttached = true;
+  }
+
+  private detachKeyboardFallback() {
+    if (!this.keyboardListenersAttached || typeof window === 'undefined') return;
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
+    this.keyboardListenersAttached = false;
+    this.fallbackKeys.clear();
+  }
+
+  private fallbackPlayer(id: 1 | 2): DualRacePosePlayer {
+    // Duo Setup still reports real camera detection. During an active race, a
+    // camera/CDN/WASM failure must never hard-brake the local racer indefinitely.
+    const inRace = typeof document !== 'undefined' && !!document.getElementById('in-race-viewport');
+    if (!inRace) return emptyPlayer(id);
+
+    const keys = this.fallbackKeys;
+    const left = id === 1 ? keys.has('KeyA') : keys.has('ArrowLeft');
+    const right = id === 1 ? keys.has('KeyD') : keys.has('ArrowRight');
+    const brake = id === 1 ? keys.has('KeyS') : keys.has('ArrowDown');
+    const nitro = id === 1
+      ? (keys.has('ShiftLeft') || keys.has('Space'))
+      : (keys.has('ShiftRight') || keys.has('Enter') || keys.has('Numpad0'));
+    const steer = Math.max(-1, Math.min(1, (left ? -1 : 0) + (right ? 1 : 0)));
+
+    return {
+      ...emptyPlayer(id),
+      bodyDetected: true,
+      confidence: 0,
+      steeringAngleDeg: steer * 35,
+      steeringNormalized: steer,
+      gesture: nitro ? 'both_arms_up' : brake ? 'duck' : 'standing',
+    };
+  }
+
+  private emitFallbackHeartbeat() {
+    this.emit([this.fallbackPlayer(1), this.fallbackPlayer(2)]);
+  }
 
   addListener(listener: Listener) {
     this.listeners.add(listener);
@@ -87,6 +141,7 @@ class DualRacePoseController {
 
   async start(video: HTMLVideoElement): Promise<boolean> {
     this.video = video;
+    this.attachKeyboardFallback();
     // Reuse the two light Pose instances between Duo Setup -> Track Select -> Race.
     // Recreating WASM/model state during 3-2-1 caused a visible hitch on TV boxes.
     if (this.poseP1 && this.poseP2) {
@@ -107,10 +162,12 @@ class DualRacePoseController {
       this.loop();
       return true;
     } catch (err) {
-      console.warn('Dual race pose unavailable:', err);
-      this.running = false;
-      this.emit([emptyPlayer(1), emptyPlayer(2)]);
-      return false;
+      console.warn('Dual race pose unavailable; keyboard fallback remains active:', err);
+      this.running = true;
+      this.poseP1 = null;
+      this.poseP2 = null;
+      this.loop();
+      return true;
     }
   }
 
@@ -136,6 +193,7 @@ class DualRacePoseController {
     try { p2?.close?.(); } catch {}
     this.latestRaw = [null, null];
     this.lastPlayers = [emptyPlayer(1), emptyPlayer(2)];
+    this.detachKeyboardFallback();
     this.lastSeenAt = [0, 0];
     this.state.forEach((s) => {
       s.landmarks = [];
@@ -195,15 +253,19 @@ class DualRacePoseController {
     const now = performance.now();
     if (!this.processing && now - this.lastInference >= interval) {
       this.lastInference = now;
-      void this.processFrame();
+      if (!this.poseP1 || !this.poseP2) this.emitFallbackHeartbeat();
+      else void this.processFrame();
     }
     this.raf = requestAnimationFrame(this.loop);
   };
 
   private async processFrame() {
     const video = this.video;
-    if (!this.running || !video || video.readyState < 2 || video.videoWidth <= 0 || video.videoHeight <= 0) return;
-    if (!this.poseP1 || !this.poseP2) return;
+    if (!this.running) return;
+    if (!video || video.readyState < 2 || video.videoWidth <= 0 || video.videoHeight <= 0 || !this.poseP1 || !this.poseP2) {
+      this.emitFallbackHeartbeat();
+      return;
+    }
     this.processing = true;
     try {
       const vw = video.videoWidth;
@@ -263,7 +325,7 @@ class DualRacePoseController {
       if (last.bodyDetected && performance.now() - this.lastSeenAt[stateIndex] < 550) {
         return { ...last, steeringNormalized: last.steeringNormalized * 0.92, steeringAngleDeg: last.steeringAngleDeg * 0.92 };
       }
-      return emptyPlayer(id);
+      return this.fallbackPlayer(id);
     }
     const mapped: PoseLandmark[] = raw.map((lm: any) => {
       const globalRawX = (cropX + lm.x * cropW) / sourceW;
