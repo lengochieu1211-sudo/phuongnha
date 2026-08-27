@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Play, Camera, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, Play, Camera, AlertTriangle } from 'lucide-react';
 import { CarModelId, PlayerRaceProfile } from '../../types';
 import { CAR_CATALOG } from '../../lib/racing/CarData';
 import { DeviceClass } from '../../utils/graphicsQuality';
