@@ -1,0 +1,103 @@
+name: V5.43 Release Gate Apply
+
+on:
+  push:
+    branches: ["release/v5.43-release-gate-upload"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: "v543-release-gate"
+  cancel-in-progress: false
+
+jobs:
+  certify-and-apply:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release payload
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify audited payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/v543
+          cat .release/v5.43/part-* | tr -d '\r\n ' > /tmp/v543/source.patch.gz.b64
+          cp .release/v5.43/useManagedTimeout.ts.b64 /tmp/v543/
+          cp .release/v5.43/releaseGateStatic.mjs.b64 /tmp/v543/
+          cp .release/v5.43/final-sha256.txt /tmp/v543/
+          base64 -d /tmp/v543/source.patch.gz.b64 > /tmp/v543/source.patch.gz
+          echo "0f76118539b798c95af2972b19c8a4cd357fb75d3e2fb48dd2c3c6dda88a6186  /tmp/v543/source.patch.gz" | sha256sum -c -
+          gzip -dc /tmp/v543/source.patch.gz > /tmp/v543/source.patch
+          echo "0c2c3423955d6666d1e0750353f251d83ed131ff50077b9723641cc903f771dd  /tmp/v543/source.patch" | sha256sum -c -
+          base64 -d /tmp/v543/useManagedTimeout.ts.b64 > /tmp/v543/useManagedTimeout.ts
+          echo "e91ec16bccd42ae07cc7a1d019a552829934e3ad4d1a60cc99e92a09be7186d4  /tmp/v543/useManagedTimeout.ts" | sha256sum -c -
+          base64 -d /tmp/v543/releaseGateStatic.mjs.b64 > /tmp/v543/releaseGateStatic.mjs
+          echo "f85f88db947d35be462dfca7ddbae542dd01c8df65ec51459d10571d05024632  /tmp/v543/releaseGateStatic.mjs" | sha256sum -c -
+
+      - name: Apply V5.43 on latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B v543-apply origin/main
+          git apply --3way /tmp/v543/source.patch
+          mkdir -p src/hooks src/scripts
+          install -m 0644 /tmp/v543/useManagedTimeout.ts src/hooks/useManagedTimeout.ts
+          install -m 0644 /tmp/v543/releaseGateStatic.mjs src/scripts/releaseGateStatic.mjs
+          sha256sum -c /tmp/v543/final-sha256.txt
+          git diff --check
+          test ! -e node_modules
+          test ! -e dist
+          test ! -e .git/index.lock
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Static release gate before dependencies
+        run: node src/scripts/releaseGateStatic.mjs
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund --no-package-lock
+
+      - name: TypeScript, assets, voice and release checks
+        run: npm run check
+
+      - name: Build Vite app
+        run: npm run build -- --base=/phuongnha/
+
+      - name: Verify source tree after build
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c /tmp/v543/final-sha256.txt
+          git diff --check
+          test ! -e package-lock.json
+          git status --short
+
+      - name: Commit certified source to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json vite.config.ts src
+          if git diff --cached --quiet; then
+            echo "Main already matches audited V5.43 source."
+          else
+            git commit -m "v5.43 release gate 2P lifecycle and regression fixes"
+            git push origin HEAD:main
+          fi
+
+      - name: Dispatch main CI certification without deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref main
