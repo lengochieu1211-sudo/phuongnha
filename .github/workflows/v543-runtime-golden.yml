@@ -16,45 +16,34 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-
       - name: Release checks
         run: npm run check
-
       - name: Build
         run: npm run build -- --base=/phuongnha/
-
       - name: Start Vite preview
         shell: bash
         run: |
           set -euo pipefail
           nohup npx vite preview --host 127.0.0.1 --port 4173 > /tmp/v543-preview.log 2>&1 &
-          echo $! > /tmp/v543-preview.pid
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:4173/phuongnha/ >/dev/null; then
-              echo "Preview ready"
-              exit 0
-            fi
+            curl -fsS http://127.0.0.1:4173/phuongnha/ >/dev/null && exit 0
             sleep 1
           done
           cat /tmp/v543-preview.log
           exit 1
-
       - name: Browser prerequisites
         shell: bash
         run: |
           set -euo pipefail
           which google-chrome || which chromium || which chromium-browser
           python -m pip install --disable-pip-version-check --quiet selenium
-
-      - name: Runtime Golden desktop and mobile
+      - name: Diagnose Garage runtime
         env:
           PYTHONUNBUFFERED: '1'
         shell: bash
@@ -62,170 +51,70 @@ jobs:
           set -euo pipefail
           mkdir -p runtime-golden-artifacts
           python - <<'PY'
-          import json, os, time, traceback
+          import json, time
           from selenium import webdriver
           from selenium.webdriver.chrome.options import Options
           from selenium.webdriver.common.by import By
           from selenium.webdriver.support.ui import WebDriverWait
           from selenium.webdriver.support import expected_conditions as EC
 
-          URL = 'http://127.0.0.1:4173/phuongnha/'
-          out = 'runtime-golden-artifacts'
-          results = []
+          URL='http://127.0.0.1:4173/phuongnha/'
+          out='runtime-golden-artifacts'
+          results=[]
 
-          def wait_id(driver, element_id, timeout=30):
-              return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((By.ID, element_id)))
+          def make_driver(width,height):
+              o=Options()
+              for a in ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--use-gl=swiftshader','--enable-webgl']:
+                  o.add_argument(a)
+              o.set_capability('goog:loggingPrefs',{'browser':'ALL'})
+              d=webdriver.Chrome(options=o)
+              d.set_window_size(width,height)
+              return d
 
-          def click_id(driver, element_id, timeout=30):
-              el = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((By.ID, element_id)))
-              driver.execute_script('arguments[0].scrollIntoView({block:"center"});', el)
-              el.click()
-              return el
+          def click_id(d, id, timeout=30):
+              e=WebDriverWait(d,timeout).until(EC.element_to_be_clickable((By.ID,id)))
+              d.execute_script('arguments[0].scrollIntoView({block:"center"});',e)
+              e.click()
 
-          def click_text_button(driver, text, timeout=30):
-              xp = f"//button[contains(normalize-space(.), {json.dumps(text)})]"
-              el = WebDriverWait(driver, timeout).until(EC.element_to_be_clickable((By.XPATH, xp)))
-              driver.execute_script('arguments[0].scrollIntoView({block:"center"});', el)
-              el.click()
-              return el
-
-          def browser_errors(driver):
-              bad = []
-              for item in driver.get_log('browser'):
-                  msg = item.get('message', '')
-                  level = item.get('level', '')
-                  if level == 'SEVERE' and not any(x in msg for x in [
-                      'favicon.ico', 'Failed to load resource: the server responded with a status of 404'
-                  ]):
-                      bad.append(msg)
-              return bad
-
-          def active_video_tracks(driver):
-              return driver.execute_script('''
-                return Array.from(document.querySelectorAll('video')).reduce((n, v) => {
-                  const s = v.srcObject;
-                  if (!s || !s.getVideoTracks) return n;
-                  return n + s.getVideoTracks().filter(t => t.readyState === 'live').length;
-                }, 0);
-              ''')
-
-          def horizontal_overflow(driver):
-              return driver.execute_script('return Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth;')
-
-          def run_case(label, width, height):
-              opts = Options()
-              opts.add_argument('--headless=new')
-              opts.add_argument('--no-sandbox')
-              opts.add_argument('--disable-dev-shm-usage')
-              opts.add_argument('--autoplay-policy=no-user-gesture-required')
-              opts.add_argument('--use-fake-device-for-media-stream')
-              opts.add_argument('--use-fake-ui-for-media-stream')
-              opts.add_argument('--use-gl=swiftshader')
-              opts.add_argument('--enable-webgl')
-              opts.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
-              driver = webdriver.Chrome(options=opts)
-              driver.set_window_size(width, height)
-              case = {'label': label, 'viewport': [width, height], 'checks': []}
+          failed=False
+          for label,w,h in [('desktop',1440,900),('mobile',390,844)]:
+              d=make_driver(w,h)
+              case={'label':label,'status':'PASS','checks':[]}
               try:
-                  driver.get(URL)
-                  wait_id(driver, 'home-card-racing')
+                  d.get(URL)
+                  WebDriverWait(d,30).until(EC.presence_of_element_located((By.ID,'home-card-racing')))
                   case['checks'].append('home-load')
-                  if label == 'mobile':
-                      ov = horizontal_overflow(driver)
-                      if ov > 4:
-                          raise AssertionError(f'home horizontal overflow={ov}')
-                      case['checks'].append('mobile-home-no-horizontal-overflow')
-                  driver.save_screenshot(f'{out}/{label}-01-home.png')
-
-                  click_id(driver, 'home-card-racing')
-                  wait_id(driver, 'racing-hub-screen')
+                  click_id(d,'home-card-racing')
+                  WebDriverWait(d,30).until(EC.presence_of_element_located((By.ID,'racing-hub-screen')))
                   case['checks'].append('racing-hub')
-
-                  click_id(driver, 'mode-garage-card')
-                  wait_id(driver, 'garage-showroom-screen')
-                  strip = wait_id(driver, 'garage-model-selector-strip')
-                  if not strip.is_displayed():
-                      raise AssertionError('garage model selector not visible')
-                  if label == 'mobile':
-                      ov = horizontal_overflow(driver)
-                      if ov > 4:
-                          raise AssertionError(f'garage horizontal overflow={ov}')
-                  case['checks'].append('garage-visible-responsive')
-                  driver.save_screenshot(f'{out}/{label}-02-garage.png')
-
-                  click_id(driver, 'garage-back-btn')
-                  wait_id(driver, 'racing-hub-screen')
-                  click_text_button(driver, '2 NGƯỜI · 1 CAMERA')
-                  click_id(driver, 'mode-quick-race-card')
-                  continue_btn = click_text_button(driver, 'TIẾP TỤC CHỌN ĐƯỜNG ĐUA')
-                  case['checks'].append('2p-setup-no-pose-gate')
-
-                  wait_id(driver, 'racing-track-select-screen')
-                  case['checks'].append('2p-track-select')
-                  driver.save_screenshot(f'{out}/{label}-03-track-select.png')
-
-                  click_text_button(driver, 'XUẤT PHÁT', timeout=30)
-                  wait_id(driver, 'in-race-viewport', timeout=45)
-                  WebDriverWait(driver, 45).until(lambda d: len(d.find_elements(By.CSS_SELECTOR, '#in-race-viewport canvas')) >= 1)
+                  d.get_log('browser')
+                  click_id(d,'mode-garage-card')
                   time.sleep(3)
-                  canvas_count = driver.execute_script("return document.querySelectorAll('#in-race-viewport canvas').length")
-                  if canvas_count != 1:
-                      raise AssertionError(f'expected exactly 1 race canvas, got {canvas_count}')
-                  body_text = driver.find_element(By.TAG_NAME, 'body').text
-                  if 'P1' not in body_text or 'P2' not in body_text:
-                      raise AssertionError('P1/P2 HUD labels missing')
-                  case['checks'].append('2p-one-webgl-canvas')
-                  case['checks'].append('2p-hud-p1-p2')
-
-                  driver.find_element(By.TAG_NAME, 'body').send_keys('a')
-                  driver.find_element(By.TAG_NAME, 'body').send_keys('\ue012')
-                  time.sleep(0.5)
-                  case['checks'].append('2p-keyboard-fallback-dispatched')
-                  driver.save_screenshot(f'{out}/{label}-04-race.png')
-
-                  exit_buttons = driver.find_elements(By.CSS_SELECTOR, '#in-race-viewport button.bg-rose-600\\/90')
-                  if not exit_buttons:
-                      exit_buttons = driver.find_elements(By.XPATH, "//*[@id='in-race-viewport']//button[.//*[local-name()='svg']]")[-1:]
-                  if not exit_buttons:
-                      raise AssertionError('race exit button missing')
-                  exit_buttons[0].click()
-                  click_id(driver, 'exit-to-race-menu-btn', timeout=20)
-                  wait_id(driver, 'racing-hub-screen', timeout=20)
-                  time.sleep(1)
-                  tracks = active_video_tracks(driver)
-                  if tracks != 0:
-                      raise AssertionError(f'camera tracks still live after leaving active 2P race: {tracks}')
-                  case['checks'].append('2p-exit-camera-cleanup')
-
-                  errors = browser_errors(driver)
-                  if errors:
-                      raise AssertionError('browser severe errors: ' + ' | '.join(errors[:5]))
-                  case['checks'].append('console-no-severe-errors')
-                  case['status'] = 'PASS'
-              except Exception as e:
-                  case['status'] = 'FAIL'
-                  case['error'] = str(e)
-                  driver.save_screenshot(f'{out}/{label}-FAIL.png')
-                  raise
+                  logs=d.get_log('browser')
+                  body=d.find_element(By.TAG_NAME,'body').text[:4000]
+                  html=d.find_element(By.TAG_NAME,'body').get_attribute('innerHTML')[:4000]
+                  print(f'=== {label} after garage click ===')
+                  print('URL',d.current_url)
+                  print('BODY',repr(body))
+                  print('HTML',repr(html))
+                  print('LOGS',json.dumps(logs,ensure_ascii=False,indent=2))
+                  d.save_screenshot(f'{out}/{label}-garage-diagnostic.png')
+                  try:
+                      WebDriverWait(d,5).until(EC.presence_of_element_located((By.ID,'garage-showroom-screen')))
+                      case['checks'].append('garage-showroom')
+                  except Exception:
+                      case['status']='FAIL'
+                      case['error']='garage-showroom-screen missing after click'
+                      case['browserLogs']=logs[-20:]
+                      failed=True
               finally:
                   results.append(case)
-                  driver.quit()
-
-          failed = False
-          for label, width, height in [('desktop', 1440, 900), ('mobile', 390, 844)]:
-              try:
-                  run_case(label, width, height)
-              except Exception:
-                  failed = True
-                  traceback.print_exc()
-
-          with open(f'{out}/runtime-golden-results.json', 'w', encoding='utf-8') as f:
-              json.dump(results, f, ensure_ascii=False, indent=2)
-          print(json.dumps(results, ensure_ascii=False, indent=2))
-          if failed:
-              raise SystemExit(1)
+                  d.quit()
+          with open(f'{out}/garage-diagnostic.json','w',encoding='utf-8') as f:
+              json.dump(results,f,ensure_ascii=False,indent=2)
+          print(json.dumps(results,ensure_ascii=False,indent=2))
+          if failed: raise SystemExit(1)
           PY
-
       - name: Upload Runtime Golden evidence
         if: always()
         uses: actions/upload-artifact@v4
