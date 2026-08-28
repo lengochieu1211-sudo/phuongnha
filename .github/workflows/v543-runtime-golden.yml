@@ -24,7 +24,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .runtime/v543-webgl-fallback.patch.b64 > /tmp/v543-webgl-fallback.patch
+          cat .runtime/v543-webgl-part-00.b64 .runtime/v543-webgl-part-01.b64 .runtime/v543-webgl-part-02.b64 | tr -d '\r\n ' > /tmp/v543-webgl-fallback.patch.b64
+          base64 -d /tmp/v543-webgl-fallback.patch.b64 > /tmp/v543-webgl-fallback.patch
+          echo "450b802d344bc0d8d6b1c396bdcc1c6dfc6d1019d846441530d2fbf95c3de1ca  /tmp/v543-webgl-fallback.patch" | sha256sum -c -
           git apply --check /tmp/v543-webgl-fallback.patch
           git apply /tmp/v543-webgl-fallback.patch
           echo "b0739d33ffa9a0988c8f9c9d0abbd0f2b0e90d7f4ef8762e17c6db0cdcbb247b  src/components/racing/GarageScreen.tsx" | sha256sum -c -
