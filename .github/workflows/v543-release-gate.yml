@@ -47,7 +47,23 @@ jobs:
           set -euo pipefail
           git fetch origin main
           git checkout -B v543-apply origin/main
+          set +e
           git apply --3way /tmp/v543/source.patch
+          apply_rc=$?
+          set -e
+          if [ "$apply_rc" -ne 0 ]; then
+            mapfile -t conflicts < <(git diff --name-only --diff-filter=U | sort)
+            expected=(
+              "src/components/racing/DuoRaceSetup.tsx"
+              "src/lib/racing/DualRacePoseController.ts"
+            )
+            if [ "${#conflicts[@]}" -ne 2 ] || [ "${conflicts[0]:-}" != "${expected[0]}" ] || [ "${conflicts[1]:-}" != "${expected[1]}" ]; then
+              printf 'Unexpected 3-way conflicts:\n%s\n' "${conflicts[*]:-none}"
+              exit 1
+            fi
+            git checkout --theirs -- "${expected[@]}"
+            git add -- "${expected[@]}"
+          fi
           mkdir -p src/hooks src/scripts
           install -m 0644 /tmp/v543/useManagedTimeout.ts src/hooks/useManagedTimeout.ts
           install -m 0644 /tmp/v543/releaseGateStatic.mjs src/scripts/releaseGateStatic.mjs
