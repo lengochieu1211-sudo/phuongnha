@@ -121,6 +121,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
   });
 
   const [activeTab, setActiveTab] = useState<'info' | 'paint' | 'parts' | 'upgrades' | 'photo'>('info');
+  const [webglUnavailable, setWebglUnavailable] = useState(false);
 
   const currentCar = CAR_CATALOG[selectedCarIndex];
   const isUnlocked = profile.unlockedCars.includes(currentCar.id);
@@ -279,13 +280,37 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     cameraRef.current = camera;
 
     // preserveDrawingBuffer=false is materially lighter while rotating large FBXs.
-    // Photo capture explicitly renders immediately before toDataURL().
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      alpha: false,
-      preserveDrawingBuffer: false,
-      powerPreference: 'high-performance',
-    });
+    // Photo capture explicitly renders immediately before toDataURL(). A failed WebGL
+    // context must never take down the whole React tree on low-end/blocked devices.
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: false,
+        preserveDrawingBuffer: false,
+        powerPreference: 'high-performance',
+      });
+      setWebglUnavailable(false);
+    } catch (error) {
+      console.warn('[Garage] WebGL unavailable; keeping lightweight garage controls alive.', error);
+      setWebglUnavailable(true);
+      container.replaceChildren();
+      scene.environment?.dispose?.();
+      rendererRef.current = null;
+      cameraRef.current = null;
+      sceneRef.current = null;
+      return () => {
+        carSwapTokenRef.current += 1;
+        externalGarageHandleRef.current?.dispose();
+        externalGarageHandleRef.current = null;
+        scene.traverse((obj: any) => {
+          obj.geometry?.dispose?.();
+          const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+          mats.forEach((m: any) => m.dispose?.());
+        });
+        scene.environment?.dispose?.();
+      };
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, graphicsProfile.pixelRatioCap));
     renderer.shadowMap.enabled = graphicsProfile.shadows;
@@ -331,7 +356,19 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
     scene.add(rimMesh);
 
     let animId = 0;
+    let contextLost = false;
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      contextLost = true;
+      cancelAnimationFrame(animId);
+      rendererRef.current = null;
+      console.warn('[Garage] WebGL context lost; switching to lightweight fallback.');
+      setWebglUnavailable(true);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
+
     const animate = () => {
+      if (contextLost) return;
       if (!isDraggingRef.current) turntableAngleRef.current += 0.005;
       if (carInstanceRef.current) carInstanceRef.current.root.rotation.y = turntableAngleRef.current;
       renderer.render(scene, camera);
@@ -356,6 +393,7 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
       externalGarageHandleRef.current?.dispose();
       externalGarageHandleRef.current = null;
       cancelAnimationFrame(animId);
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost, false);
       ro.disconnect();
       scene.traverse((obj: any) => {
         obj.geometry?.dispose?.();
@@ -753,10 +791,26 @@ export const GarageScreen: React.FC<GarageScreenProps> = ({
             onPointerUp={handlePointerUp}
           />
 
+          {webglUnavailable && (
+            <div
+              id="garage-webgl-fallback"
+              className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-950 to-black px-6 text-center pointer-events-none"
+            >
+              <div className="max-w-md rounded-3xl border border-amber-400/30 bg-slate-950/80 p-5 shadow-2xl">
+                <div className="text-5xl mb-3">🏎️</div>
+                <div className="text-lg sm:text-xl font-black text-white">{currentCar.name}</div>
+                <div className="mt-2 text-sm font-semibold text-amber-200">3D không khả dụng trên thiết bị/trình duyệt này.</div>
+                <div className="mt-1 text-xs text-slate-400">Bạn vẫn có thể chọn xe, nâng cấp và quay lại menu bình thường.</div>
+              </div>
+            </div>
+          )}
+
           {/* Turntable hint overlay */}
-          <div className="absolute top-4 left-4 bg-slate-950/70 backdrop-blur-md px-3 py-1 rounded-full text-[11px] text-slate-400 border border-slate-800 pointer-events-none">
-            🔄 Kéo chuột / vuốt để xoay 360°
-          </div>
+          {!webglUnavailable && (
+            <div className="absolute top-4 left-4 bg-slate-950/70 backdrop-blur-md px-3 py-1 rounded-full text-[11px] text-slate-400 border border-slate-800 pointer-events-none">
+              🔄 Kéo chuột / vuốt để xoay 360°
+            </div>
+          )}
           <div className="absolute top-4 right-4 bg-slate-950/75 backdrop-blur-md px-3 py-1 rounded-full text-[11px] font-black text-emerald-300 border border-emerald-500/30 pointer-events-none">
             {graphicsProfile.quality === 'high' ? '🖥️ 3D CAO • PC' : graphicsProfile.quality === 'balanced' ? '⚙️ CÂN BẰNG' : '📱 CHẾ ĐỘ NHẸ'}
           </div>
