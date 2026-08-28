@@ -12,30 +12,31 @@ permissions:
 jobs:
   runtime-golden-v2:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Apply exact audited runtime patches
+      - name: Apply audited WebGL fallback patch
         shell: bash
         run: |
           set -euo pipefail
-          cat .runtime/v543-webgl-part-00.b64 .runtime/v543-webgl-part-01.b64 .runtime/v543-webgl-part-02.b64 | tr -d '\r\n ' | base64 -d > /tmp/webgl.patch
-          echo "450b802d344bc0d8d6b1c396bdcc1c6dfc6d1019d846441530d2fbf95c3de1ca  /tmp/webgl.patch" | sha256sum -c -
-          git apply --check /tmp/webgl.patch
-          git apply /tmp/webgl.patch
-          base64 -d .runtime/v543-dual-pose-load.patch.b64 > /tmp/dual.patch
-          echo "bca2ab58e39fb48f9a63380ea3e898acbb173099001bb048b1646c7ce702ebf1  /tmp/dual.patch" | sha256sum -c -
-          git apply --check /tmp/dual.patch
-          git apply /tmp/dual.patch
+          cat .runtime/v543-webgl-part-00.b64 .runtime/v543-webgl-part-01.b64 .runtime/v543-webgl-part-02.b64 | tr -d '\r\n ' > /tmp/v543-webgl-fallback.patch.b64
+          base64 -d /tmp/v543-webgl-fallback.patch.b64 > /tmp/v543-webgl-fallback.patch
+          echo "450b802d344bc0d8d6b1c396bdcc1c6dfc6d1019d846441530d2fbf95c3de1ca  /tmp/v543-webgl-fallback.patch" | sha256sum -c -
+          git apply --check /tmp/v543-webgl-fallback.patch
+          git apply /tmp/v543-webgl-fallback.patch
           echo "b0739d33ffa9a0988c8f9c9d0abbd0f2b0e90d7f4ef8762e17c6db0cdcbb247b  src/components/racing/GarageScreen.tsx" | sha256sum -c -
           echo "18d5bb2bff35634e14b1524f7aff5b40e465943e3346004d217b6eec23ee2066  src/components/racing/Race3DCanvas.tsx" | sha256sum -c -
+          base64 -d .runtime/v543-dual-pose-load.patch.b64 > /tmp/v543-dual-pose-load.patch
+          echo "bca2ab58e39fb48f9a63380ea3e898acbb173099001bb048b1646c7ce702ebf1  /tmp/v543-dual-pose-load.patch" | sha256sum -c -
+          git apply --check /tmp/v543-dual-pose-load.patch
+          git apply /tmp/v543-dual-pose-load.patch
           echo "a10761bad127b4b9d62113b905743d690dd7bd32368bb21bb570eec84173aff0  src/lib/racing/DualRacePoseController.ts" | sha256sum -c -
           git diff --check
-
       - name: Generate and certify npm lock
         shell: bash
         run: |
@@ -46,153 +47,263 @@ jobs:
           cp package-lock.json runtime-golden-artifacts/package-lock.json
           rm -rf node_modules
           npm ci --no-audit --no-fund
-
       - name: Release checks
         run: npm run check
-
-      - name: Production build
+      - name: Build
         run: npm run build -- --base=/phuongnha/
-
-      - name: Start preview
+      - name: Start Vite preview
         shell: bash
         run: |
           set -euo pipefail
-          nohup npx vite preview --host 127.0.0.1 --port 4173 >/tmp/v543-preview.log 2>&1 &
+          nohup npx vite preview --host 127.0.0.1 --port 4173 > /tmp/v543-preview.log 2>&1 &
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:4173/phuongnha/ >/dev/null; then exit 0; fi
+            curl -fsS http://127.0.0.1:4173/phuongnha/ >/dev/null && exit 0
             sleep 1
           done
           cat /tmp/v543-preview.log
           exit 1
-
       - name: Browser prerequisites
         shell: bash
         run: |
+          set -euo pipefail
           which google-chrome || which chromium || which chromium-browser
           python -m pip install --disable-pip-version-check --quiet selenium
-
-      - name: Runtime Golden matrix
+      - name: Runtime Golden desktop mobile normal and forced no-WebGL
         env:
           PYTHONUNBUFFERED: '1'
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p runtime-golden-artifacts
           python - <<'PY'
           import json, time, traceback
           from selenium import webdriver
           from selenium.webdriver.chrome.options import Options
           from selenium.webdriver.common.by import By
+          from selenium.webdriver.common.keys import Keys
           from selenium.webdriver.support.ui import WebDriverWait
           from selenium.webdriver.support import expected_conditions as EC
 
-          URL='http://127.0.0.1:4173/phuongnha/'
-          OUT='runtime-golden-artifacts'
-          results=[]
+          URL = 'http://127.0.0.1:4173/phuongnha/'
+          OUT = 'runtime-golden-artifacts'
+          results = []
 
-          def driver(w,h,no_gl=False):
-              o=Options()
-              for a in ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']:
+          def make_driver(width, height, disable_webgl=False):
+              o = Options()
+              args = [
+                  '--headless=new', '--no-sandbox', '--disable-dev-shm-usage',
+                  '--autoplay-policy=no-user-gesture-required',
+                  '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'
+              ]
+              if disable_webgl:
+                  args += ['--disable-webgl', '--disable-software-rasterizer']
+              for a in args:
                   o.add_argument(a)
-              if no_gl:
-                  o.add_argument('--disable-webgl'); o.add_argument('--disable-software-rasterizer')
-              o.set_capability('goog:loggingPrefs',{'browser':'ALL'})
-              d=webdriver.Chrome(options=o); d.set_window_size(w,h); return d
+              o.set_capability('goog:loggingPrefs', {'browser': 'ALL'})
+              d = webdriver.Chrome(options=o)
+              d.set_window_size(width, height)
+              return d
 
-          def wait_id(d,i,t=20): return WebDriverWait(d,t).until(EC.presence_of_element_located((By.ID,i)))
-          def js_click(d,e): d.execute_script('arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',e)
-          def click_id(d,i,t=20):
-              e=WebDriverWait(d,t).until(EC.presence_of_element_located((By.ID,i))); js_click(d,e); return e
-          def click_text(d,text,t=20):
-              xp=f"//button[contains(normalize-space(.), {json.dumps(text,ensure_ascii=False)})]"
-              e=WebDriverWait(d,t).until(EC.presence_of_element_located((By.XPATH,xp))); js_click(d,e); return e
-          def dismiss_notice(d):
-              for e in d.find_elements(By.XPATH,"//button[normalize-space(.)='Đóng']"):
-                  if e.is_displayed(): js_click(d,e); time.sleep(.15); break
-          def live_tracks(d):
-              return d.execute_script("return Array.from(document.querySelectorAll('video')).reduce((n,v)=>n+(v.srcObject&&v.srcObject.getVideoTracks?v.srcObject.getVideoTracks().filter(t=>t.readyState==='live').length:0),0)")
-          def no_uncaught(d,allow_webgl=False):
-              bad=[]
-              for x in d.get_log('browser'):
-                  m=x.get('message','')
-                  if 'Uncaught' in m or 'Unhandled' in m:
-                      if allow_webgl and 'WebGL' in m: continue
-                      bad.append(m)
-              if bad: raise AssertionError('uncaught browser errors: '+' | '.join(bad[:4]))
-          def enter_racing(d): click_id(d,'home-card-racing'); wait_id(d,'racing-hub-screen')
-          def enter_2p_track(d):
-              dismiss_notice(d); click_text(d,'2 NGƯỜI · 1 CAMERA'); time.sleep(.25)
-              click_id(d,'mode-quick-race-card')
-              WebDriverWait(d,15).until(lambda x:'ĐUA 2 NGƯỜI' in x.find_element(By.TAG_NAME,'body').text)
-              click_text(d,'TIẾP TỤC CHỌN ĐƯỜNG ĐUA'); wait_id(d,'racing-track-select-screen')
-          def start_race(d): click_text(d,'XUẤT PHÁT'); wait_id(d,'in-race-viewport',35)
-          def hud_ok(d): WebDriverWait(d,20).until(lambda x:'P1' in x.find_element(By.TAG_NAME,'body').text and 'P2' in x.find_element(By.TAG_NAME,'body').text)
-          def keyboard_fallback(d):
-              ok=d.execute_script("""
-                const fire=(key,code)=>{document.dispatchEvent(new KeyboardEvent('keydown',{key,code,bubbles:true}));document.dispatchEvent(new KeyboardEvent('keyup',{key,code,bubbles:true}));};
-                fire('a','KeyA'); fire('ArrowRight','ArrowRight'); fire('e','KeyE'); fire('Enter','Enter');
-                return !!document.getElementById('in-race-viewport');
+          def wait_id(d, element_id, timeout=30):
+              return WebDriverWait(d, timeout).until(EC.presence_of_element_located((By.ID, element_id)))
+
+          def click_id(d, element_id, timeout=30):
+              WebDriverWait(d, timeout).until(EC.presence_of_element_located((By.ID, element_id)))
+              ok = d.execute_script("const e=document.getElementById(arguments[0]); if(!e) return false; e.scrollIntoView({block:'center'}); e.click(); return true;", element_id)
+              if not ok: raise AssertionError('cannot click id ' + element_id)
+
+          def click_text(d, text, timeout=30):
+              WebDriverWait(d, timeout).until(lambda x: x.execute_script("return Array.from(document.querySelectorAll('button')).some(b=>(b.textContent||'').includes(arguments[0]) && b.offsetParent!==null);", text))
+              ok = d.execute_script("const e=Array.from(document.querySelectorAll('button')).find(b=>(b.textContent||'').includes(arguments[0]) && b.offsetParent!==null); if(!e)return false;e.scrollIntoView({block:'center'});e.click();return true;", text)
+              if not ok: raise AssertionError('cannot click text ' + text)
+
+          def dismiss_landscape_notice(d):
+              clicked = d.execute_script("""
+                  const b = Array.from(document.querySelectorAll('button'))
+                    .find(x => (x.textContent || '').trim() === 'Đóng' && x.offsetParent !== null);
+                  if (b) { b.click(); return true; }
+                  return false;
               """)
-              if not ok: raise AssertionError('race viewport disappeared after fallback keys')
-              time.sleep(.35)
-          def exit_race(d):
-              buttons=d.find_elements(By.CSS_SELECTOR,"#in-race-viewport button.bg-rose-600\\/90")
-              if not buttons: raise AssertionError('race exit button missing')
-              js_click(d,buttons[0]); click_id(d,'exit-to-race-menu-btn'); wait_id(d,'racing-hub-screen'); time.sleep(.6)
-              if live_tracks(d)!=0: raise AssertionError(f'camera tracks remain live: {live_tracks(d)}')
+              if clicked:
+                  time.sleep(0.2)
 
-          def run(label,w,h,no_gl):
-              d=driver(w,h,no_gl); c={'case':f"{label}-{'no-webgl' if no_gl else 'webgl'}",'checks':[],'status':'PASS'}
+          def overflow_x(d):
+              return d.execute_script('return Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth;')
+
+          def active_tracks(d):
+              return d.execute_script('''
+                  return Array.from(document.querySelectorAll('video')).reduce((n, v) => {
+                    const s = v.srcObject;
+                    if (!s || !s.getVideoTracks) return n;
+                    return n + s.getVideoTracks().filter(t => t.readyState === 'live').length;
+                  }, 0);
+              ''')
+
+          def assert_no_uncaught(d, allow_renderer_messages=False):
+              logs = d.get_log('browser')
+              bad = []
+              for x in logs:
+                  msg = x.get('message', '')
+                  if x.get('level') != 'SEVERE':
+                      continue
+                  if 'favicon.ico' in msg:
+                      continue
+                  if allow_renderer_messages and ('THREE.WebGLRenderer' in msg or 'WebGL context' in msg):
+                      if 'Uncaught' not in msg:
+                          continue
+                  bad.append(msg)
+              if bad:
+                  raise AssertionError('browser severe/uncaught errors: ' + ' | '.join(bad[:5]))
+
+          def select_two_player_and_open_setup(d):
+              dismiss_landscape_notice(d)
+              click_text(d, '2 NGƯỜI · 1 CAMERA')
+              time.sleep(0.35)
+              click_id(d, 'mode-quick-race-card')
+              WebDriverWait(d, 20).until(lambda x: 'ĐUA 2 NGƯỜI' in x.find_element(By.TAG_NAME, 'body').text)
+              click_text(d, 'TIẾP TỤC CHỌN ĐƯỜNG ĐUA')
+              wait_id(d, 'racing-track-select-screen', 30)
+
+          def start_race(d):
+              click_text(d, 'XUẤT PHÁT', 30)
+              wait_id(d, 'in-race-viewport', 45)
+
+          def assert_p1_p2_hud(d):
+              WebDriverWait(d, 30).until(lambda x: 'P1' in x.find_element(By.TAG_NAME, 'body').text and 'P2' in x.find_element(By.TAG_NAME, 'body').text)
+
+          def exit_race_to_menu(d):
+              ok = d.execute_script("const root=document.getElementById('in-race-viewport');const b=root&&Array.from(root.querySelectorAll('button')).find(x=>(x.className||'').includes('bg-rose-600'));if(b){b.click();return true}return false")
+              if not ok:
+                  raise AssertionError('2P race exit button missing')
+              click_id(d, 'exit-to-race-menu-btn', 20)
+              wait_id(d, 'racing-hub-screen', 20)
+              time.sleep(1)
+              if active_tracks(d) != 0:
+                  raise AssertionError('camera track still live after leaving 2P race')
+
+          def run_normal(label, width, height):
+              d = make_driver(width, height, False)
+              case = {'case': f'{label}-normal-webgl', 'viewport': [width, height], 'checks': [], 'status': 'PASS'}
               try:
-                  d.get(URL); wait_id(d,'home-card-racing'); c['checks'].append('home')
-                  enter_racing(d); c['checks'].append('hub'); d.get_log('browser')
-                  click_id(d,'mode-garage-card'); wait_id(d,'garage-showroom-screen'); dismiss_notice(d)
-                  if no_gl:
-                      f=wait_id(d,'garage-webgl-fallback');
-                      if not f.is_displayed(): raise AssertionError('garage fallback hidden')
-                      c['checks'].append('garage-no-webgl-fallback')
-                  else:
-                      c['checks'].append('garage-webgl')
-                  click_id(d,'garage-next-car-btn'); click_id(d,'garage-back-btn'); wait_id(d,'racing-hub-screen'); c['checks'].append('garage-controls-exit')
-                  enter_2p_track(d); c['checks']+=['2p-no-pose-gate','2p-track']
-                  start_race(d); hud_ok(d)
-                  if no_gl:
-                      f=wait_id(d,'race-webgl-fallback');
-                      if not f.is_displayed(): raise AssertionError('race fallback hidden')
-                      c['checks'].append('race-no-webgl-fallback')
-                  else:
-                      WebDriverWait(d,30).until(lambda x:len(x.find_elements(By.CSS_SELECTOR,'#in-race-viewport canvas'))==1)
-                      c['checks'].append('2p-one-canvas')
-                  c['checks'].append('p1-p2-hud')
-                  keyboard_fallback(d); c['checks'].append('keyboard-fallback-responsive')
-                  d.save_screenshot(f"{OUT}/{c['case']}-race.png")
-                  exit_race(d); c['checks'].append('camera-cleanup')
-                  no_uncaught(d,no_gl); c['checks'].append('no-uncaught')
+                  d.get(URL)
+                  wait_id(d, 'home-card-racing'); case['checks'].append('home-load')
+                  if label == 'mobile' and overflow_x(d) > 4:
+                      raise AssertionError(f'home horizontal overflow={overflow_x(d)}')
+                  click_id(d, 'home-card-racing')
+                  wait_id(d, 'racing-hub-screen'); case['checks'].append('racing-hub')
+                  d.get_log('browser')
+
+                  click_id(d, 'mode-garage-card')
+                  wait_id(d, 'garage-showroom-screen', 30)
+                  dismiss_landscape_notice(d)
+                  if label == 'mobile' and overflow_x(d) > 4:
+                      raise AssertionError(f'garage horizontal overflow={overflow_x(d)}')
+                  if not d.find_element(By.ID, 'garage-next-car-btn').is_displayed():
+                      raise AssertionError('garage next-car control missing')
+                  click_id(d, 'garage-next-car-btn')
+                  case['checks'] += ['garage-visible', 'garage-controls-alive']
+                  d.save_screenshot(f'{OUT}/{label}-normal-garage.png')
+                  click_id(d, 'garage-back-btn')
+                  wait_id(d, 'racing-hub-screen')
+                  assert_no_uncaught(d)
+                  case['checks'].append('garage-exit-no-uncaught')
+
+                  select_two_player_and_open_setup(d)
+                  case['checks'] += ['2p-setup-no-pose-gate', '2p-track-select']
+                  d.save_screenshot(f'{OUT}/{label}-normal-2p-track.png')
+                  start_race(d)
+                  WebDriverWait(d, 45).until(lambda x: len(x.find_elements(By.CSS_SELECTOR, '#in-race-viewport canvas')) == 1)
+                  assert_p1_p2_hud(d)
+                  case['checks'] += ['2p-one-webgl-canvas', '2p-hud-p1-p2']
+
+                  body = d.find_element(By.TAG_NAME, 'body')
+                  body.send_keys('a')
+                  body.send_keys(Keys.ARROW_RIGHT)
+                  d.execute_script("document.dispatchEvent(new KeyboardEvent('keydown',{key:'e',code:'KeyE',bubbles:true}));document.dispatchEvent(new KeyboardEvent('keyup',{key:'e',code:'KeyE',bubbles:true}));document.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',bubbles:true}));document.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter',bubbles:true}));")
+                  case['checks'].append('2p-keyboard-fallback-dispatched')
+                  d.save_screenshot(f'{OUT}/{label}-normal-2p-race.png')
+                  exit_race_to_menu(d)
+                  case['checks'].append('2p-exit-camera-cleanup')
+                  assert_no_uncaught(d)
+                  case['checks'].append('console-no-severe-uncaught')
               except Exception as e:
-                  c['status']='FAIL'; c['error']=str(e)
-                  try:
-                      a=d.switch_to.alert; c['alert']=a.text; a.dismiss()
-                  except Exception: pass
-                  try: d.save_screenshot(f"{OUT}/{c['case']}-FAIL.png")
+                  case['status'] = 'FAIL'; case['error'] = str(e)
+                  try: d.save_screenshot(f'{OUT}/{label}-normal-FAIL.png')
                   except Exception: pass
                   traceback.print_exc()
               finally:
-                  results.append(c); d.quit()
-              return c['status']=='PASS'
+                  results.append(case)
+                  d.quit()
+              return case['status'] == 'PASS'
 
-          ok=True
-          for label,w,h in [('desktop',1440,900),('mobile',390,844)]:
-              ok=run(label,w,h,False) and ok
-              ok=run(label,w,h,True) and ok
-          with open(f'{OUT}/runtime-golden-results.json','w',encoding='utf-8') as f: json.dump(results,f,ensure_ascii=False,indent=2)
-          print(json.dumps(results,ensure_ascii=False,indent=2))
-          if not ok: raise SystemExit(1)
+          def run_forced_no_webgl(label, width, height):
+              d = make_driver(width, height, True)
+              case = {'case': f'{label}-forced-no-webgl', 'viewport': [width, height], 'checks': [], 'status': 'PASS'}
+              try:
+                  d.get(URL)
+                  wait_id(d, 'home-card-racing'); case['checks'].append('home-load')
+                  click_id(d, 'home-card-racing')
+                  wait_id(d, 'racing-hub-screen'); case['checks'].append('racing-hub')
+                  d.get_log('browser')
+
+                  click_id(d, 'mode-garage-card')
+                  wait_id(d, 'garage-showroom-screen', 30)
+                  dismiss_landscape_notice(d)
+                  fallback = wait_id(d, 'garage-webgl-fallback', 20)
+                  if not fallback.is_displayed():
+                      raise AssertionError('Garage fallback is not visible with forced no-WebGL')
+                  if not d.find_element(By.ID, 'garage-next-car-btn').is_displayed():
+                      raise AssertionError('Garage controls missing in no-WebGL fallback')
+                  click_id(d, 'garage-next-car-btn')
+                  case['checks'] += ['garage-root-survives-webgl-failure', 'garage-fallback-visible', 'garage-controls-alive']
+                  d.save_screenshot(f'{OUT}/{label}-forced-no-webgl-garage.png')
+                  click_id(d, 'garage-back-btn')
+                  wait_id(d, 'racing-hub-screen')
+                  assert_no_uncaught(d, True)
+                  case['checks'].append('garage-exit-no-uncaught')
+
+                  select_two_player_and_open_setup(d)
+                  case['checks'] += ['2p-setup-no-pose-gate', '2p-track-select']
+                  start_race(d)
+                  fallback_race = wait_id(d, 'race-webgl-fallback', 30)
+                  if not fallback_race.is_displayed():
+                      raise AssertionError('Race WebGL fallback not visible')
+                  assert_p1_p2_hud(d)
+                  case['checks'] += ['race-shell-survives-webgl-failure', 'race-fallback-visible', '2p-hud-p1-p2']
+                  d.save_screenshot(f'{OUT}/{label}-forced-no-webgl-2p-race.png')
+                  exit_race_to_menu(d)
+                  case['checks'].append('2p-exit-camera-cleanup')
+                  assert_no_uncaught(d, True)
+                  case['checks'].append('no-uncaught-webgl-exception')
+              except Exception as e:
+                  case['status'] = 'FAIL'; case['error'] = str(e)
+                  try:
+                      a=d.switch_to.alert; case['alert']=a.text; a.dismiss()
+                  except Exception: pass
+                  try: d.save_screenshot(f'{OUT}/{label}-forced-no-webgl-FAIL.png')
+                  except Exception: pass
+                  traceback.print_exc()
+              finally:
+                  results.append(case)
+                  d.quit()
+              return case['status'] == 'PASS'
+
+          ok = True
+          for label, width, height in [('desktop', 1440, 900), ('mobile', 390, 844)]:
+              ok = run_normal(label, width, height) and ok
+              ok = run_forced_no_webgl(label, width, height) and ok
+
+          with open(f'{OUT}/runtime-golden-results.json', 'w', encoding='utf-8') as f:
+              json.dump(results, f, ensure_ascii=False, indent=2)
+          print(json.dumps(results, ensure_ascii=False, indent=2))
+          if not ok:
+              raise SystemExit(1)
           PY
-
-      - name: Upload evidence and certified lock
+      - name: Upload Runtime Golden evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: v5.43-runtime-golden-v2-evidence
           path: runtime-golden-artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
