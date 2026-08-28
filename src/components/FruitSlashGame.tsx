@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useManagedTimeout } from '../hooks/useManagedTimeout';
 import { Sparkles, ArrowLeft, RotateCcw, Zap, Award, Volume2, Shield, Clock } from 'lucide-react';
 import { PlayerProgress, GameGesture, GameDifficulty } from '../types';
 import { audio } from '../lib/AudioEngine';
@@ -97,6 +98,7 @@ export default function FruitSlashGame({
   workoutMode = false,
   isPaused = false,
 }: FruitSlashGameProps) {
+  const scheduleTimeout = useManagedTimeout();
   const { trackingMode, isStreaming } = useCameraPose();
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'game_over'>(() => workoutMode ? 'playing' : 'intro');
   const [difficulty, setDifficulty] = useState<GameDifficulty>('normal');
@@ -290,7 +292,7 @@ export default function FruitSlashGame({
               voiceGuide.speak(VOICE_LINES.fruitslash.inkCloud, 'high');
               setInkSplattered(true);
               setCombo(0);
-              setTimeout(() => setInkSplattered(false), 3000);
+              scheduleTimeout(() => setInkSplattered(false), 3000);
             }
             return { ...fruit, isSliced: true };
           }
@@ -400,7 +402,7 @@ export default function FruitSlashGame({
   const startGame = () => {
     audio.playRoundStartJingle();
     voiceGuide.speak(VOICE_LINES.fruitslash.ready, 'high');
-    setTimeout(() => {
+    scheduleTimeout(() => {
       voiceGuide.speak(VOICE_LINES.fruitslash.start, 'high');
     }, 1800);
 

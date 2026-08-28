@@ -111,7 +111,7 @@ export default function BaraSpeedRacingGame({
   gesture = 'standing',
   onBack,
 }: BaraSpeedRacingGameProps) {
-  const { videoElement, isCameraReady } = useCameraPose();
+  const { videoElement, isCameraReady, startCamera, stopCamera } = useCameraPose();
   // 1. Profile State
   const [profile, setProfile] = useState<PlayerRaceProfile>(() => loadRaceProfile());
   const [currentSubScreen, setCurrentSubScreen] = useState<RacingSubScreen>('mode_select');
@@ -129,9 +129,15 @@ export default function BaraSpeedRacingGame({
   const [showGestureGuide, setShowGestureGuide] = useState(false);
   const shieldCooldownRef = useRef<[number, number]>([0, 0]);
   const lastDualPoseAtRef = useRef<number>(0);
+  const dualDetectedRef = useRef<[boolean, boolean]>([false, false]);
+  const manualFallbackRef = useRef<[
+    { steer: number; brake: boolean },
+    { steer: number; brake: boolean }
+  ]>([{ steer: 0, brake: false }, { steer: 0, brake: false }]);
 
   // 4. Engine & HUD State
   const [engine, setEngine] = useState<RaceEngine | null>(null);
+  const engineRef = useRef<RaceEngine | null>(null);
   const [raceResult, setRaceResult] = useState<RaceResult | null>(null);
   const [isSoundMuted, setIsSoundMuted] = useState(false);
   const [activeVoiceText, setActiveVoiceText] = useState<string>('');
@@ -162,6 +168,21 @@ export default function BaraSpeedRacingGame({
     }
   }, [raceSettings]);
 
+  // Racing owns the shared webcam only on sub-screens that actually consume it.
+  // This is intentionally independent from pose readiness: camera failure never blocks 2P,
+  // and leaving setup/race releases the stream instead of keeping it alive in Garage/menu.
+  useEffect(() => {
+    const needsCamera = currentSubScreen === 'duo_setup'
+      || currentSubScreen === 'calibration'
+      || (currentSubScreen === 'in_race' && (localPlayerCount === 2 || raceSettings.controlMode === 'camera_motion'));
+    if (needsCamera) void startCamera();
+    else stopCamera();
+  }, [currentSubScreen, localPlayerCount, raceSettings.controlMode, startCamera, stopCamera]);
+
+  useEffect(() => () => {
+    stopCamera();
+  }, [stopCamera]);
+
   // V5.29: two racers share ONE camera. Pause the original single-pose inference loop
   // while dual left/right crops are active so we never run three pose models at once.
   // Multi-pose is intentionally OFF in Garage / Track Select to avoid competing with FBX parsing.
@@ -170,6 +191,8 @@ export default function BaraSpeedRacingGame({
     if (localPlayerCount !== 2) {
       dualRacePoseController.stop();
       poseDetector.setProcessingEnabled(true);
+      dualDetectedRef.current = [false, false];
+      manualFallbackRef.current = [{ steer: 0, brake: false }, { steer: 0, brake: false }];
       setDualPoseFrame(null);
       return;
     }
@@ -182,12 +205,16 @@ export default function BaraSpeedRacingGame({
       // Garage/menu/podium release them completely to free memory on Android TV.
       if (currentSubScreen === 'track_select' || currentSubScreen === 'in_race') dualRacePoseController.pause();
       else dualRacePoseController.stop();
+      dualDetectedRef.current = [false, false];
       setDualPoseFrame(null);
       return;
     }
 
     const unsub = dualRacePoseController.addListener((frame) => {
-      if (!cancelled) setDualPoseFrame(frame);
+      if (!cancelled) {
+        dualDetectedRef.current = [frame.players[0].bodyDetected, frame.players[1].bodyDetected];
+        setDualPoseFrame(frame);
+      }
     });
     if (videoElement && isCameraReady) {
       void dualRacePoseController.start(videoElement);
@@ -204,6 +231,12 @@ export default function BaraSpeedRacingGame({
   useEffect(() => () => {
     dualRacePoseController.stop();
     poseDetector.setProcessingEnabled(true);
+    dualDetectedRef.current = [false, false];
+    manualFallbackRef.current = [{ steer: 0, brake: false }, { steer: 0, brake: false }];
+    engineRef.current?.destroy();
+    engineRef.current = null;
+    raceAudio.stopAll();
+    voiceGuide.stop();
   }, []);
 
   // V5.16: warm NETWORK cache only while choosing a track. Do not parse a 20–40 MB
@@ -231,6 +264,15 @@ export default function BaraSpeedRacingGame({
     img.src = `${((import.meta as any).env?.BASE_URL || '/')}assets/pc-hd/asphalt-hd.webp`;
   }, []);
 
+  const releaseCurrentEngine = useCallback(() => {
+    const active = engineRef.current;
+    if (active) active.destroy();
+    engineRef.current = null;
+    setEngine(null);
+    raceAudio.stopAll();
+    voiceGuide.stop();
+  }, []);
+
   // Pause and Exit Handlers
   const handlePauseAndShowExitModal = useCallback(() => {
     if (engine) {
@@ -255,24 +297,18 @@ export default function BaraSpeedRacingGame({
   }, [engine]);
 
   const handleConfirmExitToRaceMenu = useCallback(() => {
-    if (engine) {
-      engine.destroy();
-      setEngine(null);
-    }
+    releaseCurrentEngine();
     setShowExitModal(false);
     setCurrentSubScreen('mode_select');
     raceAudio.playMenuClick();
-  }, [engine]);
+  }, [releaseCurrentEngine]);
 
   const handleConfirmExitToAppMain = useCallback(() => {
-    if (engine) {
-      engine.destroy();
-      setEngine(null);
-    }
+    releaseCurrentEngine();
     setShowExitModal(false);
     onBack();
     raceAudio.playMenuClick();
-  }, [engine, onBack]);
+  }, [releaseCurrentEngine, onBack]);
 
   // 5. Steering & Input State
   const steeringEngineRef = useRef<MotionSteeringEngine>(new MotionSteeringEngine());
@@ -390,20 +426,54 @@ export default function BaraSpeedRacingGame({
     };
   }, [engine, gesture, localPlayerCount, raceSettings.controlMode]);
 
+  const applyManualFallback = useCallback((player: 1 | 2) => {
+    if (!engine || engine.phase !== 'racing') return;
+    const state = manualFallbackRef.current[player - 1];
+    if (player === 1) {
+      engine.setSteeringInput(state.steer);
+      engine.setBrakeInput(state.brake);
+    } else {
+      engine.setSecondPlayerSteeringInput(state.steer);
+      engine.setSecondPlayerBrakeInput(state.brake);
+    }
+  }, [engine]);
+
+  const handleManualSteer = useCallback((player: 1 | 2, steer: number) => {
+    manualFallbackRef.current[player - 1].steer = Math.max(-1, Math.min(1, steer));
+    if (!dualDetectedRef.current[player - 1]) applyManualFallback(player);
+  }, [applyManualFallback]);
+
+  const handleManualBrake = useCallback((player: 1 | 2, braking: boolean) => {
+    manualFallbackRef.current[player - 1].brake = braking;
+    if (!dualDetectedRef.current[player - 1]) applyManualFallback(player);
+  }, [applyManualFallback]);
+
+  const handleManualNitro = useCallback((player: 1 | 2) => {
+    if (!engine || engine.phase !== 'racing') return;
+    if (player === 1) engine.triggerNitro();
+    else engine.triggerSecondPlayerNitro();
+  }, [engine]);
+
+  const handleManualShield = useCallback((player: 1 | 2) => {
+    if (!engine || engine.phase !== 'racing') return;
+    if (player === 1) engine.activatePlayerShield(4.5);
+    else engine.activateSecondPlayerShield(4.5);
+  }, [engine]);
+
   // Dual camera controls. P1 stays on screen-left, P2 on screen-right.
-  // If one player disappears, only that player's steering returns to neutral; IDs never swap.
+  // Camera is one input source, not a gate: a missing player uses their own manual fallback.
   useEffect(() => {
     if (localPlayerCount !== 2 || !engine || engine.phase !== 'racing' || raceSettings.controlMode !== 'camera_motion') return;
     const frame = dualPoseFrame;
     if (!frame) return;
     lastDualPoseAtRef.current = frame.timestamp || performance.now();
     const [p1, p2] = frame.players;
+    dualDetectedRef.current = [p1.bodyDetected, p2.bodyDetected];
     const now = performance.now();
     const applyPlayer = (player: typeof p1, index: 0 | 1) => {
-      // If one person leaves the camera for longer than the short ID grace period,
-      // slow only that player's car instead of letting auto-throttle drive unattended.
       if (!player.bodyDetected) {
-        return { steer: 0, nitro: false, brake: true, shield: false };
+        const fallback = manualFallbackRef.current[index];
+        return { steer: fallback.steer, nitro: false, brake: fallback.brake, shield: false };
       }
       let steer = player.steeringNormalized;
       if (player.gesture === 'tilt_left') steer = Math.min(steer, -0.8);
@@ -424,37 +494,80 @@ export default function BaraSpeedRacingGame({
     engine.setSecondPlayerBrakeInput(b.brake);
     if (b.nitro) engine.triggerSecondPlayerNitro();
     if (b.shield) engine.activateSecondPlayerShield(4.5);
-    setSteeringState((prev) => ({ ...prev, steerValue: a.steer, steeringAngleDeg: p1.steeringAngleDeg, isHoldingWheel: p1.bodyDetected, nitroTriggered: a.nitro, brakeTriggered: a.brake, handsConfidence: p1.confidence }));
+    setSteeringState((prev) => ({ ...prev, steerValue: a.steer, steeringAngleDeg: p1.bodyDetected ? p1.steeringAngleDeg : a.steer * 35, isHoldingWheel: p1.bodyDetected, nitroTriggered: a.nitro, brakeTriggered: a.brake, handsConfidence: p1.confidence }));
   }, [dualPoseFrame, engine, localPlayerCount, raceSettings.controlMode]);
 
-  // Safety watchdog: if the dual detector stops producing frames (camera unplugged,
-  // browser permission revoked, WASM hiccup), do not let auto-throttle drive either
-  // local car unattended. A fresh pose frame immediately resumes normal control.
+  // Safety watchdog: if camera / MediaPipe stalls, switch each local player to manual
+  // fallback rather than hard-braking the whole race. Fresh pose frames resume gesture input.
   useEffect(() => {
     if (localPlayerCount !== 2 || !engine || currentSubScreen !== 'in_race') return;
     lastDualPoseAtRef.current = performance.now();
     const timer = window.setInterval(() => {
       if (engine.phase !== 'racing') return;
       if (performance.now() - lastDualPoseAtRef.current <= 900) return;
-      engine.setSteeringInput(0);
-      engine.setBrakeInput(true);
-      engine.setSecondPlayerSteeringInput(0);
-      engine.setSecondPlayerBrakeInput(true);
+      dualDetectedRef.current = [false, false];
+      setDualPoseFrame(null);
+      applyManualFallback(1);
+      applyManualFallback(2);
     }, 250);
     return () => window.clearInterval(timer);
-  }, [engine, currentSubScreen, localPlayerCount]);
+  }, [engine, currentSubScreen, localPlayerCount, applyManualFallback]);
 
-  // Keyboard controls listener for in-race
+  // Keyboard controls. In local 2P these are always available as an independent fallback,
+  // even while camera_motion is selected. Pose has precedence only for the player detected.
   useEffect(() => {
     if (!engine || currentSubScreen !== 'in_race') return;
 
     const keysDown = new Set<string>();
+
+    const updateControls = () => {
+      if (engine.phase === 'finished') return;
+
+      if (keysDown.has('KeyC')) {
+        setCameraView((prev) => {
+          const views: CameraViewMode[] = ['chase', 'close_chase', 'hood', 'cockpit', 'cinematic'];
+          return views[(views.indexOf(prev) + 1) % views.length];
+        });
+        raceAudio.playMenuClick();
+        keysDown.delete('KeyC');
+      }
+
+      if (localPlayerCount === 2) {
+        const p1Steer = (keysDown.has('KeyA') ? -1 : 0) + (keysDown.has('KeyD') ? 1 : 0);
+        const p2Steer = (keysDown.has('ArrowLeft') ? -1 : 0) + (keysDown.has('ArrowRight') ? 1 : 0);
+        manualFallbackRef.current[0].steer = Math.max(-1, Math.min(1, p1Steer));
+        manualFallbackRef.current[1].steer = Math.max(-1, Math.min(1, p2Steer));
+        manualFallbackRef.current[0].brake = keysDown.has('KeyS');
+        manualFallbackRef.current[1].brake = keysDown.has('ArrowDown');
+        if (!dualDetectedRef.current[0]) applyManualFallback(1);
+        if (!dualDetectedRef.current[1]) applyManualFallback(2);
+        return;
+      }
+
+      if (raceSettings.controlMode !== 'keyboard') return;
+      if (keysDown.has('ArrowUp') || keysDown.has('KeyW')) engine.setThrottleInput(1.0);
+      else if (!raceSettings.autoThrottle) engine.setThrottleInput(0);
+      engine.setBrakeInput(keysDown.has('ArrowDown') || keysDown.has('KeyS'));
+      let steer = 0;
+      if (keysDown.has('ArrowLeft') || keysDown.has('KeyA')) steer -= 1.0;
+      if (keysDown.has('ArrowRight') || keysDown.has('KeyD')) steer += 1.0;
+      engine.setSteeringInput(steer);
+    };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Escape' || e.code === 'KeyP') {
         if (engine.phase === 'paused') handleResumeRace();
         else handlePauseAndShowExitModal();
         return;
+      }
+      if (localPlayerCount === 2) {
+        if (['KeyA','KeyD','KeyS','KeyE','KeyQ','ArrowLeft','ArrowRight','ArrowDown','Enter','Slash'].includes(e.code)) e.preventDefault();
+        if (!e.repeat && e.code === 'KeyE') handleManualNitro(1);
+        if (!e.repeat && e.code === 'KeyQ') handleManualShield(1);
+        if (!e.repeat && e.code === 'Enter') handleManualNitro(2);
+        if (!e.repeat && e.code === 'Slash') handleManualShield(2);
+      } else if (!e.repeat && (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight')) {
+        engine.triggerNitro();
       }
       keysDown.add(e.code);
       updateControls();
@@ -465,59 +578,18 @@ export default function BaraSpeedRacingGame({
       updateControls();
     };
 
-    const updateControls = () => {
-      if (!engine || engine.phase === 'finished') return;
-
-      // Camera view toggle (always allowed)
-      if (keysDown.has('KeyC')) {
-        setCameraView((prev) => {
-          const views: CameraViewMode[] = ['chase', 'close_chase', 'hood', 'cockpit', 'cinematic'];
-          return views[(views.indexOf(prev) + 1) % views.length];
-        });
-        raceAudio.playMenuClick();
-        keysDown.delete('KeyC');
-      }
-
-      // Guard gameplay steering, throttle, brake, nitro to keyboard mode only
-      if (raceSettings.controlMode !== 'keyboard') return;
-
-      // Throttle (Gas)
-      if (keysDown.has('ArrowUp') || keysDown.has('KeyW')) {
-        engine.setThrottleInput(1.0);
-      } else if (!raceSettings.autoThrottle) {
-        engine.setThrottleInput(0);
-      }
-
-      // Brake / Reverse
-      if (keysDown.has('ArrowDown') || keysDown.has('KeyS')) {
-        engine.setBrakeInput(true);
-      } else {
-        engine.setBrakeInput(false);
-      }
-
-      // Steering
-      let steer = 0;
-      if (keysDown.has('ArrowLeft') || keysDown.has('KeyA')) {
-        steer -= 1.0;
-      }
-      if (keysDown.has('ArrowRight') || keysDown.has('KeyD')) {
-        steer += 1.0;
-      }
-      engine.setSteeringInput(steer);
-
-      // Nitro
-      if (keysDown.has('Space') || keysDown.has('ShiftLeft') || keysDown.has('ShiftRight')) {
-        engine.triggerNitro();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, { passive: false });
     window.addEventListener('keyup', handleKeyUp);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      manualFallbackRef.current = [{ steer: 0, brake: false }, { steer: 0, brake: false }];
+      if (localPlayerCount === 2 && engine.phase === 'racing') {
+        if (!dualDetectedRef.current[0]) { engine.setSteeringInput(0); engine.setBrakeInput(false); }
+        if (!dualDetectedRef.current[1]) { engine.setSecondPlayerSteeringInput(0); engine.setSecondPlayerBrakeInput(false); }
+      }
     };
-  }, [engine, currentSubScreen, raceSettings.autoThrottle, raceSettings.controlMode, handlePauseAndShowExitModal, handleResumeRace]);
+  }, [engine, currentSubScreen, raceSettings.autoThrottle, raceSettings.controlMode, localPlayerCount, applyManualFallback, handleManualNitro, handleManualShield, handlePauseAndShowExitModal, handleResumeRace]);
 
   // Start race runner
   const handleStartRace = (trackId: RacingTrackId, carId: CarModelId, mode: RaceMode) => {
@@ -526,6 +598,8 @@ export default function BaraSpeedRacingGame({
     setRaceMode(mode);
     setShowExitModal(false);
 
+    // Replays / route changes must not leave the previous RaceEngine/audio lifecycle alive.
+    releaseCurrentEngine();
     raceAudio.init();
 
     const effectivePlayerCount: LocalRacePlayerCount = mode === 'quick_race' ? localPlayerCount : 1;
@@ -545,6 +619,7 @@ export default function BaraSpeedRacingGame({
         : 'Đang dựng đường đua và cảnh vật...'
     );
 
+    engineRef.current = newEngine;
     setEngine(newEngine);
     setCurrentSubScreen('in_race');
   };
@@ -1233,6 +1308,10 @@ export default function BaraSpeedRacingGame({
               onExit={handlePauseAndShowExitModal}
               onGuide={() => setShowGestureGuide(true)}
               onSwitchCamera={handleCycleCameraView}
+              onManualSteer={handleManualSteer}
+              onManualBrake={handleManualBrake}
+              onManualNitro={handleManualNitro}
+              onManualShield={handleManualShield}
             />
           ) : (
           <RaceHUD
@@ -1332,14 +1411,17 @@ export default function BaraSpeedRacingGame({
             handleStartRace(selectedTrackId, selectedCarId, raceMode);
           }}
           onChooseTrack={() => {
+            releaseCurrentEngine();
             setRaceResult(null);
             setCurrentSubScreen('track_select');
           }}
           onGoGarage={() => {
+            releaseCurrentEngine();
             setRaceResult(null);
             setCurrentSubScreen('garage');
           }}
           onHome={() => {
+            releaseCurrentEngine();
             setRaceResult(null);
             setCurrentSubScreen('mode_select');
           }}

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useManagedTimeout } from '../../hooks/useManagedTimeout';
 import { 
   Sparkles, Shirt, Camera, Award, ArrowLeft, RefreshCw, 
   Trash2, Play, Sliders, Check, Lock, Star, ChevronLeft, ChevronRight 
@@ -56,6 +57,7 @@ export default function FashionGame({
   onUpdateProgress,
   onBack
 }: FashionGameProps) {
+  const scheduleTimeout = useManagedTimeout();
   // Navigation / Game States
   const [gameState, setGameState] = useState<'calibration' | 'dressing' | 'show'>('calibration');
   const [activeCategory, setActiveCategory] = useState<CategoryType>('hat');
@@ -536,7 +538,7 @@ export default function FashionGame({
           // Snap!
           audio.playDiceRoll();
           setShowPhotoFlash(true);
-          setTimeout(() => setShowPhotoFlash(false), 150);
+          scheduleTimeout(() => setShowPhotoFlash(false), 150);
           setLastPhoto(true);
           return null;
         }

@@ -158,7 +158,7 @@ export function createAsphaltTexture(size: number): THREE.Texture | null {
   }
   ctx.globalAlpha = 1;
 
-  const tex = new THREE.CanvasTexture(canvas);
+  const tex: THREE.Texture = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(1, 30);
   tex.colorSpace = THREE.SRGBColorSpace;

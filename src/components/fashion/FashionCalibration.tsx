@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useManagedTimeout } from '../../hooks/useManagedTimeout';
 import { Camera, Check, AlertCircle, Sparkles } from 'lucide-react';
 import { useCameraPose } from '../../providers/CameraPoseContext';
 import { audio } from '../../lib/AudioEngine';
@@ -18,6 +19,7 @@ export default function FashionCalibration({
   onCalibrationSuccess,
   onSkip
 }: FashionCalibrationProps) {
+  const scheduleTimeout = useManagedTimeout();
   const { landmarks, isStreaming, bodyDetected } = useCameraPose();
   
   const [checklist, setChecklist] = useState({
@@ -55,7 +57,7 @@ export default function FashionCalibration({
     if (!voiceTriggeredRef.current) {
       voiceTriggeredRef.current = true;
       audio.playCollect();
-      setTimeout(() => {
+      scheduleTimeout(() => {
         voiceGuide.speak('Chỉ cần thấy rõ mặt, vai, khuỷu tay và hai cổ tay là có thể thử đồ nửa người. Nếu thấy thêm chân, gương sẽ tự mở chế độ toàn thân nhé!', 'high');
       }, 500);
     }
@@ -192,7 +194,7 @@ export default function FashionCalibration({
           'high'
         );
 
-        setTimeout(() => {
+        scheduleTimeout(() => {
           onCalibrationSuccessRef.current(isFullBodyValid);
         }, 350);
       }

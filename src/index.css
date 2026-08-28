@@ -108,3 +108,16 @@
 .garage-car-strip::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(90deg, rgba(103, 232, 249, 1), rgba(192, 132, 252, 1));
 }
+
+
+/* V5.43 Release Gate: visible keyboard/TV focus without changing pointer layout. */
+:where(button, [role='button'], a, input, select):focus-visible {
+  outline: 3px solid rgba(253, 224, 71, 0.95);
+  outline-offset: 3px;
+}
+
+@media (pointer: coarse) and (min-width: 700px) {
+  :where(button, [role='button'], a):focus-visible {
+    transform: scale(1.035);
+  }
+}

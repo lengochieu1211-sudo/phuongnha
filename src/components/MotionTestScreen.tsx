@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useManagedTimeout } from '../hooks/useManagedTimeout';
 import {
   CheckCircle2,
   Circle,
@@ -53,6 +54,7 @@ const GESTURE_CHECKLIST: GestureTestItem[] = [
 ];
 
 export default function MotionTestScreen({ onBack }: MotionTestScreenProps) {
+  const scheduleTimeout = useManagedTimeout();
   const {
     isStreaming,
     isCameraReady,
@@ -145,7 +147,7 @@ export default function MotionTestScreen({ onBack }: MotionTestScreenProps) {
           setLeftTargetHit(true);
           setTargetScore((s) => s + 10);
           audio.playPop();
-          setTimeout(() => setLeftTargetHit(false), 700);
+          scheduleTimeout(() => setLeftTargetHit(false), 700);
         }
       }
     }
@@ -157,7 +159,7 @@ export default function MotionTestScreen({ onBack }: MotionTestScreenProps) {
           setRightTargetHit(true);
           setTargetScore((s) => s + 10);
           audio.playPop();
-          setTimeout(() => setRightTargetHit(false), 700);
+          scheduleTimeout(() => setRightTargetHit(false), 700);
         }
       }
     }

@@ -185,7 +185,7 @@ export class PoseDetectorManager {
   public setMode(mode: TrackingMode) {
     if (this.mode === mode) return;
     this.mode = mode;
-    if (this.isRunning && this.videoElement && this.canvasElement) {
+    if (this.processingEnabled && this.isRunning && this.videoElement && this.canvasElement) {
       this.restartTracking();
     }
   }
@@ -199,12 +199,15 @@ export class PoseDetectorManager {
     this.processingEnabled = enabled;
     if (!enabled) {
       this.isProcessingFrame = false;
-      // 2P racing owns two lightweight pose loops. Stop the single-pose RAF/interval
-      // completely instead of leaving an idle callback running every display frame.
+      // 2P racing owns one sequential dual-crop pose loop. Stop the shared single-player
+      // RAF/interval completely instead of duplicating MediaPipe work every display frame.
       this.stopMediaPipe();
+      this.releaseMediaPipeInstance();
       this.stopPixelMotion();
     } else if (changed && this.isRunning) {
-      // Reuse the already-loaded model/scripts when returning to normal 1P mode.
+      // Scripts stay cached by the page, but the actual Pose/WASM instance is recreated
+      // after 2P releases ownership. This prevents one dormant 1P model plus one active
+      // 2P model from occupying memory at the same time on phones/Android TV.
       this.restartTracking();
     }
     if (changed && typeof window !== 'undefined') {
@@ -250,8 +253,18 @@ export class PoseDetectorManager {
     this.canvasCtx = canvas.getContext('2d', { willReadFrequently: true });
     this.mode = mode;
     this.isRunning = true;
-    this.status = 'loading';
 
+    // Local 2P racing can own the camera frames while the shared single-player detector
+    // is suspended. Do not create/restart another MediaPipe/WASM loop until processing
+    // is explicitly re-enabled; the webcam stream itself remains alive in the provider.
+    if (!this.processingEnabled) {
+      this.status = 'idle';
+      this.stopMediaPipe();
+      this.stopPixelMotion();
+      return;
+    }
+
+    this.status = 'loading';
     this.restartTracking();
   }
 
@@ -259,6 +272,7 @@ export class PoseDetectorManager {
     this.isRunning = false;
     this.status = 'idle';
     this.stopMediaPipe();
+    this.releaseMediaPipeInstance();
     this.stopPixelMotion();
     this.prevLeftWrist = null;
     this.prevRightWrist = null;
@@ -272,7 +286,7 @@ export class PoseDetectorManager {
     this.stopMediaPipe();
     this.stopPixelMotion();
 
-    if (!this.isRunning || !this.videoElement || !this.canvasElement) return;
+    if (!this.processingEnabled || !this.isRunning || !this.videoElement || !this.canvasElement) return;
 
     if (this.mode === 'mediapipe') {
       this.startMediaPipe();
@@ -357,6 +371,20 @@ export class PoseDetectorManager {
       this.rafId = null;
     }
     this.isProcessingFrame = false;
+  }
+
+  private releaseMediaPipeInstance() {
+    const pose = this.mediaPipePose;
+    this.mediaPipePose = null;
+    if (!pose) return;
+    try {
+      const maybePromise = pose.close?.();
+      if (maybePromise && typeof maybePromise.catch === 'function') {
+        maybePromise.catch(() => undefined);
+      }
+    } catch {
+      // Cleanup must never block navigation/fallback controls.
+    }
   }
 
   private async loadMediaPipeScripts(): Promise<void> {

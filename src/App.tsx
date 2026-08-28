@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameScreen, PlayerProgress, GameGesture, WorldConfig } from './types';
 import { loadProgress, saveProgress, WORLDS, evaluateAchievements } from './utils/progression';
 import { audio } from './lib/AudioEngine';
@@ -39,6 +39,7 @@ import LandscapeNotice from './components/LandscapeNotice';
 import TVModeModal from './components/TVModeModal';
 
 export default function App() {
+  const keyboardResetTimerRef = useRef<number | null>(null);
   const isTVDisplay = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tv') === '1';
   const [progress, setProgress] = useState<PlayerProgress>(() => loadProgress());
   const [currentScreen, setCurrentScreen] = useState<GameScreen>('menu');
@@ -222,7 +223,9 @@ export default function App() {
 
     const handleKeyUp = () => {
       if (trackingMode !== 'keyboard_only') return;
-      setTimeout(() => {
+      if (keyboardResetTimerRef.current !== null) window.clearTimeout(keyboardResetTimerRef.current);
+      keyboardResetTimerRef.current = window.setTimeout(() => {
+        keyboardResetTimerRef.current = null;
         setSimulatedGesture('standing');
       }, 300);
     };
@@ -232,14 +235,19 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      if (keyboardResetTimerRef.current !== null) {
+        window.clearTimeout(keyboardResetTimerRef.current);
+        keyboardResetTimerRef.current = null;
+      }
     };
   }, [setSimulatedGesture, trackingMode, isStreaming]);
 
   // Manage camera lifecycle only for screens that actually consume pose/camera data.
-  // This prevents webcam/MediaPipe from burning battery/GPU in screens that do not consume camera data.
+  // Racing owns its camera at sub-screen granularity (duo setup / calibration / active race)
+  // so Garage, track select, podium and racing menus do not keep webcam/MediaPipe alive.
   useEffect(() => {
     const cameraScreens: GameScreen[] = [
-      'adventure', 'racing', 'starcatcher', 'mimic', 'dance', 'fruitslash',
+      'adventure', 'starcatcher', 'mimic', 'dance', 'fruitslash',
       'chickenblaster', 'sweetzombie', 'workout_session', 'parentplay',
       'dressing', 'ninja', 'goalkeeper', 'magicacademy', 'ludo', 'petcare', 'cameratest', 'calibration'
     ];

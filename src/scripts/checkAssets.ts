@@ -50,7 +50,7 @@ const maxFbxBytes: Record<string, number> = {
   'assets/cars/roadster-883-3d.fbx': 6_500_000,
   'assets/cars/vespa-studio-3d.fbx': 24_000_000,
   'assets/cars/s14-sport-coupe.fbx': 5_800_000,
-  'assets/cars/rescue-truck-hauler.fbx': 30_000_000,
+  'assets/cars/rescue-truck-hauler.fbx': 24_500_000,
   'assets/cars/xedap-city-bike.fbx': 18_300_000,
   'assets/cars/capybara-lowpoly-racer.fbx': 900_000,
   'assets/vehicles-extra/police-motorcycle-racer.fbx': 380_000,
@@ -111,6 +111,10 @@ const vite = fs.readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
 if (!workflow.includes('--base=/phuongnha/')) {
   console.error('[asset] GitHub Pages workflow must build with --base=/phuongnha/');
+  failed = true;
+}
+if (!vite.includes("base: '/phuongnha/'")) {
+  console.error('[asset] vite.config.ts must keep base /phuongnha/');
   failed = true;
 }
 if (!vite.includes('defineConfig')) {

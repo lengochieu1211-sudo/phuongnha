@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useManagedTimeout } from '../hooks/useManagedTimeout';
 import { Star, Zap, Clock, Timer, Award, ArrowLeft, RotateCcw, Sparkles, Gift } from 'lucide-react';
 import { PlayerProgress, GameGesture } from '../types';
 import { audio } from '../lib/AudioEngine';
@@ -44,6 +45,7 @@ export default function StarCatcherGame({
   workoutMode = false,
   isPaused = false,
 }: StarCatcherGameProps) {
+  const scheduleTimeout = useManagedTimeout();
   const [gameState, setGameState] = useState<'intro' | 'playing' | 'game_over'>(() => workoutMode ? 'playing' : 'intro');
   const [score, setScore] = useState<number>(0);
   const [combo, setCombo] = useState<number>(0);
@@ -367,7 +369,7 @@ export default function StarCatcherGame({
       id: Date.now() + i,
     }));
     setParticles((prev) => [...prev, ...newParts]);
-    setTimeout(() => {
+    scheduleTimeout(() => {
       setParticles((prev) => prev.filter((p) => !newParts.find((np) => np.id === p.id)));
     }, 1200);
   };

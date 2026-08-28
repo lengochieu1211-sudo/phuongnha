@@ -166,6 +166,9 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     let externalLoadCancelled = false;
     let acceptLateExternalModel = true;
     let externalReadyPromise: Promise<void> = Promise.resolve();
+    let externalWaitTimer: number | null = null;
+    let warmupRaf1: number | null = null;
+    let warmupRaf2: number | null = null;
 
     if (
       isExternalCar(car.id) &&
@@ -438,8 +441,17 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       const maxExternalWaitMs = actualDeviceClass === 'desktop' ? 7000 : 3800;
       const externalLoadedInTime = await Promise.race([
         externalReadyPromise.then(() => true),
-        new Promise<boolean>((resolve) => window.setTimeout(() => resolve(false), maxExternalWaitMs)),
+        new Promise<boolean>((resolve) => {
+          externalWaitTimer = window.setTimeout(() => {
+            externalWaitTimer = null;
+            resolve(false);
+          }, maxExternalWaitMs);
+        }),
       ]);
+      if (externalWaitTimer !== null) {
+        window.clearTimeout(externalWaitTimer);
+        externalWaitTimer = null;
+      }
       if (!externalLoadedInTime) acceptLateExternalModel = false;
       if (readyCancelled || externalLoadCancelled) return;
 
@@ -457,9 +469,15 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
       // Give the browser two presentation frames after shader compilation. This avoids
       // starting 3-2-1 in the same frame as the final GPU upload on slower PCs/TV boxes.
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
-      );
+      await new Promise<void>((resolve) => {
+        warmupRaf1 = requestAnimationFrame(() => {
+          warmupRaf1 = null;
+          warmupRaf2 = requestAnimationFrame(() => {
+            warmupRaf2 = null;
+            resolve();
+          });
+        });
+      });
       if (!readyCancelled && !externalLoadCancelled) onReady?.();
     })();
 
@@ -718,6 +736,9 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
       fbxSceneryHandle?.dispose();
       externalPlayerHandle?.dispose();
       externalAiHandles.forEach((handle) => handle.dispose());
+      if (externalWaitTimer !== null) window.clearTimeout(externalWaitTimer);
+      if (warmupRaf1 !== null) cancelAnimationFrame(warmupRaf1);
+      if (warmupRaf2 !== null) cancelAnimationFrame(warmupRaf2);
       if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
       resizeObserver.disconnect();
       scene.traverse((obj: any) => {

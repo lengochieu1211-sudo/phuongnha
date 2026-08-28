@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useManagedTimeout } from '../hooks/useManagedTimeout';
 import { X, Volume2, VolumeX, Mic, Sparkles, Play, Check, Heart, User, Smile, Sliders, Info } from 'lucide-react';
 import { voiceGuide, VoiceStyle, VoiceGuideSettings } from '../lib/VoiceGuideService';
 import { audio } from '../lib/AudioEngine';
@@ -14,6 +15,7 @@ interface VoiceSettingsModalProps {
 }
 
 export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsModalProps) {
+  const scheduleTimeout = useManagedTimeout();
   const [settings, setSettings] = useState<VoiceGuideSettings>(() => voiceGuide.getSettings());
   const [isPlayingPreview, setIsPlayingPreview] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -45,7 +47,7 @@ export default function VoiceSettingsModal({ isOpen, onClose }: VoiceSettingsMod
     audio.playMenuClick();
     setIsPlayingPreview(true);
     voiceGuide.previewVoiceStyle(style);
-    setTimeout(() => setIsPlayingPreview(false), 2800);
+    scheduleTimeout(() => setIsPlayingPreview(false), 2800);
   };
 
   const handlePitchChange = (pitch: number) => {

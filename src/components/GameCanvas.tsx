@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useManagedTimeout } from '../hooks/useManagedTimeout';
 import { ArrowLeft, Play, Pause, RotateCcw, Star, Trophy, Heart, Flame, Shield, CloudRain } from 'lucide-react';
 import { PlayerProgress, GameGesture, WorldConfig, CharacterId } from '../types';
 import { audio } from '../lib/AudioEngine';
@@ -48,6 +49,7 @@ export default function GameCanvas({
   isPaused = false,
   onBack,
 }: GameCanvasProps) {
+  const scheduleTimeout = useManagedTimeout();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [score, setScore] = useState<number>(0);
@@ -278,7 +280,7 @@ export default function GameCanvas({
   const addFloatingText = (text: string, x: number, y: number) => {
     const id = Date.now() + Math.random();
     setFloatingText((prev) => [...prev, { id, text, x, y }]);
-    setTimeout(() => {
+    scheduleTimeout(() => {
       setFloatingText((prev) => prev.filter((t) => t.id !== id));
     }, 1200);
   };

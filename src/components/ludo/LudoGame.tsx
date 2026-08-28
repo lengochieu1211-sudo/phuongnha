@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useManagedTimeout } from '../../hooks/useManagedTimeout';
 import {
   ArrowLeft,
   RotateCcw,
@@ -57,6 +58,8 @@ export default function LudoGame({
   gesture,
   onBack,
 }: LudoGameProps) {
+  const scheduleTimeout = useManagedTimeout();
+  const hopTimerRef = useRef<number | null>(null);
   const [engine] = useState<LudoGameEngine>(() => new LudoGameEngine());
   const [gameState, setGameState] = useState<LudoGameState>(engine.state);
   const [showSetupModal, setShowSetupModal] = useState<boolean>(true);
@@ -147,7 +150,7 @@ export default function LudoGame({
     updateState();
     audio.playDiceRoll();
 
-    setTimeout(() => {
+    scheduleTimeout(() => {
       engine.state.isRolling = false;
       const rolledVal = engine.rollDice();
       updateState();
@@ -175,7 +178,7 @@ export default function LudoGame({
       // Check if no legal moves exist
       if (engine.state.validPiecesToMove.length === 0) {
         speakVoice(`Rất tiếc! Không có quân nào đi được. Đổi lượt tiếp theo nhé!`);
-        setTimeout(() => {
+        scheduleTimeout(() => {
           advanceToNextTurn();
         }, 1800);
       } else if (
@@ -184,7 +187,7 @@ export default function LudoGame({
         !currentPlayer.isAI
       ) {
         // Auto select and move if only 1 option available
-        setTimeout(() => {
+        scheduleTimeout(() => {
           handlePieceSelect(engine.state.validPiecesToMove[0]);
         }, 1200);
       }
@@ -212,7 +215,8 @@ export default function LudoGame({
     let stepIndex = 0;
     const hopInterval = gameState.rules.moveSpeed === 'fast' ? 120 : 200;
 
-    const hopTimer = setInterval(() => {
+    if (hopTimerRef.current !== null) window.clearInterval(hopTimerRef.current);
+    hopTimerRef.current = window.setInterval(() => {
       if (stepIndex < calc.routeCoords.length) {
         setMovingPieceInfo({
           playerId: currentPlayer.id,
@@ -222,7 +226,10 @@ export default function LudoGame({
         audio.playPieceHop();
         stepIndex++;
       } else {
-        clearInterval(hopTimer);
+        if (hopTimerRef.current !== null) {
+          window.clearInterval(hopTimerRef.current);
+          hopTimerRef.current = null;
+        }
         setMovingPieceInfo(null);
         setPreviewCoords([]);
 
@@ -239,7 +246,7 @@ export default function LudoGame({
             victimMascot: result.captured.mascot,
           });
           speakVoice('ludo.capture', true);
-          setTimeout(() => setPopCaptureEvent(null), 2500);
+          scheduleTimeout(() => setPopCaptureEvent(null), 2500);
         }
 
         // Handle Magic Tile Event
@@ -274,7 +281,7 @@ export default function LudoGame({
           engine.state.selectedPieceId = null;
           updateState();
         } else {
-          setTimeout(() => {
+          scheduleTimeout(() => {
             advanceToNextTurn();
           }, 800);
         }
@@ -299,6 +306,13 @@ export default function LudoGame({
     audio.playUndo();
     speakVoice('Đã hoàn tác nước vừa chọn!');
   };
+
+  useEffect(() => () => {
+    if (hopTimerRef.current !== null) {
+      window.clearInterval(hopTimerRef.current);
+      hopTimerRef.current = null;
+    }
+  }, []);
 
   // AI Automatic Play Logic
   useEffect(() => {

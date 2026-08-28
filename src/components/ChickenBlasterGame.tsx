@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useManagedTimeout } from '../hooks/useManagedTimeout';
 import {
   Sparkles,
   ArrowLeft,
@@ -99,6 +100,7 @@ export default function ChickenBlasterGame({
   workoutMode = false,
   isPaused = false,
 }: ChickenBlasterGameProps) {
+  const scheduleTimeout = useManagedTimeout();
   const { isStreaming, poseStatus } = useCameraPose();
 
   // Game state
@@ -287,7 +289,7 @@ export default function ChickenBlasterGame({
       if (hitChicken) {
         const targetChicken: ActiveChicken = hitChicken;
         setCrosshairFlash('green');
-        setTimeout(() => setCrosshairFlash(null), 150);
+        scheduleTimeout(() => setCrosshairFlash(null), 150);
 
         setChickens((prev) =>
           prev.map((c) => {
@@ -757,7 +759,7 @@ export default function ChickenBlasterGame({
                 setEggSplattered(true);
                 setCombo(0); // Reset combo
                 setScore((s) => Math.max(0, s - 5)); // Small deduction, non-violent
-                setTimeout(() => setEggSplattered(false), 1800);
+                scheduleTimeout(() => setEggSplattered(false), 1800);
                 return { ...egg, y: 150 }; // remove
               }
             }
