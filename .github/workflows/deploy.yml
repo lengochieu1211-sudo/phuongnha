@@ -3,6 +3,8 @@ name: Deploy Phuong Nha to GitHub Pages
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
@@ -30,18 +32,26 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Release gate checks
+        run: npm run check
+
       - name: Build Vite app
         run: npm run build -- --base=/phuongnha/
 
       - name: Setup Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy]')
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy]')
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
   deploy:
+    # Check/build runs on every main push and PR. Production Pages deploy is explicit only:
+    # the main-branch commit message must contain [deploy].
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy]')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
