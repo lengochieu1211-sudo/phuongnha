@@ -31,6 +31,7 @@ jobs:
           cat .release/v5.43/part-* | tr -d '\r\n ' > /tmp/v543/source.patch.gz.b64
           cp .release/v5.43/useManagedTimeout.ts.b64 /tmp/v543/
           cp .release/v5.43/releaseGateStatic.mjs.b64 /tmp/v543/
+          cp .release/v5.43/graphicsQuality.ts.b64 /tmp/v543/
           cp .release/v5.43/final-sha256.txt /tmp/v543/
           base64 -d /tmp/v543/source.patch.gz.b64 > /tmp/v543/source.patch.gz
           echo "0f76118539b798c95af2972b19c8a4cd357fb75d3e2fb48dd2c3c6dda88a6186  /tmp/v543/source.patch.gz" | sha256sum -c -
@@ -40,6 +41,8 @@ jobs:
           echo "e91ec16bccd42ae07cc7a1d019a552829934e3ad4d1a60cc99e92a09be7186d4  /tmp/v543/useManagedTimeout.ts" | sha256sum -c -
           base64 -d /tmp/v543/releaseGateStatic.mjs.b64 > /tmp/v543/releaseGateStatic.mjs
           echo "cac81668fd50257629b2aafb7a85a09573737c35baf11bda7f72989eb502b7be  /tmp/v543/releaseGateStatic.mjs" | sha256sum -c -
+          base64 -d /tmp/v543/graphicsQuality.ts.b64 > /tmp/v543/graphicsQuality.ts
+          echo "e8ef477929d869ea11dd192f673d10dcc801cdc6406dbc32894b14264c5bad83  /tmp/v543/graphicsQuality.ts" | sha256sum -c -
 
       - name: Apply V5.43 on latest main
         shell: bash
@@ -64,9 +67,10 @@ jobs:
             git checkout --theirs -- "${expected[@]}"
             git add -- "${expected[@]}"
           fi
-          mkdir -p src/hooks src/scripts
+          mkdir -p src/hooks src/scripts src/utils
           install -m 0644 /tmp/v543/useManagedTimeout.ts src/hooks/useManagedTimeout.ts
           install -m 0644 /tmp/v543/releaseGateStatic.mjs src/scripts/releaseGateStatic.mjs
+          install -m 0644 /tmp/v543/graphicsQuality.ts src/utils/graphicsQuality.ts
           sha256sum -c /tmp/v543/final-sha256.txt
           git diff --check
           test ! -e node_modules
