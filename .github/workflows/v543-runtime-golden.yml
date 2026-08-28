@@ -101,11 +101,18 @@ jobs:
               return e
 
           def click_text(d, text, timeout=30):
-              xp = f"//button[contains(normalize-space(.), {json.dumps(text)})]"
+              xp = f"//button[contains(normalize-space(.), {json.dumps(text, ensure_ascii=False)})]"
               e = WebDriverWait(d, timeout).until(EC.element_to_be_clickable((By.XPATH, xp)))
               d.execute_script('arguments[0].scrollIntoView({block:"center"});', e)
               e.click()
               return e
+
+          def dismiss_landscape_notice(d):
+              for e in d.find_elements(By.XPATH, "//button[normalize-space(.)='Đóng']"):
+                  if e.is_displayed():
+                      d.execute_script('arguments[0].click();', e)
+                      time.sleep(0.2)
+                      break
 
           def overflow_x(d):
               return d.execute_script('return Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth;')
@@ -136,6 +143,7 @@ jobs:
                   raise AssertionError('browser severe/uncaught errors: ' + ' | '.join(bad[:5]))
 
           def select_two_player_and_open_setup(d):
+              dismiss_landscape_notice(d)
               click_text(d, '2 NGƯỜI · 1 CAMERA')
               time.sleep(0.35)
               click_id(d, 'mode-quick-race-card')
@@ -175,6 +183,7 @@ jobs:
 
                   click_id(d, 'mode-garage-card')
                   wait_id(d, 'garage-showroom-screen', 30)
+                  dismiss_landscape_notice(d)
                   if label == 'mobile' and overflow_x(d) > 4:
                       raise AssertionError(f'garage horizontal overflow={overflow_x(d)}')
                   if not d.find_element(By.ID, 'garage-next-car-btn').is_displayed():
@@ -226,6 +235,7 @@ jobs:
 
                   click_id(d, 'mode-garage-card')
                   wait_id(d, 'garage-showroom-screen', 30)
+                  dismiss_landscape_notice(d)
                   fallback = wait_id(d, 'garage-webgl-fallback', 20)
                   if not fallback.is_displayed():
                       raise AssertionError('Garage fallback is not visible with forced no-WebGL')
