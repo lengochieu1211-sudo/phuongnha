@@ -28,3 +28,8 @@ Runtime Golden V2 đã PASS 4/4 cấu hình:
 Mỗi ca kiểm Home → Racing Hub → Garage → 2P setup → Track Select → Race → P1/P2 HUD → fallback → exit → camera cleanup.
 
 Ngoài ra runner sạch đã PASS `npm ci`, Release Gate, TypeScript, asset checks, voice checks và Vite production build.
+
+### Web deployment
+
+- GitHub Pages deployment của v5.43.0 được kích hoạt sau khi Release Gate, Runtime Golden và CI trên `main` đã PASS.
+- Commit deploy không thay đổi logic/tính năng ứng dụng; chỉ ghi nhận mốc triển khai production.
