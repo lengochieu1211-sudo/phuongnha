@@ -39,7 +39,7 @@ jobs:
           base64 -d /tmp/v543/useManagedTimeout.ts.b64 > /tmp/v543/useManagedTimeout.ts
           echo "e91ec16bccd42ae07cc7a1d019a552829934e3ad4d1a60cc99e92a09be7186d4  /tmp/v543/useManagedTimeout.ts" | sha256sum -c -
           base64 -d /tmp/v543/releaseGateStatic.mjs.b64 > /tmp/v543/releaseGateStatic.mjs
-          echo "f85f88db947d35be462dfca7ddbae542dd01c8df65ec51459d10571d05024632  /tmp/v543/releaseGateStatic.mjs" | sha256sum -c -
+          echo "9e1d3689bcd8df129923e9f06cdee22c9810954e89ac718821368808b732de0f  /tmp/v543/releaseGateStatic.mjs" | sha256sum -c -
 
       - name: Apply V5.43 on latest main
         shell: bash
