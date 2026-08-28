@@ -37,7 +37,6 @@ jobs:
           git apply /tmp/v543-final.patch
           git diff --check
           rm -rf .release-final
-          rm -f .github/workflows/v543-finalize-source.yml
 
       - name: Preinstall static release gate
         run: node src/scripts/releaseGateStatic.mjs
@@ -56,6 +55,9 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf node_modules dist
+          # The Actions token may not modify workflow files. Keep both workflow files byte-identical
+          # to this branch during the bot push; the authenticated repo connection updates/removes them next.
+          git restore --source=HEAD -- .github/workflows/deploy.yml .github/workflows/v543-finalize-source.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
