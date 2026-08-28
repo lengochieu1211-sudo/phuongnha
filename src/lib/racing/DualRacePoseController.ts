@@ -86,6 +86,15 @@ class DualRacePoseController {
 
   async start(video: HTMLVideoElement): Promise<boolean> {
     this.video = video;
+    // MediaPipe Pose requires a usable WebGL context internally. On blocked/low-end
+    // environments, skip Pose entirely so 2P manual keyboard/touch fallback remains
+    // responsive instead of allowing MediaPipe to raise a browser-level WebGL alert.
+    if (!this.hasUsableWebGL()) {
+      console.warn('Dual race pose disabled: WebGL unavailable; using manual fallback.');
+      this.stop();
+      this.emit([emptyPlayer(1), emptyPlayer(2)]);
+      return false;
+    }
     // Reuse the single light Pose instance between Duo Setup -> Track Select -> Race.
     // Recreating WASM/model state during 3-2-1 caused a visible hitch on TV boxes.
     if (this.pose) {
@@ -141,13 +150,30 @@ class DualRacePoseController {
     });
   }
 
+
+  private hasUsableWebGL(): boolean {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = (canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: false })
+        || canvas.getContext('webgl', { failIfMajorPerformanceCaveat: false })) as WebGLRenderingContext | null;
+      if (!gl) return false;
+      // Release the probe context immediately; the probe must not consume one of the
+      // limited WebGL contexts on Android/TV devices.
+      try { gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {}
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   private createPose() {
     const pose = new (window as any).Pose({
       locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
     });
     pose.setOptions({
       // Dual mode intentionally uses the lightest model. Rendering remains 30–60 FPS while
-      // pose inference runs independently at a device-aware 8–18 FPS.
+      // pose inference runs independently at a much lower device-aware cadence. Each
+      // controller cycle processes TWO crops, so 8 Hz here already means ~16 Pose sends/s.
       modelComplexity: 0,
       smoothLandmarks: true,
       enableSegmentation: false,
@@ -185,7 +211,10 @@ class DualRacePoseController {
   private loop = () => {
     if (!this.running) return;
     const device = detectDeviceClass();
-    const targetFps = device === 'desktop' ? 16 : device === 'tv' ? 10 : device === 'tablet' ? 10 : 8;
+    // One dual cycle performs two sequential Pose.send() calls (P1 + P2). Keep the
+    // aggregate inference rate conservative so the browser main thread remains available
+    // for 3D rendering, keyboard/touch fallback and the exit UI.
+    const targetFps = device === 'desktop' ? 8 : device === 'tv' ? 6 : device === 'tablet' ? 6 : 5;
     const interval = 1000 / targetFps;
     const now = performance.now();
     if (!this.processing && now - this.lastInference >= interval) {
@@ -205,7 +234,7 @@ class DualRacePoseController {
       const vh = video.videoHeight;
       const cropW = Math.floor(vw / 2);
       const device = detectDeviceClass();
-      const targetH = device === 'desktop' ? 480 : device === 'tv' ? 360 : 320;
+      const targetH = device === 'desktop' ? 360 : device === 'tv' ? 288 : device === 'tablet' ? 288 : 256;
       const targetW = Math.max(160, Math.round(targetH * (cropW / vh)));
       for (const c of [this.canvasP1, this.canvasP2]) {
         if (c.width !== targetW) c.width = targetW;

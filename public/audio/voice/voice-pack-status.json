@@ -1,11 +1,11 @@
 {
   "recordedPackAvailable": true,
   "voiceStyle": "female_offline_vi_optional_fallback",
-  "generator": "offline Vietnamese female-formant synthetic fallback (manual opt-in)",
+  "generator": "bundled offline Vietnamese female-formant synthetic fallback (manual opt-in)",
   "totalFiles": 366,
   "validFiles": 366,
   "invalidFiles": 0,
   "missingFiles": 0,
-  "note": "Synthetic offline fallback pack, not a human recording. V5.27 keeps MP3 fallback disabled by default; Web Speech Vietnamese non-male/female voices are preferred.",
-  "autoPlayback": false
+  "checkedAt": "2026-08-28T14:49:41.016Z",
+  "note": "Synthetic offline fallback pack, not a human recording. V5.27 keeps MP3 fallback disabled by default; Web Speech Vietnamese non-male/female voices are preferred."
 }

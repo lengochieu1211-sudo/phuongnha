@@ -5,6 +5,8 @@
 
 import React, { useState } from 'react';
 import MagicalWorldHub from './MagicalWorldHub';
+import VersionInfoModal from './VersionInfoModal';
+import { BUILD_INFO } from '../lib/buildInfo';
 import {
   Sparkles,
   Trophy,
@@ -75,6 +77,7 @@ export default function MainMenu({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [minigameFilter, setMinigameFilter] = useState<'all' | '3d' | 'board' | 'reflex' | 'dance'>('all');
   const [wardrobeFilter, setWardrobeFilter] = useState<'all' | 'skin' | 'accessory'>('all');
+  const [showVersionInfo, setShowVersionInfo] = useState(false);
 
   const buyOrEquipSkin = (item: typeof SKINS[0]) => {
     const isSkin = item.type === 'skin';
@@ -250,6 +253,16 @@ export default function MainMenu({
               <span className="text-sm md:text-base">📺</span><span className="text-[11px] md:text-xs font-black">TV / Mi Box</span>
             </button>
           )}
+
+          <button
+            id="header-version-info-btn"
+            onClick={() => setShowVersionInfo(true)}
+            className="p-1.5 px-2.5 md:p-2 md:px-3 md:py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-full border border-slate-300 shadow-xs transition active:scale-95 flex items-center gap-1 shrink-0"
+            title="Xem phiên bản, thời gian build và ghi chú cập nhật"
+          >
+            <span className="text-sm md:text-base">ℹ️</span>
+            <span className="text-[11px] md:text-xs font-black">v{BUILD_INFO.version}</span>
+          </button>
 
           {/* Camera Quick Live Status */}
           <div className="flex items-center bg-white rounded-full p-0.5 border-2 border-emerald-300 shadow-xs shrink-0">
@@ -1670,6 +1683,8 @@ export default function MainMenu({
           </nav>
         </>
       )}
+
+      {showVersionInfo && <VersionInfoModal onClose={() => setShowVersionInfo(false)} />}
     </div>
   );
 }

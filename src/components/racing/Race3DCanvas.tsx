@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {
   RacingTrackConfig,
@@ -56,6 +56,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
   const particlesRef = useRef<THREE.Points | null>(null);
   const animFrameIdRef = useRef<number | null>(null);
   const cameraViewRef = useRef<CameraViewMode>(cameraView);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
     cameraViewRef.current = cameraView;
@@ -94,8 +95,31 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
     const secondCamera = twoPlayer ? new THREE.PerspectiveCamera(54, width / height, 0.12, 1400) : null;
     secondCameraRef.current = secondCamera;
 
-    // 2. WebGL Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    // 2. WebGL Renderer. Some Android/TV browsers and headless/locked-down
+    // environments can reject WebGL context creation. Never let that exception
+    // unmount the entire app: keep the race shell/HUD alive so the user can exit.
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+      setRenderError(null);
+    } catch (error) {
+      console.warn('[Race3D] WebGL unavailable; showing safe fallback instead of crashing.', error);
+      setRenderError('Không thể mở đồ họa 3D trên thiết bị/trình duyệt này. Bạn có thể quay lại menu và chọn chế độ khác.');
+      scene.traverse((obj: any) => {
+        obj.geometry?.dispose?.();
+        const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
+        mats.forEach((m: any) => { m.map?.dispose?.(); m.dispose?.(); });
+      });
+      scene.environment?.dispose?.();
+      sceneRef.current = null;
+      cameraRef.current = null;
+      secondCameraRef.current = null;
+      rendererRef.current = null;
+      onReady?.();
+      return () => {
+        scene.environment?.dispose?.();
+      };
+    }
     renderer.setSize(width, height);
     const splitRatioScale = twoPlayer ? (actualDeviceClass === 'desktop' ? 0.88 : 0.74) : 1;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, profile.pixelRatioCap * splitRatioScale));
@@ -108,6 +132,16 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
+    let rendererContextLost = false;
+    const handleRendererContextLost = (event: Event) => {
+      event.preventDefault();
+      rendererContextLost = true;
+      if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
+      rendererRef.current = null;
+      console.warn('[Race3D] WebGL context lost; keeping race UI alive with fallback.');
+      setRenderError('Đồ họa 3D đã bị ngắt. Hãy quay lại menu hoặc thử giảm chất lượng đồ họa.');
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleRendererContextLost, false);
 
     // 3. Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -746,6 +780,7 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
         const mats = Array.isArray(obj.material) ? obj.material : obj.material ? [obj.material] : [];
         mats.forEach((m: any) => { m.map?.dispose?.(); m.dispose?.(); });
       });
+      renderer.domElement.removeEventListener('webglcontextlost', handleRendererContextLost, false);
       renderer.dispose();
       renderer.forceContextLoss?.();
       if (renderer.domElement.parentElement === container) container.removeChild(renderer.domElement);
@@ -761,10 +796,24 @@ export const Race3DCanvas: React.FC<Race3DCanvasProps> = ({
 
   return (
     <div
-      ref={containerRef}
       id="race-3d-viewport"
       className="w-full h-full absolute inset-0 bg-slate-950 overflow-hidden"
-    />
+    >
+      <div ref={containerRef} className="absolute inset-0" />
+      {renderError && (
+        <div
+          id="race-webgl-fallback"
+          className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-slate-900 via-slate-950 to-black px-6 text-center"
+        >
+          <div className="max-w-lg rounded-3xl border border-amber-400/30 bg-slate-950/90 p-6 shadow-2xl">
+            <div className="text-5xl mb-3">🏁</div>
+            <div className="text-xl font-black text-white">Không mở được đồ họa 3D</div>
+            <p className="mt-2 text-sm font-semibold text-amber-200">{renderError}</p>
+            <p className="mt-2 text-xs text-slate-400">Ứng dụng vẫn hoạt động và nút thoát cuộc đua vẫn dùng được.</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
