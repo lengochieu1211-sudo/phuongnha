@@ -1,0 +1,198 @@
+name: V5.43 Runtime Golden V2
+
+on:
+  push:
+    branches:
+      - runtime/v5.43-golden
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-golden-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Apply exact audited runtime patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .runtime/v543-webgl-part-00.b64 .runtime/v543-webgl-part-01.b64 .runtime/v543-webgl-part-02.b64 | tr -d '\r\n ' | base64 -d > /tmp/webgl.patch
+          echo "450b802d344bc0d8d6b1c396bdcc1c6dfc6d1019d846441530d2fbf95c3de1ca  /tmp/webgl.patch" | sha256sum -c -
+          git apply --check /tmp/webgl.patch
+          git apply /tmp/webgl.patch
+          base64 -d .runtime/v543-dual-pose-load.patch.b64 > /tmp/dual.patch
+          echo "bca2ab58e39fb48f9a63380ea3e898acbb173099001bb048b1646c7ce702ebf1  /tmp/dual.patch" | sha256sum -c -
+          git apply --check /tmp/dual.patch
+          git apply /tmp/dual.patch
+          echo "b0739d33ffa9a0988c8f9c9d0abbd0f2b0e90d7f4ef8762e17c6db0cdcbb247b  src/components/racing/GarageScreen.tsx" | sha256sum -c -
+          echo "18d5bb2bff35634e14b1524f7aff5b40e465943e3346004d217b6eec23ee2066  src/components/racing/Race3DCanvas.tsx" | sha256sum -c -
+          echo "a10761bad127b4b9d62113b905743d690dd7bd32368bb21bb570eec84173aff0  src/lib/racing/DualRacePoseController.ts" | sha256sum -c -
+          git diff --check
+
+      - name: Generate and certify npm lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p runtime-golden-artifacts
+          npm install --no-audit --no-fund
+          test -s package-lock.json
+          cp package-lock.json runtime-golden-artifacts/package-lock.json
+          rm -rf node_modules
+          npm ci --no-audit --no-fund
+
+      - name: Release checks
+        run: npm run check
+
+      - name: Production build
+        run: npm run build -- --base=/phuongnha/
+
+      - name: Start preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup npx vite preview --host 127.0.0.1 --port 4173 >/tmp/v543-preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/phuongnha/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/v543-preview.log
+          exit 1
+
+      - name: Browser prerequisites
+        shell: bash
+        run: |
+          which google-chrome || which chromium || which chromium-browser
+          python -m pip install --disable-pip-version-check --quiet selenium
+
+      - name: Runtime Golden matrix
+        env:
+          PYTHONUNBUFFERED: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, time, traceback
+          from selenium import webdriver
+          from selenium.webdriver.chrome.options import Options
+          from selenium.webdriver.common.by import By
+          from selenium.webdriver.support.ui import WebDriverWait
+          from selenium.webdriver.support import expected_conditions as EC
+
+          URL='http://127.0.0.1:4173/phuongnha/'
+          OUT='runtime-golden-artifacts'
+          results=[]
+
+          def driver(w,h,no_gl=False):
+              o=Options()
+              for a in ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--autoplay-policy=no-user-gesture-required','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']:
+                  o.add_argument(a)
+              if no_gl:
+                  o.add_argument('--disable-webgl'); o.add_argument('--disable-software-rasterizer')
+              o.set_capability('goog:loggingPrefs',{'browser':'ALL'})
+              d=webdriver.Chrome(options=o); d.set_window_size(w,h); return d
+
+          def wait_id(d,i,t=20): return WebDriverWait(d,t).until(EC.presence_of_element_located((By.ID,i)))
+          def js_click(d,e): d.execute_script('arguments[0].scrollIntoView({block:"center"}); arguments[0].click();',e)
+          def click_id(d,i,t=20):
+              e=WebDriverWait(d,t).until(EC.presence_of_element_located((By.ID,i))); js_click(d,e); return e
+          def click_text(d,text,t=20):
+              xp=f"//button[contains(normalize-space(.), {json.dumps(text,ensure_ascii=False)})]"
+              e=WebDriverWait(d,t).until(EC.presence_of_element_located((By.XPATH,xp))); js_click(d,e); return e
+          def dismiss_notice(d):
+              for e in d.find_elements(By.XPATH,"//button[normalize-space(.)='Đóng']"):
+                  if e.is_displayed(): js_click(d,e); time.sleep(.15); break
+          def live_tracks(d):
+              return d.execute_script("return Array.from(document.querySelectorAll('video')).reduce((n,v)=>n+(v.srcObject&&v.srcObject.getVideoTracks?v.srcObject.getVideoTracks().filter(t=>t.readyState==='live').length:0),0)")
+          def no_uncaught(d,allow_webgl=False):
+              bad=[]
+              for x in d.get_log('browser'):
+                  m=x.get('message','')
+                  if 'Uncaught' in m or 'Unhandled' in m:
+                      if allow_webgl and 'WebGL' in m: continue
+                      bad.append(m)
+              if bad: raise AssertionError('uncaught browser errors: '+' | '.join(bad[:4]))
+          def enter_racing(d): click_id(d,'home-card-racing'); wait_id(d,'racing-hub-screen')
+          def enter_2p_track(d):
+              dismiss_notice(d); click_text(d,'2 NGƯỜI · 1 CAMERA'); time.sleep(.25)
+              click_id(d,'mode-quick-race-card')
+              WebDriverWait(d,15).until(lambda x:'ĐUA 2 NGƯỜI' in x.find_element(By.TAG_NAME,'body').text)
+              click_text(d,'TIẾP TỤC CHỌN ĐƯỜNG ĐUA'); wait_id(d,'racing-track-select-screen')
+          def start_race(d): click_text(d,'XUẤT PHÁT'); wait_id(d,'in-race-viewport',35)
+          def hud_ok(d): WebDriverWait(d,20).until(lambda x:'P1' in x.find_element(By.TAG_NAME,'body').text and 'P2' in x.find_element(By.TAG_NAME,'body').text)
+          def keyboard_fallback(d):
+              ok=d.execute_script("""
+                const fire=(key,code)=>{document.dispatchEvent(new KeyboardEvent('keydown',{key,code,bubbles:true}));document.dispatchEvent(new KeyboardEvent('keyup',{key,code,bubbles:true}));};
+                fire('a','KeyA'); fire('ArrowRight','ArrowRight'); fire('e','KeyE'); fire('Enter','Enter');
+                return !!document.getElementById('in-race-viewport');
+              """)
+              if not ok: raise AssertionError('race viewport disappeared after fallback keys')
+              time.sleep(.35)
+          def exit_race(d):
+              buttons=d.find_elements(By.CSS_SELECTOR,"#in-race-viewport button.bg-rose-600\\/90")
+              if not buttons: raise AssertionError('race exit button missing')
+              js_click(d,buttons[0]); click_id(d,'exit-to-race-menu-btn'); wait_id(d,'racing-hub-screen'); time.sleep(.6)
+              if live_tracks(d)!=0: raise AssertionError(f'camera tracks remain live: {live_tracks(d)}')
+
+          def run(label,w,h,no_gl):
+              d=driver(w,h,no_gl); c={'case':f"{label}-{'no-webgl' if no_gl else 'webgl'}",'checks':[],'status':'PASS'}
+              try:
+                  d.get(URL); wait_id(d,'home-card-racing'); c['checks'].append('home')
+                  enter_racing(d); c['checks'].append('hub'); d.get_log('browser')
+                  click_id(d,'mode-garage-card'); wait_id(d,'garage-showroom-screen'); dismiss_notice(d)
+                  if no_gl:
+                      f=wait_id(d,'garage-webgl-fallback');
+                      if not f.is_displayed(): raise AssertionError('garage fallback hidden')
+                      c['checks'].append('garage-no-webgl-fallback')
+                  else:
+                      c['checks'].append('garage-webgl')
+                  click_id(d,'garage-next-car-btn'); click_id(d,'garage-back-btn'); wait_id(d,'racing-hub-screen'); c['checks'].append('garage-controls-exit')
+                  enter_2p_track(d); c['checks']+=['2p-no-pose-gate','2p-track']
+                  start_race(d); hud_ok(d)
+                  if no_gl:
+                      f=wait_id(d,'race-webgl-fallback');
+                      if not f.is_displayed(): raise AssertionError('race fallback hidden')
+                      c['checks'].append('race-no-webgl-fallback')
+                  else:
+                      WebDriverWait(d,30).until(lambda x:len(x.find_elements(By.CSS_SELECTOR,'#in-race-viewport canvas'))==1)
+                      c['checks'].append('2p-one-canvas')
+                  c['checks'].append('p1-p2-hud')
+                  keyboard_fallback(d); c['checks'].append('keyboard-fallback-responsive')
+                  d.save_screenshot(f"{OUT}/{c['case']}-race.png")
+                  exit_race(d); c['checks'].append('camera-cleanup')
+                  no_uncaught(d,no_gl); c['checks'].append('no-uncaught')
+              except Exception as e:
+                  c['status']='FAIL'; c['error']=str(e)
+                  try:
+                      a=d.switch_to.alert; c['alert']=a.text; a.dismiss()
+                  except Exception: pass
+                  try: d.save_screenshot(f"{OUT}/{c['case']}-FAIL.png")
+                  except Exception: pass
+                  traceback.print_exc()
+              finally:
+                  results.append(c); d.quit()
+              return c['status']=='PASS'
+
+          ok=True
+          for label,w,h in [('desktop',1440,900),('mobile',390,844)]:
+              ok=run(label,w,h,False) and ok
+              ok=run(label,w,h,True) and ok
+          with open(f'{OUT}/runtime-golden-results.json','w',encoding='utf-8') as f: json.dump(results,f,ensure_ascii=False,indent=2)
+          print(json.dumps(results,ensure_ascii=False,indent=2))
+          if not ok: raise SystemExit(1)
+          PY
+
+      - name: Upload evidence and certified lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v5.43-runtime-golden-v2-evidence
+          path: runtime-golden-artifacts/
+          if-no-files-found: error
+          retention-days: 7
